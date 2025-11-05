@@ -111,6 +111,30 @@ def _wrap_lines(text: str, font: str, size: int, max_w: float):
     return lines
 
 
+# ===== Helper tên: ưu tiên ho_dem + ten, fallback ho_ten =====
+def _name_parts(a: Applicant):
+    """
+    Trả về (ho_dem, ten) nếu có; nếu không, cố gắng tách từ ho_ten.
+    """
+    ln = (getattr(a, "ho_dem", None) or "").strip()
+    fn = (getattr(a, "ten", None) or "").strip()
+    if ln or fn:
+        return ln, fn
+    full = (getattr(a, "ho_ten", None) or "").strip()
+    if not full:
+        return "", ""
+    parts = full.split()
+    if len(parts) == 1:
+        return "", parts[0]
+    return " ".join(parts[:-1]), parts[-1]
+
+def _full_name(a: Applicant) -> str:
+    ln, fn = _name_parts(a)
+    if ln or fn:
+        return f"{ln} {fn}".strip()
+    return (getattr(a, "ho_ten", None) or "").strip()
+
+
 # ===== Vẽ cặp "Nhãn: Giá trị" bám sát dấu ":" =====
 def _draw_kv(c, x_label, _x_val_ignored, y, label, value, step=KV_STEP, gap=1.4*mm):
     """
@@ -299,7 +323,7 @@ def render_single_pdf(a: Applicant, items: List[ChecklistItem], docs: List[Appli
     _register_font_times()
     buf = io.BytesIO()
     c = rl_canvas.Canvas(buf, pagesize=A4)
-    c.setTitle(f"Bản in A4 - {a.ho_ten}")
+    c.setTitle(f"Bản in A4 - {_full_name(a)}")
     W, H = A4
 
     # Header + intro
@@ -312,10 +336,10 @@ def render_single_pdf(a: Applicant, items: List[ChecklistItem], docs: List[Appli
 
     # 2 cột thông tin (bám sát dấu :)
     left_lbl, left_val   = LM,          LM + 26*mm
-    right_lbl, right_val = LM + 85*mm,  LM + 110*mm   
+    right_lbl, right_val = LM + 85*mm,  LM + 110*mm
 
     # Hàng 1
-    y_l = _draw_kv(c, left_lbl,  left_val,  y, "Họ và tên:",      a.ho_ten or "")
+    y_l = _draw_kv(c, left_lbl,  left_val,  y, "Họ và tên:",      _full_name(a))
     y_r = _draw_kv(c, right_lbl, right_val, y, "Mã số HV:",       a.ma_so_hv or "");                       y = min(y_l, y_r)
 
     # Hàng 2
@@ -388,10 +412,10 @@ def render_batch_pdf(
 
         # 2 cột thông tin
         left_lbl, left_val   = LM,         LM + 26*mm
-        right_lbl, right_val = LM + 85*mm, LM + 110*mm 
+        right_lbl, right_val = LM + 85*mm, LM + 110*mm
 
         # Hàng 1
-        y_l = _draw_kv(c, left_lbl,  left_val,  y, "Họ và tên:",      a.ho_ten or "")
+        y_l = _draw_kv(c, left_lbl,  left_val,  y, "Họ và tên:",      _full_name(a))
         y_r = _draw_kv(c, right_lbl, right_val, y, "Mã số HV:",       a.ma_so_hv or "");                       y = min(y_l, y_r)
 
         # Hàng 2
@@ -440,8 +464,6 @@ def render_batch_pdf(
     return buf.getvalue()
 
 # ================== BẢN IN A5 TỐI GIẢN (cho học viên) ==================
-
-# ================== (đã thêm cột STT) ==================
 def _build_rows_nonzero(items: List[ChecklistItem], docs: List[ApplicantDoc]):
     """Chỉ lấy mục có số lượng > 0 để bản A5 gọn + thêm cột STT."""
     doc_map = {d.code: int(d.so_luong or 0) for d in docs}
@@ -455,8 +477,6 @@ def _build_rows_nonzero(items: List[ChecklistItem], docs: List[ApplicantDoc]):
     if len(rows) == 1:
         rows.append(["", "(Chưa nộp hồ sơ!)", ""])
     return rows
-# =======================================================
-
 
 def render_single_pdf_a5(a: Applicant, items: List[ChecklistItem], docs: List[ApplicantDoc]) -> bytes:
     """
@@ -465,7 +485,7 @@ def render_single_pdf_a5(a: Applicant, items: List[ChecklistItem], docs: List[Ap
     _register_font_times()
     buf = io.BytesIO()
     c = rl_canvas.Canvas(buf, pagesize=landscape(A5))
-    c.setTitle(f"Bản in A5 - {a.ho_ten}")
+    c.setTitle(f"Bản in A5 - {_full_name(a)}")
     W, H = landscape(A5)
 
     # Lề & cỡ chữ gọn
@@ -507,7 +527,7 @@ def render_single_pdf_a5(a: Applicant, items: List[ChecklistItem], docs: List[Ap
     r_left_x, r_val_x  = lm + 70*mm, lm + 95*mm
 
     c.setFont(FONT_REG, text_sz);  c.drawString(left_x,  y, "Họ và tên:")
-    c.setFont(FONT_BOLD, text_sz); c.drawString(val_x,   y, a.ho_ten or "")
+    c.setFont(FONT_BOLD, text_sz); c.drawString(val_x,   y, _full_name(a))
     c.setFont(FONT_REG, text_sz);  c.drawString(r_left_x, y, "MS HV:")
     c.setFont(FONT_BOLD, text_sz); c.drawString(r_val_x,  y, a.ma_so_hv or "")
     y -= info_step
@@ -579,7 +599,7 @@ def render_single_pdf_a5(a: Applicant, items: List[ChecklistItem], docs: List[Ap
 
     sig = Table(
         [["Người nộp", "Người nhận"],
-         [a.ho_ten or "", a.nguoi_nhan_ky_ten or ""]],
+         [_full_name(a), a.nguoi_nhan_ky_ten or ""]],
         colWidths=[sign_w, sign_w],
         rowHeights=[sign_label_h, sign_area_h],
     )
@@ -599,5 +619,4 @@ def render_single_pdf_a5(a: Applicant, items: List[ChecklistItem], docs: List[Ap
 
     c.showPage(); c.save()
     return buf.getvalue()
-
 # ================== HẾT BẢN IN A5 ==================

@@ -16,11 +16,22 @@ from app.core.security import hash_password  # dùng context chung
 
 router = APIRouter()
 
-# === Trỏ đúng thư mục template: <repo>/web ===
-ROOT_DIR = Path(__file__).resolve().parents[2]   # .../Project_Admission_Management_System
+ROOT_DIR = Path(__file__).resolve().parents[2]
 templates = Jinja2Templates(directory=str(ROOT_DIR / "web"))
 
 VALID_ROLES = {"Admin", "NhanVien", "CongTacVien"}
+
+# ---------- helper tách tên Việt ----------
+def _split_vn(fullname: str):
+    s = " ".join((fullname or "").split())
+    if not s:
+        return "", ""
+    parts = s.split(" ")
+    if len(parts) == 1:
+        # không rõ họ/đệm -> để vào first_name (tên gọi)
+        return "", parts[0]
+    return " ".join(parts[:-1]), parts[-1]
+# -----------------------------------------
 
 @router.get("/admin")
 def admin_index(
@@ -38,16 +49,19 @@ def admin_index(
 def admin_create_user(
     username: str = Form(...),
     password: str = Form(...),
+    # ===== mới: form ưu tiên họ+tên =====
+    last_name: str = Form("", alias="last_name"),
+    first_name: str = Form("", alias="first_name"),
+    # ===== cũ: full_name để tương thích =====
     full_name: str = Form(""),
     email: str = Form(""),
     role: str = Form("NhanVien"),
-    dob: Optional[str] = Form(None),  # <-- thêm ngày sinh (YYYY-MM-DD)
+    dob: Optional[str] = Form(None),  # YYYY-MM-DD
     me: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     username = (username or "").strip()
     email = (email or "").strip() or None
-    full_name = (full_name or "").strip() or None
     role = (role or "NhanVien").strip()
 
     if not username:
@@ -57,8 +71,20 @@ def admin_create_user(
     if role not in VALID_ROLES:
         raise HTTPException(400, f"Role không hợp lệ. Hợp lệ: {', '.join(sorted(VALID_ROLES))}")
 
-    # username hoặc email trùng
-    exists = db.query(User).filter(or_(User.username == username, User.email == email)).first()
+    # Chuẩn tên
+    ln = (last_name or "").strip()
+    fn = (first_name or "").strip()
+    if not (ln or fn):
+        # fallback từ full_name
+        ln, fn = _split_vn(full_name)
+
+    display = (" ".join([ln, fn])).strip() or None
+
+    # Check trùng username/email (chỉ thêm điều kiện email khi có email)
+    conds = [User.username == username]
+    if email:
+        conds.append(User.email == email)
+    exists = db.query(User).filter(or_(*conds)).first()
     if exists:
         raise HTTPException(400, "Username/Email đã tồn tại")
 
@@ -66,7 +92,7 @@ def admin_create_user(
     dob_val = None
     if dob:
         try:
-            dob_val = date.fromisoformat(dob)  # expecting YYYY-MM-DD
+            dob_val = date.fromisoformat(dob)
         except ValueError:
             raise HTTPException(400, "Ngày sinh không hợp lệ (định dạng YYYY-MM-DD)")
 
@@ -74,12 +100,16 @@ def admin_create_user(
         u = User(
             username=username,
             email=email,
-            full_name=full_name,
             role=role,
             is_active=True,
             password_hash=hash_password(password),
-            must_change_password=True,   # ép đổi mật khẩu lần đầu
+            must_change_password=True,   # ép đổi lần đầu
             dob=dob_val,
+            # tên tách đôi
+            last_name=ln or None,
+            first_name=fn or None,
+            # đồng bộ full_name giai đoạn chuyển tiếp
+            full_name=display,
         )
         db.add(u)
         db.commit()
@@ -92,6 +122,10 @@ def admin_create_user(
 @router.post("/admin/users/update")
 def admin_update_user(
     user_id: int = Form(...),
+    # ===== mới: form ưu tiên họ+tên =====
+    last_name: str = Form("", alias="last_name"),
+    first_name: str = Form("", alias="first_name"),
+    # ===== cũ: full_name để tương thích =====
     full_name: str = Form(""),
     email: str = Form(""),
     dob: Optional[str] = Form(None),
@@ -104,22 +138,17 @@ def admin_update_user(
     if not u:
         raise HTTPException(404, "User not found")
 
-    # Không cho tự hạ quyền chính mình (tránh khoá quyền Admin)
     if u.id == me.id and role != u.role:
         raise HTTPException(400, "Không thể thay đổi quyền của tài khoản đang đăng nhập")
-
-    # Validate role
     if role not in VALID_ROLES:
         raise HTTPException(400, f"Role không hợp lệ ({', '.join(sorted(VALID_ROLES))})")
 
-    # Email trùng người khác?
     email = (email or "").strip() or None
     if email:
         dup = db.query(User).filter(User.email == email, User.id != u.id).first()
         if dup:
             raise HTTPException(400, "Email đã được dùng bởi tài khoản khác")
 
-    # Parse dob (YYYY-MM-DD) nếu có
     dob_val = None
     if dob:
         try:
@@ -127,12 +156,23 @@ def admin_update_user(
         except ValueError:
             raise HTTPException(400, "Ngày sinh không hợp lệ (định dạng YYYY-MM-DD)")
 
+    # Chuẩn tên
+    ln = (last_name or "").strip()
+    fn = (first_name or "").strip()
+    if not (ln or fn):
+        ln, fn = _split_vn(full_name)
+
+    display = (" ".join([ln, fn])).strip() or None
+
     try:
-        u.full_name = (full_name or "").strip() or None
+        u.last_name = ln or None
+        u.first_name = fn or None
+        # đồng bộ full_name giai đoạn chuyển tiếp
+        u.full_name = display
+
         u.email = email
         u.dob = dob_val
         u.role = role
-        # is_active: nếu có checkbox, giá trị "on" -> True, else False
         if is_active is not None:
             u.is_active = bool(is_active == "on")
 
@@ -174,7 +214,11 @@ def admin_reset_pass(
     if not u:
         raise HTTPException(404, "User not found")
     try:
-        u.password_hash = hash_password(new_password)
+        new_hash = hash_password(new_password)
+        # LƯU Ý: lưu cả password_hash và reset_password_hash
+        # để BE có thể chặn người dùng đổi ngược về "mật khẩu reset" sau này.
+        u.password_hash = new_hash
+        u.reset_password_hash = new_hash
         u.must_change_password = True
         u.password_changed_at = None
         db.commit()

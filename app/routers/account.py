@@ -14,29 +14,33 @@ from app.core.security import verify_password, hash_password
 
 router = APIRouter()
 
-# Trỏ thư mục template: <repo>/web
 ROOT_DIR = Path(__file__).resolve().parents[2]
 templates = Jinja2Templates(directory=str(ROOT_DIR / "web"))
 
-# ---------------- Flash helpers ----------------
 def _flash(request: Request, msg: str, level: str = "info"):
-    """Đặt flash message (lưu trong session; đọc một lần)"""
     request.session["_flash"] = {"message": msg, "level": level}
 
 def _pop_flash(request: Request):
-    """Lấy và xóa flash trong session"""
     return request.session.pop("_flash", None)
 
-# ---------------- Views ----------------
+# ---- helper tách tên Việt ----
+def _split_vn(fullname: str):
+    s = " ".join((fullname or "").split())
+    if not s:
+        return "", ""
+    parts = s.split(" ")
+    if len(parts) == 1:
+        # Không rõ họ/đệm -> để vào first_name (tên gọi) cho dễ xưng hô/sort
+        return "", parts[0]
+    return " ".join(parts[:-1]), parts[-1]
+
 @router.get("/account")
 def account_view(
     request: Request,
     me: User = Depends(require_login),
     db: Session = Depends(get_db),
 ):
-    """Trang thông tin tài khoản + form đổi mật khẩu.
-    UI sẽ tự hiển thị nhắc đổi mật khẩu (không dùng flash ở BE)."""
-    flash = _pop_flash(request)  # chỉ dùng cho các thông báo thật sự (lỗi/success)
+    flash = _pop_flash(request)
     first = request.query_params.get("first") == "1"
 
     return templates.TemplateResponse(
@@ -44,10 +48,8 @@ def account_view(
         {
             "request": request,
             "me": me,
-            "flash": flash,  # có thể None
-            # cờ 'first' để JS giao diện tự mở form/hiện nhắc
+            "flash": flash,
             "first": first,
-            # (tuỳ chọn) truyền thêm cờ must_change_password để UI quyết định
             "must_change_password": bool(getattr(me, "must_change_password", False)),
         },
     )
@@ -61,8 +63,6 @@ def account_change_password(
     me: User = Depends(require_login),
     db: Session = Depends(get_db),
 ):
-    """Đổi mật khẩu tài khoản hiện tại"""
-    # Validate cơ bản
     if len(new_password) < 6:
         _flash(request, "Mật khẩu mới tối thiểu 6 ký tự!", "error")
         return RedirectResponse(url="/account", status_code=302)
@@ -73,37 +73,24 @@ def account_change_password(
         _flash(request, "Mật khẩu hiện tại không đúng!", "error")
         return RedirectResponse(url="/account", status_code=302)
 
-    # 🛑 Không cho trùng mật khẩu mặc định sau reset
-    # - Nếu reset_password_hash có giá trị -> dùng nó
-    # - Nếu chưa có mà user vẫn đang ở trạng thái "vừa reset" (must_change_password=1
-    #   và chưa từng đổi password) -> fallback dùng password_hash hiện tại
     reset_hash = getattr(me, "reset_password_hash", None)
     if not reset_hash and getattr(me, "must_change_password", False) and not getattr(me, "password_changed_at", None):
-        reset_hash = me.password_hash  # fallback an toàn cho dữ liệu cũ chưa populate
+        reset_hash = me.password_hash
 
     if reset_hash:
         try:
             if verify_password(new_password, reset_hash):
-                _flash(
-                    request,
-                    "Mật khẩu mới không được trùng với mật khẩu cũ!",
-                    "error",
-                )
+                _flash(request, "Mật khẩu mới không được trùng với mật khẩu cũ!", "error")
                 return RedirectResponse(url="/account", status_code=302)
         except Exception:
-            pass  # hash rỗng/hỏng -> bỏ qua check thay vì crash
+            pass
 
-    # Lưu DB
     try:
         me.password_hash = hash_password(new_password)
         me.must_change_password = False
         me.password_changed_at = datetime.now(timezone.utc)
-        # ❗ KHÔNG xóa reset_password_hash: tiếp tục cấm dùng lại mật khẩu reset cũ
         db.commit()
-
-        # Đồng bộ session
         request.session["must_change_password"] = False
-
         _flash(request, "Đổi mật khẩu thành công!", "success")
     except Exception:
         db.rollback()
@@ -111,17 +98,27 @@ def account_change_password(
 
     return RedirectResponse(url="/account", status_code=302)
 
+# ========= Cập nhật hồ sơ: hỗ trợ tên tách đôi & tương thích full_name =========
 @router.post("/account/profile")
 def account_update_profile(
     request: Request,
+    # Form mới (ưu tiên): last_name = họ+đệm, first_name = tên
+    last_name: str = Form("", alias="last_name"),
+    first_name: str = Form("", alias="first_name"),
+    # Form cũ (tương thích): full_name
     full_name: str = Form(""),
     email: str = Form(""),
     dob: str = Form(""),
     me: User = Depends(require_login),
     db: Session = Depends(get_db),
 ):
-    """Cập nhật thông tin hồ sơ: họ tên, email, ngày sinh"""
-    # Chuẩn hóa & kiểm tra unique email
+    """
+    Cập nhật thông tin hồ sơ:
+    - Ưu tiên nhận last_name/first_name.
+    - Nếu không có, nhận full_name và tự tách -> last_name/first_name.
+    - Vẫn ghi 'full_name' (tạm thời) để tương thích chỗ cũ.
+    """
+    # Chuẩn hóa email & unique check
     email_norm = (email or "").strip() or None
     if email_norm:
         dup = db.query(User).filter(User.email == email_norm, User.id != me.id).first()
@@ -129,7 +126,7 @@ def account_update_profile(
             _flash(request, "Email đã được dùng bởi tài khoản khác.", "error")
             return RedirectResponse(url="/account", status_code=302)
 
-    # Parse DOB nếu có (YYYY-MM-DD)
+    # Parse DOB (YYYY-MM-DD)
     dob_val = None
     if dob:
         try:
@@ -138,11 +135,26 @@ def account_update_profile(
             _flash(request, "Ngày sinh không hợp lệ!", "error")
             return RedirectResponse(url="/account", status_code=302)
 
-    # Lưu DB
+    # Xác định tên
+    ln = (last_name or "").strip()
+    fn = (first_name or "").strip()
+
+    # Nếu form mới không gửi, fallback từ full_name cũ
+    if not (ln or fn):
+        ln, fn = _split_vn(full_name)
+
+    # Build full_name cho giai đoạn chuyển tiếp (nếu bạn vẫn giữ cột full_name)
+    display = (" ".join([ln, fn])).strip() or None
+
     try:
-        me.full_name = (full_name or "").strip() or None
+        me.last_name = ln or None
+        me.first_name = fn or None
+        # Đồng bộ cột full_name (tương thích UI/view cũ)
+        setattr(me, "full_name", display)
+
         me.email = email_norm
         me.dob = dob_val
+
         db.commit()
         _flash(request, "Cập nhật thông tin tài khoản thành công!", "success")
     except Exception:

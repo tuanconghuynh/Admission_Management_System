@@ -5,22 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Đăng nhập | Admission_Management_System</title>
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Favicon -->
   <link rel="icon" type="image/png" href="/hutech.png" sizes="32x32">
-  <link rel="icon" type="image/png" href="hutech.png" sizes="32x32">
-  <link rel="apple-touch-icon" href="hutech.png">
+  <link rel="apple-touch-icon" href="/hutech.png">
   <meta name="theme-color" content="#2563eb">
+
+  <!-- (Tùy chọn) CSRF meta do BE render -->
+  <!-- <meta name="csrf-token" content="{{ csrf_token }}"> -->
+
   <style>
     body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
     /* nền banner toàn màn hình, mờ + tối nhẹ */
     .login-bg{
       position:fixed; inset:0; z-index:-1;
-      background: url('banner.png') center/cover no-repeat;
-      filter: blur(4px) saturate(105%);
+      background:url('banner.png') center/cover no-repeat;
+      filter:blur(4px) saturate(105%);
     }
     .login-overlay{
       position:fixed; inset:0; z-index:-1;
-      background: linear-gradient(to bottom, rgba(0,0,0,.25), rgba(0,0,0,.35));
+      background:linear-gradient(to bottom, rgba(0,0,0,.25), rgba(0,0,0,.35));
     }
+    .btn:disabled{opacity:.7; cursor:not-allowed}
+    .visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -28,83 +35,215 @@
   <div class="login-bg" aria-hidden="true"></div>
   <div class="login-overlay" aria-hidden="true"></div>
 
-  <div class="w-full max-w-md">
-    <div class="rounded-2xl shadow-2xl p-8 bg-white/90 backdrop-blur-md">
-      <div class="flex items-center gap-3 mb-6">
+  <main class="w-full max-w-md" aria-labelledby="loginTitle">
+    <section class="rounded-2xl shadow-2xl p-8 bg-white/90 backdrop-blur-md">
+      <header class="flex items-center gap-3 mb-6">
         <img src="/hutech.png" class="h-10 w-10" alt="HUTECH">
         <div>
-          <h1 class="text-xl font-bold leading-tight">Viện Hợp tác &amp; Phát triển Đào tạo</h1>
-          <p class="text-sm text-gray-500">Đăng nhập - Admission Management System (AMS) – Trang Nội Bộ</p>
+          <h1 id="loginTitle" class="text-xl font-bold leading-tight">Viện Hợp tác &amp; Phát triển Đào tạo</h1>
+          <p class="text-sm text-gray-500">Đăng nhập — Admission Management System (AMS)</p>
         </div>
-      </div>
+      </header>
 
-      <form class="space-y-4" onsubmit="return doLogin(event)">
+      <!-- Thông báo lỗi -->
+      <div id="alert" role="status" aria-live="polite" class="min-h-[1.25rem] mb-2 text-sm"></div>
+
+      <form id="loginForm" class="space-y-4" novalidate>
         <div>
-          <label class="block text-sm text-gray-700 font-semibold mb-1">Tài khoản</label>
-          <input id="u" autocomplete="username" autofocus spellcheck="false" autocapitalize="off"
+          <label for="u" class="block text-sm text-gray-700 font-semibold mb-1">Tài khoản</label>
+          <input id="u" name="username" autocomplete="username" autofocus spellcheck="false" autocapitalize="off"
             class="w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
             placeholder="Mã NV hoặc email" required>
         </div>
+
         <div>
-          <label class="block text-sm text-gray-700 font-semibold mb-1">Mật khẩu</label>
+          <label for="p" class="block text-sm text-gray-700 font-semibold mb-1">Mật khẩu</label>
           <div class="relative">
-            <input id="p" type="password" minlength="6" autocomplete="current-password"
+            <input id="p" name="password" type="password" minlength="6" autocomplete="current-password"
               class="w-full rounded-xl border border-gray-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-300"
-              placeholder="••••••••" required>
-            <button type="button" id="toggle" class="absolute inset-y-0 right-2 px-2 text-gray-500" title="Hiện/ẩn">👁️</button>
+              placeholder="••••••••" required aria-describedby="capsTip">
+            <button type="button" id="toggle" class="absolute inset-y-0 right-2 px-2 text-gray-500"
+                    title="Hiện/ẩn mật khẩu" aria-label="Hiện/ẩn mật khẩu" aria-pressed="false">👁️</button>
           </div>
+          <div id="capsTip" class="text-xs text-amber-700 mt-1 hidden">⚠️ Caps Lock đang bật</div>
         </div>
-        <button class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-2.5 transition mt-1">
-          Đăng nhập
+
+        <div class="flex items-center justify-between">
+          <label class="inline-flex items-center gap-2 text-sm text-gray-700 select-none">
+            <input id="remember" type="checkbox" class="rounded border-gray-300">
+            <span>Nhớ tài khoản trên máy này</span>
+          </label>
+          <a href="mailto:hc.tuan@hutech.edu.vn" class="text-sm text-blue-600 hover:underline">Quên mật khẩu?</a>
+        </div>
+
+        <button id="btnLogin"
+          class="btn w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-2.5 transition mt-1 flex items-center justify-center gap-2">
+          <svg id="spinner" class="animate-spin h-4 w-4 hidden" viewBox="0 0 24 24" aria-hidden="true">
+            <circle class="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-80" fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+          </svg>
+          <span>Đăng nhập</span>
         </button>
-        <p id="err" class="text-sm text-red-600 min-h-[1.25rem] mt-1"></p>
-        <div class="mt-3 text-sm text-gray-600">
-          <div class="mt-1">❗Nếu chưa có tài khoản! Hãy liên hệ Admin để được cấp!</div>
-          <div class="mt-1">❗Nếu quên mật khẩu, vui lòng liên hệ Admin để được hỗ trợ khôi phục!</div>
-          <div class="mt-1">📩Email Admin liên hệ:
-            <a href="mailto:hc.tuan@hutech.edu.vn" class="text-blue-600 hover:underline">hc.tuan@hutech.edu.vn</a>
-          </div>
-          <div class="mt-1">🔎Thông tin VP:
-            <a href="http://hutech.edu.vn/e-hutech" class="text-blue-600 hover:underline">Viện Hợp tác & Phát triển Đào tạo</a>
-          </div>
+
+        <p id="err" class="text-sm text-red-600 min-h-[1.25rem] mt-1" role="alert" aria-live="assertive"></p>
+
+        <div class="mt-3 text-sm text-gray-600 leading-relaxed">
+          <div>❗Chưa có tài khoản? Liên hệ Admin để được cấp.</div>
+          <div>❗Quên mật khẩu? Vui lòng liên hệ Admin để khôi phục.</div>
+          <div>📩 Email Admin: <a href="mailto:hc.tuan@hutech.edu.vn" class="text-blue-600 hover:underline">hc.tuan@hutech.edu.vn</a></div>
+          <div>🔎 Thông tin VP: <a href="http://hutech.edu.vn/e-hutech" class="text-blue-600 hover:underline" rel="noopener">Viện Hợp tác &amp; Phát triển Đào tạo</a></div>
         </div>
-      <p class="text-center text-sm text-gray-600 mt-4">
-        © V-HT.PTĐT HUTECH ➖ Code by: HC-TUAN
-      </p>
-  </div>
+      </form>
+
+      <p class="text-center text-sm text-gray-600 mt-6">© V-HT.PTĐT HUTECH — Code by: HC-TUAN</p>
+    </section>
+  </main>
+
   <script>
-    // Hiện/ẩn mật khẩu
+    /* ========== DOM refs ========== */
+    const form = document.getElementById('loginForm');
+    const u = document.getElementById('u');
     const p = document.getElementById('p');
-    document.getElementById('toggle').onclick = () => {
-      p.type = p.type === 'password' ? 'text' : 'password';
-    };
+    const remember = document.getElementById('remember');
+    const btn = document.getElementById('btnLogin');
+    const spinner = document.getElementById('spinner');
+    const err = document.getElementById('err');
+    const alertBox = document.getElementById('alert');
+    const toggleBtn = document.getElementById('toggle');
+    const capsTip = document.getElementById('capsTip');
 
-    async function doLogin(e){
-      e.preventDefault();
-      const btn = e.target.querySelector('button[type="submit"], button:not([type])') || e.target.querySelector('button');
-      const err = document.getElementById('err');
-      if (err) err.textContent = '';
+    /* ========== Helpers ========== */
+    function showErr(msg){
+      err.textContent = msg || '';
+      err.classList.toggle('hidden', !msg);
+    }
+    function showMsg(msg, type='info'){
+      alertBox.textContent = msg || '';
+      alertBox.className = 'min-h-[1.25rem] mb-2 text-sm ' + (type==='error'
+        ? 'text-red-700' : type==='success' ? 'text-emerald-700' : 'text-gray-600');
+    }
+    function setLoading(on){
+      if(!btn) return;
+      btn.disabled = on;
+      spinner.classList.toggle('hidden', !on);
+    }
+    function getCsrf(){
+      // Ưu tiên meta, fallback đọc cookie nếu tên __Host-csrf/ csrf_token (tùy BE)
+      const meta = document.querySelector('meta[name="csrf-token"]');
+      if (meta && meta.content) return meta.content;
+      const m = document.cookie.match(/(?:^|;\s*)(?:__Host-)?csrf(?:_token)?=([^;]+)/);
+      return m ? decodeURIComponent(m[1]) : null;
+    }
 
-      const fd = new FormData();
-      fd.append('username', document.getElementById('u').value.trim());
-      fd.append('password', document.getElementById('p').value);
-
-      try {
-        if (btn) { btn.disabled = true; btn.classList.add('opacity-70'); }
-        const r = await fetch('/api/login', { method:'POST', body: fd });
-        if (!r.ok) {
-          if (err) err.textContent = 'Sai tài khoản hoặc mật khẩu';
-          return false;
+    function persistUsername(){
+      try{
+        if(remember.checked){
+          localStorage.setItem('ams_username', u.value.trim());
+        }else{
+          localStorage.removeItem('ams_username');
         }
-        location.href = '/ams_home.html'; // giữ đúng flow hiện tại của anh
-        return false;
-      } catch (ex) {
-        if (err) err.textContent = 'Không thể kết nối máy chủ. Vui lòng thử lại.';
-        return false;
-      } finally {
-        if (btn) { btn.disabled = false; btn.classList.remove('opacity-70'); }
+      }catch{}
+    }
+
+    function restoreUsername(){
+      try{
+        const saved = localStorage.getItem('ams_username');
+        if(saved){
+          u.value = saved;
+          remember.checked = true;
+          // đưa focus vào password cho nhanh
+          p.focus();
+        }
+      }catch{}
+    }
+
+    /* ========== Interactions ========== */
+    // Hiện/ẩn password với ARIA
+    toggleBtn.addEventListener('click', ()=>{
+      const next = p.type === 'password' ? 'text' : 'password';
+      p.type = next;
+      toggleBtn.setAttribute('aria-pressed', String(next === 'text'));
+      toggleBtn.title = next === 'text' ? 'Ẩn mật khẩu' : 'Hiện mật khẩu';
+    });
+
+    // Cảnh báo Caps Lock
+    function handleKey(e){
+      if (typeof e.getModifierState === 'function') {
+        const on = e.getModifierState('CapsLock');
+        capsTip.classList.toggle('hidden', !on);
       }
     }
+    p.addEventListener('keydown', handleKey);
+    p.addEventListener('keyup', handleKey);
+
+    // Nhấn Enter trong input => submit (form mặc định đã làm, nhưng đảm bảo)
+    [u,p].forEach(el=> el.addEventListener('keypress', e=>{
+      if(e.key === 'Enter'){ form.requestSubmit(); }
+    }));
+
+    // Khôi phục username đã nhớ
+    restoreUsername();
+
+    /* ========== Submit login ========== */
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      showErr(''); showMsg('');
+
+      if (!u.value.trim() || !p.value) {
+        showErr('Vui lòng nhập đầy đủ tài khoản và mật khẩu.');
+        return;
+      }
+
+      setLoading(true);
+
+      const fd = new FormData();
+      fd.append('username', u.value.trim());
+      fd.append('password', p.value);
+
+      const headers = {};
+      const csrf = getCsrf();
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+
+      try{
+        const resp = await fetch('/api/login', {
+          method: 'POST',
+          body: fd,
+          headers,
+          credentials: 'include'
+        });
+
+        // Thử đọc payload JSON nếu có
+        let payload = null;
+        const ct = resp.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          try{ payload = await resp.json(); }catch{}
+        } else {
+          try{ const t = await resp.text(); payload = t ? JSON.parse(t) : null; }catch{}
+        }
+
+        if (!resp.ok) {
+          let msg =
+            (payload && (payload.detail || payload.message || payload.error)) ||
+            (resp.status===401 ? 'Sai tài khoản hoặc mật khẩu.' :
+             resp.status===423 ? 'Tài khoản đang bị khoá. Vui lòng liên hệ Admin.' :
+             resp.status===429 ? 'Bạn thao tác quá nhanh. Vui lòng thử lại sau ít phút.' :
+             `Đăng nhập thất bại (HTTP ${resp.status}).`);
+          showErr(msg);
+          return;
+        }
+
+        // Thành công
+        persistUsername();
+        showMsg('Đăng nhập thành công ✅', 'success');
+        // Chuyển trang theo flow
+        location.href = '/ams_home.html';
+      }catch(ex){
+        showErr('Không thể kết nối máy chủ. Vui lòng kiểm tra mạng và thử lại.');
+      }finally{
+        setLoading(false);
+      }
+    });
   </script>
 </body>
 </html>

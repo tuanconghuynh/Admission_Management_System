@@ -7,7 +7,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, status, Request, Response
 from fastapi.responses import StreamingResponse
-from sqlalchemy import or_, and_, func
+from sqlalchemy import literal, or_, and_, func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -185,6 +185,8 @@ def snapshot_applicant(a: Applicant) -> dict:
         "ma_so_hv": a.ma_so_hv,
         "ma_ho_so": a.ma_ho_so,
         "ho_ten": a.ho_ten,
+        "ho_dem": getattr(a, "ho_dem", None),
+        "ten": getattr(a, "ten", None),
         "email_hoc_vien": getattr(a, "email_hoc_vien", None),
         "ngay_nhan_hs": iso(a.ngay_nhan_hs),
         "ngay_sinh": iso(a.ngay_sinh),
@@ -209,12 +211,27 @@ def snapshot_applicant(a: Applicant) -> dict:
         "dan_toc": getattr(a, "dan_toc", None),
     }
 
-
 # 🆕 Helper: lấy map docs {code: so_luong}
 def _docs_map(db: Session, mshv: str) -> dict[str, int]:
     rows = db.query(ApplicantDoc).filter_by(applicant_ma_so_hv=mshv).all()
     return {d.code: int(d.so_luong or 0) for d in rows}
 
+def _split_vn_name(fullname: str) -> tuple[str, str]:
+    s = " ".join((fullname or "").split())
+    if not s:
+        return "", ""
+    parts = s.split(" ")
+    if len(parts) == 1:
+        # 1 từ -> xem như tên gọi, họ đệm rỗng
+        return "", parts[0]
+    return " ".join(parts[:-1]), parts[-1]
+
+def _display_name(ho_dem: Optional[str], ten: Optional[str], fallback_full: Optional[str] = None) -> str:
+    ln = (ho_dem or "").strip()
+    fn = (ten or "").strip()
+    if ln or fn:
+        return (ln + " " + fn).strip()
+    return (fallback_full or "").strip()
 
 # ================= GET by code =================
 @router.get("/by-code/{key}")
@@ -283,6 +300,10 @@ def get_by_code(
         "ngay_nhan_hs": _to_dmy(a.ngay_nhan_hs),
         "ngay_nhan_hs_iso": _to_iso(a.ngay_nhan_hs),
         "ho_ten": a.ho_ten,
+        # tên tách đôi + full_name hiển thị
+        "ho_dem": getattr(a, "ho_dem", None),
+        "ten": getattr(a, "ten", None),
+        "full_name": _display_name(getattr(a, "ho_dem", None), getattr(a, "ten", None), getattr(a, "ho_ten", None)),
         "email_hoc_vien": getattr(a, "email_hoc_vien", None),
         "ngay_sinh": _to_dmy(a.ngay_sinh),
         "ngay_sinh_iso": _to_iso(a.ngay_sinh),
@@ -443,11 +464,22 @@ def create_applicant(
     raw_ma_hs = (payload.get("ma_ho_so") or "").strip()
     ma_ho_so = raw_ma_hs or None
 
+    # ===== tên =====
+    input_ho_dem = (payload.get("ho_dem") or "").strip()
+    input_ten = (payload.get("ten") or "").strip()
     ho_ten = (payload.get("ho_ten") or "").strip()
+
+    if not (input_ho_dem or input_ten):
+        # nếu FE gửi mỗi ho_ten -> tách
+        input_ho_dem, input_ten = _split_vn_name(ho_ten)
+
+    # build full cho giai đoạn chuyển tiếp (vẫn còn cột ho_ten)
+    full_built = _display_name(input_ho_dem, input_ten, ho_ten)
+
     ngay_nhan_hs = _parse_date_flexible(payload.get("ngay_nhan_hs"))
 
     # ❌ bỏ check bắt buộc Mã HS
-    if not ho_ten:
+    if not (input_ho_dem or input_ten or ho_ten):
         raise HTTPException(422, "Thiếu trường bắt buộc: Họ Và Tên")
     if not ngay_nhan_hs:
         raise HTTPException(422, "Thiếu trường bắt buộc: Ngày nhận hồ sơ (dd/MM/YYYY hoặc YYYY-MM-DD)")
@@ -460,9 +492,13 @@ def create_applicant(
 
     a = Applicant(
         ma_so_hv=ma_so_hv,
-        ma_ho_so=ma_ho_so,                    # << cho phép None
+        ma_ho_so=ma_ho_so,
         ngay_nhan_hs=ngay_nhan_hs,
-        ho_ten=ho_ten,
+        # ===== tên =====
+        ho_ten=full_built or None,          # giữ tương thích
+        ho_dem=input_ho_dem or None,        # tên tách đôi
+        ten=input_ten or None,              
+        # =================
         email_hoc_vien=payload.get("email_hoc_vien"),
         ngay_sinh=_parse_date_flexible(payload.get("ngay_sinh")),
         so_dt=payload.get("so_dt"),
@@ -552,9 +588,15 @@ def search_applicants(
     # Nếu có từ khoá tìm kiếm
     if qn:
         like = f"%{qn}%"
+        # concat tên tách đôi (an toàn nếu cột chưa tồn tại trên DB cũ: dùng getattr)
+        name_expr = func.concat(
+            func.coalesce(Applicant.ho_dem, ""), literal(" "),  # Sửa ở đây
+            func.coalesce(Applicant.ten, "")
+        )
         query = query.filter(
             or_(
-                Applicant.ho_ten.ilike(like),
+                Applicant.ho_ten.ilike(like),         # tương thích
+                name_expr.ilike(like),                # 🆕 tìm theo ho_dem + ten
                 Applicant.ma_ho_so.ilike(like),
                 Applicant.ma_so_hv.ilike(like),
             )
@@ -573,6 +615,9 @@ def search_applicants(
             {
                 "ma_so_hv": a.ma_so_hv,
                 "ma_ho_so": a.ma_ho_so,
+                "ho_dem": getattr(a, "ho_dem", None),
+                "ten": getattr(a, "ten", None),
+                "full_name": _display_name(getattr(a, "ho_dem", None), getattr(a, "ten", None), getattr(a, "ho_ten", None)),
                 "ho_ten": a.ho_ten,
                 "email_hoc_vien": getattr(a, "email_hoc_vien", None),
                 "ngay_nhan_hs": a.ngay_nhan_hs.isoformat() if a.ngay_nhan_hs else None,
@@ -626,6 +671,9 @@ def find_by_ma_ho_so(
         "ma_ho_so": a.ma_ho_so,
         "ngay_nhan_hs": a.ngay_nhan_hs.isoformat() if a.ngay_nhan_hs else None,
         "ho_ten": a.ho_ten,
+        "ho_dem": getattr(a, "ho_dem", None),
+        "ten": getattr(a, "ten", None),
+        "full_name": _display_name(getattr(a, "ho_dem", None), getattr(a, "ten", None), getattr(a, "ho_ten", None)),
         "email_hoc_vien": getattr(a, "email_hoc_vien", None),
         "ngay_sinh": (
             a.ngay_sinh if isinstance(getattr(a, "ngay_sinh", None), str)
@@ -650,7 +698,6 @@ def find_by_ma_ho_so(
         "dan_toc": getattr(a, "dan_toc", None),
     }
 
-
 # ================= UPDATE (có lý do) =================
 @router.put("/{ma_so_hv}")
 def update_applicant(
@@ -661,6 +708,23 @@ def update_applicant(
     me=Depends(require_roles("Admin", "NhanVien", "CongTacVien")),
 ):
     ensure_mssv(ma_so_hv)
+
+    # helpers cục bộ cho tên
+    def _split_vn_name(fullname: str) -> tuple[str, str]:
+        s = " ".join((fullname or "").split())
+        if not s:
+            return "", ""
+        parts = s.split(" ")
+        if len(parts) == 1:
+            return "", parts[0]
+        return " ".join(parts[:-1]), parts[-1]
+
+    def _display_name(ho_dem: Optional[str], ten: Optional[str], fallback_full: Optional[str] = None) -> str:
+        ln = (ho_dem or "").strip()
+        fn = (ten or "").strip()
+        if ln or fn:
+            return (ln + " " + fn).strip()
+        return (fallback_full or "").strip()
 
     a = db.query(Applicant).filter(Applicant.ma_so_hv == ma_so_hv).first()
     if not a:
@@ -735,10 +799,32 @@ def update_applicant(
     if "dan_toc" in body and hasattr(Applicant, "dan_toc"):
         a.dan_toc = str_or_none(body.get("dan_toc"))
 
+    # 🟦===== CẬP NHẬT TÊN (song song) =====🟦
+    any_split_updated = False
+    if "ho_dem" in body or "ten" in body:
+        # FE mới gửi tách đôi -> cập nhật ưu tiên
+        if "ho_dem" in body:
+            a.ho_dem = str_or_none(body.get("ho_dem"))
+            any_split_updated = True
+        if "ten" in body:
+            a.ten = str_or_none(body.get("ten"))
+            any_split_updated = True
+
+    # Nếu chỉ gửi ho_ten (cũ) và chưa gửi tách -> tách ra để đồng bộ
+    if ("ho_ten" in body) and not any_split_updated:
+        _full_in = str_or_none(body.get("ho_ten"))
+        if _full_in:
+            ln, fn = _split_vn_name(_full_in)
+            a.ho_dem = ln or None
+            a.ten = fn or None
+
+    # Đồng bộ lại ho_ten (full) cho giai đoạn chuyển tiếp
+    a.ho_ten = _display_name(getattr(a, "ho_dem", None), getattr(a, "ten", None), getattr(a, "ho_ten", None)) or None
+    # 🟦===== HẾT phần tên =====🟦
+
     # 🆕 TỰ CẤP MÃ HS: khi hồ sơ CHƯA có mã và FE yêu cầu
     auto_assign = bool(body.get("auto_assign_ma_ho_so", False))
     if auto_assign and not (a.ma_ho_so and str(a.ma_ho_so).strip()):
-        # Dùng (khoa, đợt) vừa sửa (nếu có), nếu không dùng giá trị đang có
         _khoa = (body.get("khoa") if "khoa" in body else a.khoa)
         _dot  = (body.get("dot")  if "dot"  in body else a.dot)
         a.ma_ho_so = _next_seq4(db, _khoa, _dot)
@@ -807,6 +893,10 @@ def update_applicant(
         "ma_so_hv": a.ma_so_hv,
         "ma_ho_so": a.ma_ho_so,
         "ho_ten": a.ho_ten,
+        # trả thêm để FE mới dùng ngay
+        "ho_dem": getattr(a, "ho_dem", None),
+        "ten": getattr(a, "ten", None),
+        "full_name": _display_name(getattr(a, "ho_dem", None), getattr(a, "ten", None), getattr(a, "ho_ten", None)),
     }
 
 # ================= DELETE by MSSV (SOFT-DELETE, chỉ cần lý do) =================
@@ -873,7 +963,6 @@ def delete_applicant(
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-
 # ================= PRINT (A4, A5) by MSSV =================
 def _do_print(ma_so_hv: str, mark_printed: bool, db: Session, request: Request, a5: bool = False):
     from app.services.pdf_service import render_single_pdf, render_single_pdf_a5
@@ -921,7 +1010,6 @@ def _do_print(ma_so_hv: str, mark_printed: bool, db: Session, request: Request, 
         headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )
 
-
 @router.get("/{ma_so_hv}/print")
 def print_applicant_now(
     ma_so_hv: str,
@@ -930,7 +1018,6 @@ def print_applicant_now(
     db: Session = Depends(get_db),
 ):
     return _do_print(ma_so_hv, mark_printed, db, request=request, a5=False)
-
 
 @router.post("/{ma_so_hv}/print")
 def print_applicant_now_post(
@@ -941,7 +1028,6 @@ def print_applicant_now_post(
 ):
     return _do_print(ma_so_hv, mark_printed, db, request=request, a5=False)
 
-
 @router.get("/{ma_so_hv}/print-a5")
 def print_applicant_a5(
     ma_so_hv: str,
@@ -950,7 +1036,6 @@ def print_applicant_a5(
     db: Session = Depends(get_db),
 ):
     return _do_print(ma_so_hv, mark_printed, db, request=request, a5=True)
-
 
 @router.post("/{ma_so_hv}/print-a5")
 def print_applicant_a5_post(
@@ -961,9 +1046,16 @@ def print_applicant_a5_post(
 ):
     return _do_print(ma_so_hv, mark_printed, db, request=request, a5=True)
 
-
 # ================= Recent =================
 @router.get("/recent")
 def get_recent_applicants(db: Session = Depends(get_db), limit: int = 50):
     rows = db.query(Applicant).order_by(Applicant.created_at.desc()).limit(limit).all()
-    return [{"ma_so_hv": a.ma_so_hv, "ma_ho_so": a.ma_ho_so, "ho_ten": a.ho_ten} for a in rows]
+    return [{
+        "ma_so_hv": a.ma_so_hv,
+        "ma_ho_so": a.ma_ho_so,
+        "ho_ten": a.ho_ten,
+        "ho_dem": getattr(a, "ho_dem", None),
+        "ten": getattr(a, "ten", None),
+        "full_name": _display_name(getattr(a, "ho_dem", None), getattr(a, "ten", None), getattr(a, "ho_ten", None)),
+    } for a in rows]
+

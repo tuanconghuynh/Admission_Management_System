@@ -1,23 +1,24 @@
-# app/models/applicant.py
 from sqlalchemy import (
-    Column, String, Date, Integer, Boolean, ForeignKey, Text, DateTime, text
+    Column, String, Date, Integer, Boolean, ForeignKey, Text, DateTime, text, func
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.ext.hybrid import hybrid_property
 from app.db.base import Base
 
-# ================= Applicant =================
 class Applicant(Base):
     __tablename__ = "applicants"
 
-    # KHÓA CHÍNH = ma_so_hv (10 số)
-    ma_so_hv  = Column(String(10), primary_key=True, index=True)  # PK + unique tự nhiên
-
-    # CHO PHÉP TRÙNG (nullable để nhập dần, KHÔNG unique)
-    ma_ho_so = Column(String(64), nullable=True, index=True)
-
+    ma_so_hv  = Column(String(10), primary_key=True, index=True)
+    ma_ho_so  = Column(String(64), nullable=True, index=True)
     ngay_nhan_hs = Column(Date, nullable=True)
 
+    # Cũ: giữ để tương thích
     ho_ten = Column(String(255), nullable=True)
+
+    # Mới: tách tên
+    ho_dem = Column(String(255), nullable=True, index=True)  # họ + tên đệm
+    ten    = Column(String(100), nullable=True, index=True)  # tên (given name)
+
     gioi_tinh = Column(String(10), nullable=True)
     email_hoc_vien = Column(String(255), nullable=True)
     ngay_sinh = Column(Date, nullable=True)
@@ -43,7 +44,7 @@ class Applicant(Base):
         server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
     )
 
-    # Quan hệ tới ApplicantDoc qua khóa ma_so_hv
+    # Quan hệ
     docs = relationship(
         "ApplicantDoc",
         back_populates="applicant",
@@ -53,20 +54,35 @@ class Applicant(Base):
         lazy="selectin",
     )
 
-# ================= ApplicantDoc =================
+    # ---- Hiển thị 'full_name' thống nhất (ưu tiên ho_dem + ten, fallback ho_ten cũ) ----
+    @hybrid_property
+    def full_name(self) -> str:
+        hd = (self.ho_dem or '').strip()
+        t  = (self.ten or '').strip()
+        if hd or t:
+            return (hd + ' ' + t).strip()
+        return (self.ho_ten or '').strip()
+
+    @full_name.expression
+    def full_name(cls):
+        # Cho ORDER BY / ILIKE trên SQL side
+        return func.trim(
+            func.concat(
+                func.coalesce(cls.ho_dem, ''), ' ', func.coalesce(cls.ten, '')
+            )
+        )
+
+
 class ApplicantDoc(Base):
     __tablename__ = "applicant_docs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-
-    # FK theo ma_so_hv (khớp DB hiện tại)
     applicant_ma_so_hv = Column(
         String(10),
         ForeignKey("applicants.ma_so_hv", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=False,
         index=True,
     )
-
     code = Column(String(64), nullable=True)
     display_name = Column(String(255), nullable=True)
     so_luong = Column(Integer, nullable=True)

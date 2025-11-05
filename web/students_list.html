@@ -52,7 +52,7 @@
         <div class="xl:col-span-2">
           <div class="flex items-center gap-2">
             <div class="relative flex-1 min-w-[240px]">
-              <input id="q" class="input w-full pl-10" placeholder="Nhập họ tên hoặc MSHV..." aria-label="Từ khóa" />
+              <input id="q" class="input w-full pl-10" placeholder="Nhập họ và tên hoặc MSHV..." aria-label="Từ khóa" />
               <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true">🔎</span>
             </div>
             <div class="grid grid-cols-2 gap-2">
@@ -122,7 +122,8 @@
             <thead>
               <tr>
                 <th class="text-left">Mã HS</th>
-                <th class="text-left">Họ tên</th>
+                <th class="text-left th-sortable" data-sort="ho_dem" role="button" tabindex="0" aria-label="Sắp xếp theo Họ đệm">Họ đệm <span class="arrow"></span></th>
+                <th class="text-left th-sortable" data-sort="ten" role="button" tabindex="0" aria-label="Sắp xếp theo Tên">Tên <span class="arrow"></span></th>
                 <th class="text-left th-sortable" data-sort="ma_so_hv" role="button" tabindex="0" aria-label="Sắp xếp theo MSHV">MSHV <span class="arrow">▲▼</span></th>
                 <th class="th-sortable" data-sort="ngay_nhan_hs" role="button" tabindex="0" aria-label="Sắp xếp theo Ngày nhận">Ngày nhận <span class="arrow">▲▼</span></th>
                 <th class="th-sortable" data-sort="nganh" role="button" tabindex="0" aria-label="Sắp xếp theo Ngành">Ngành <span class="arrow">▲▼</span></th>
@@ -341,7 +342,8 @@
         tr.className = "row-alt";
         tr.innerHTML = `
           <td class="border-b whitespace-nowrap font-medium">${dash(it.ma_ho_so)}</td>
-          <td class="border-b">${dash(it.ho_ten)}</td>
+          <td class="border-b">${dash(it.ho_dem || '')}</td> 
+          <td class="border-b">${dash(it.ten || '')}</td>
           <td class="border-b">${dash(mshv)}</td>
           <td class="border-b text-center whitespace-nowrap">${dash(fmtDMY(it.ngay_nhan_hs))}</td>
           <td class="border-b">${dash(nganh)}</td>
@@ -562,20 +564,19 @@
     }
 
     // sắp xếp client-side (trên toàn tập)
-    function applySort(list){
-      const {key, dir} = state.sort;
+    function applySort(list) {
+      const { key, dir } = state.sort;
       if (!key) return list;
-      const getVal = (it)=>{
-        if (key === 'ma_so_hv')   return (it.ma_so_hv || "").toString();
-        if (key === 'dot')        return (it.dot || it.dot_tuyen || "").toString();
-        if (key === 'khoa')       return (it.khoa || it.khoa_hoc || it.khoahoc || "").toString();
-        if (key === 'nganh')      return (it.nganh_nhap_hoc || it.nganh || "").toString();
-        if (key === 'nguoi_nhan') return (it.nguoi_nhan_ky_ten || it.nguoi_nhan || it.nguoi_ky || "").toString();
-        if (key === 'ngay_nhan_hs') return (it.ngay_nhan_hs || "");
+
+      const getVal = (it) => {
+        if (key === 'ho_dem') return (it.ho_dem || "").toString(); // Sắp xếp theo Họ đệm
+        if (key === 'ten') return (it.ten || "").toString(); // Sắp xếp theo Tên
+        if (key === 'ma_so_hv') return (it.ma_so_hv || "").toString(); // Sắp xếp theo MSHV
         return "";
       };
-      const collator = new Intl.Collator('vi', {numeric:true, sensitivity:'base'});
-      const arr = list.slice().sort((a,b)=> collator.compare(getVal(a), getVal(b)));
+
+      const collator = new Intl.Collator('vi', { numeric: true, sensitivity: 'base' });
+      const arr = list.slice().sort((a, b) => collator.compare(getVal(a), getVal(b)));
       return dir === 'asc' ? arr : arr.reverse();
     }
 
@@ -587,11 +588,12 @@
       }
     }
 
-    async function toggleSort(key){
-      if (state.sort.key === key){
+    async function toggleSort(key) {
+      if (state.sort.key === key) {
         state.sort.dir = (state.sort.dir === 'asc' ? 'desc' : 'asc');
       } else {
-        state.sort.key = key; state.sort.dir = 'asc';
+        state.sort.key = key;
+        state.sort.dir = 'asc';
       }
       setAriaSort();
       await runSearch();
@@ -623,29 +625,39 @@
       return hasLetter && !manyDigits;
     }
 
-    function vnNorm(s){
-      return (s||"")
-        .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
-        .replace(/đ/g,"d").replace(/Đ/g,"D")
-        .trim().toLowerCase();
-    }
-    function matchScore(name, query){
-      const a = vnNorm(name), b = vnNorm(query);
-      if (!a || !b) return 0;
-      if (a === b) return 100;
-      if (a.startsWith(b)) return 90;
-      if (a.includes(b)) return 70;
-      const tokens = b.split(/\s+/).filter(Boolean);
-      return tokens.every(t => a.includes(t)) ? 60 : 0;
-    }
-    function filterAndSortByName(list, q, limit=5000){
-      const scored = (list||[]).map(it=>{
-        const name = it.ho_ten || it.full_name || it.ten || "";
-        return {it, score: matchScore(name, q)};
-      }).filter(x => x.score > 0);
-      scored.sort((p,q)=> q.score - p.score);
-      return scored.slice(0, limit).map(x=>x.it);
-    }
+  // Chuẩn hóa văn bản và loại bỏ dấu (chỉ so sánh dấu chính xác)
+  function vnNorm(s) {
+    return (s || "")
+      .normalize("NFD")  // Phân tách dấu
+      .replace(/[\u0300-\u036f]/g, "") // Loại bỏ dấu
+      .replace(/đ/g, "d").replace(/Đ/g, "D") // Thay thế "đ" và "Đ"
+      .trim().toLowerCase();  // Chuyển về chữ thường
+  }
+
+  // So sánh tên (Họ đệm + Tên) với từ khóa, chỉ ra kết quả chính xác
+  function matchScore(name, query) {
+    const normalizedName = vnNorm(name);
+    const normalizedQuery = vnNorm(query);
+
+    // Nếu cả hai giống nhau (có dấu giống nhau)
+    if (normalizedName === normalizedQuery) return 100;  
+
+    // Nếu tên bắt đầu giống từ khóa (có dấu giống nhau)
+    if (normalizedName.startsWith(normalizedQuery)) return 90;
+
+    // Nếu tên chứa từ khóa
+    if (normalizedName.includes(normalizedQuery)) return 80;
+
+    return 0;  // Không có sự khớp
+  }
+
+  // Lọc và sắp xếp tên (Họ đệm + Tên) theo từ khóa nhập vào
+  function filterAndSortByName(list, query) {
+    return list.filter(item => {
+      const fullName = item.ho_ten || item.ten || "";  // Lấy Họ tên
+      return matchScore(fullName, query) > 0;  // Kiểm tra xem có khớp không
+    });
+  }
 
     // lấy 1 trang server
     async function fetchPageServer(q, page, size){
@@ -720,7 +732,7 @@
     async function runSearch(){
       setState({loading:true});
       try{
-        const full = await buildSourceFull();
+        const full = await buildSourceFull(); // Lấy dữ liệu đã lọc
         clearDeletedIfExists(full);
         state.total = full.length;
 
@@ -728,7 +740,7 @@
         if (state.page > totalPages) state.page = totalPages;
 
         const start = (state.page - 1) * state.size;
-        renderRows(full.slice(start, start + state.size));
+        renderRows(full.slice(start, start + state.size)); // Hiển thị các kết quả
         updatePagerUI(state.total, state.page, state.size);
         setState({loading:false, empty: state.total === 0});
       }catch(e){
@@ -957,11 +969,10 @@
     $('q').addEventListener('input', debounce(async () => {
       const v = $('q').value.trim();
 
-      // (tuỳ chọn) chỉ chạy khi >= 2 ký tự, còn <2 thì xoá kết quả
       if (v.length < 2) {
         state.q = '';
         state.page = 1;
-        await runSearch();      // sẽ trả về danh sách theo bộ lọc khác (hoặc rỗng)
+        await runSearch(); // Trả về danh sách đã lọc
         return;
       }
 
@@ -969,7 +980,6 @@
       state.page = 1;
       await runSearch();
     }, 250));
-
 
     (function () {
     // Ưu tiên query expired=1 (khi bị redirect)

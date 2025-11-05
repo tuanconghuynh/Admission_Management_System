@@ -8,37 +8,38 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="hutech.png" type="image/png" />
   <style>
-    /* Hình nền và hiệu ứng mờ */
-    body {
-      background: url('hinhnen.png') center/cover fixed no-repeat;
-      font-family: system-ui, sans-serif;
-    }
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(3px);
-      z-index: -1;
-    }
-    .card {
-      background: white;
-      border-radius: 1rem;
-      border: 1px solid rgba(59,130,246,0.1);
-      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-      transition: all .2s ease;
-    }
-    .card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 12px 24px rgba(0,0,0,0.12);
-      border-color: rgba(59,130,246,0.3);
-    }
+    /* Nền + mờ */
+    body{background:url('hinhnen.png') center/cover fixed no-repeat;font-family:system-ui,sans-serif}
+    body::before{content:"";position:fixed;inset:0;background:rgba(255,255,255,.85);backdrop-filter:blur(3px);z-index:-1}
+
+    .card{background:#fff;border-radius:1rem;border:1px solid rgba(59,130,246,.1);box-shadow:0 8px 20px rgba(0,0,0,.08);transition:all .2s}
+    .card:hover{transform:translateY(-3px);box-shadow:0 12px 24px rgba(0,0,0,.12);border-color:rgba(59,130,246,.3)}
+
+    /* Skeleton khi chờ me */
+    .skeleton{position:relative;overflow:hidden;background:#eef2ff}
+    .skeleton::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);transform:translateX(-100%);animation:shimmer 1.2s infinite}
+    @keyframes shimmer{100%{transform:translateX(100%)}}
+
+    /* Dropdown */
+    .menu{opacity:0;transform:translateY(-4px);pointer-events:none;transition:.15s}
+    .menu.show{opacity:1;transform:translateY(0);pointer-events:auto}
+
+    /* Modal confirm logout */
+    .overlay{position:fixed;inset:0;background:rgba(2,6,23,.45);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;z-index:1000}
+    .overlay.show{display:flex}
+    .modal{background:#fff;border-radius:1rem;box-shadow:0 20px 60px rgba(0,0,0,.2);width:92vw;max-width:420px;transform:scale(.96);opacity:0;transition:.18s}
+    .overlay.show .modal{transform:scale(1);opacity:1}
+
+    /* Toast */
+    #toast-wrap{position:fixed;right:16px;bottom:16px;z-index:1100;display:flex;flex-direction:column;gap:10px}
+    .toast{background:#111827;color:#fff;padding:10px 14px;border-radius:.75rem;box-shadow:0 10px 25px rgba(0,0,0,.2);opacity:0;transform:translateY(8px);transition:.18s}
+    .toast.show{opacity:1;transform:translateY(0)}
+    .toast.success{background:#065f46}.toast.warn{background:#92400e}.toast.error{background:#7f1d1d}
   </style>
 </head>
 
 <body class="min-h-screen flex flex-col">
-
-  <!-- Header trên cùng -->
+  <!-- Header -->
   <header class="w-full px-8 py-5 flex flex-col sm:flex-row items-center justify-between max-w-7xl mx-auto">
     <div class="flex items-center gap-3">
       <a href="/ams_home.html" class="flex items-center gap-3 hover:opacity-90 transition" title="Về trang chủ">
@@ -53,33 +54,35 @@
         </div>
       </a>
     </div>
+
     <div class="mt-4 sm:mt-0 flex items-center gap-3 relative">
       <!-- Nút tên + menu -->
       <button id="userMenuBtn"
         class="text-base text-gray-700 bg-white/70 hover:bg-white px-3 py-2 rounded-lg shadow border flex items-center gap-2"
-        aria-haspopup="true" aria-expanded="false">
-        <span id="hello">Hi, <b>—</b> <span class="text-gray-500">(—)</span></span>
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" class="text-gray-500">
+        aria-haspopup="true" aria-expanded="false" aria-controls="userMenu">
+        <span>Hi, <b id="helloName">—</b> <span class="text-gray-500">(<span id="helloRole">—</span>)</span></span>
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" class="text-gray-500" aria-hidden="true">
           <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.187l3.71-3.956a.75.75 0 011.08 1.04l-4.24 4.52a.75.75 0 01-1.08 0l-4.24-4.52a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
         </svg>
       </button>
 
       <!-- Dropdown -->
-    <div id="userMenu"
-      class="hidden absolute right-0 top-[calc(100%+6px)] w-56 bg-white border rounded-xl shadow-lg overflow-hidden z-20">
-      <a href="/account" class="block px-4 py-2 hover:bg-gray-50">🔎 Thông tin tài khoản</a>
-      <a href="/account" class="block px-4 py-2 hover:bg-gray-50">🔐 Đổi mật khẩu</a>
-      <button id="btnMenuLogout" class="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-600">↩️ Đăng xuất</button>
-    </div>
-
+      <div id="userMenu" class="menu absolute right-0 top-[calc(100%+6px)] w-56 bg-white border rounded-xl shadow-lg overflow-hidden z-20" role="menu">
+        <a href="/account" class="block px-4 py-2 hover:bg-gray-50" role="menuitem">🔎 Thông tin tài khoản</a>
+        <a href="/account" class="block px-4 py-2 hover:bg-gray-50" role="menuitem">🔐 Đổi mật khẩu</a>
+        <button id="btnMenuLogout" class="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-600" role="menuitem">
+          ↩️ Đăng xuất
+        </button>
+      </div>
     </div>
   </header>
 
-  <!-- Phần chức năng ở giữa -->
+  <!-- Main -->
   <main class="flex-1 flex items-center justify-center">
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 px-8 py-12 text-left">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 px-8 py-12 text-left max-w-7xl w-full">
 
-      <a id="cardNhap" href="/compilation.html" class="card p-6 hidden">
+      <!-- Các thẻ có data-role để map quyền -->
+      <a id="cardNhap" href="/compilation.html" class="card p-6 hidden" data-role="Admin,NhanVien,CongTacVien">
         <div class="flex items-start gap-4">
           <div class="text-4xl">📝</div>
           <div>
@@ -89,7 +92,7 @@
         </div>
       </a>
 
-      <a id="cardDSHS" href="/students_list.html" class="card p-6 hidden">
+      <a id="cardDSHS" href="/students_list.html" class="card p-6 hidden" data-role="Admin,NhanVien,CongTacVien">
         <div class="flex items-start gap-4">
           <div class="text-4xl">📋</div>
           <div>
@@ -99,7 +102,7 @@
         </div>
       </a>
 
-      <a id="cardImport" href="/import_students.html" class="card p-6 hidden">
+      <a id="cardImport" href="/import_students.html" class="card p-6 hidden" data-role="Admin,NhanVien">
         <div class="flex items-start gap-4">
           <div class="text-4xl">⬇️</div>
           <div>
@@ -109,7 +112,7 @@
         </div>
       </a>
 
-      <a id="cardJournal" href="/journal.html" class="card p-6 hidden">
+      <a id="cardJournal" href="/journal.html" class="card p-6 hidden" data-role="Admin,NhanVien">
         <div class="flex items-start gap-4">
           <div class="text-4xl">🕓</div>
           <div>
@@ -119,7 +122,7 @@
         </div>
       </a>
 
-      <a id="cardAdmin" href="/admin" class="card p-6 hidden">
+      <a id="cardAdmin" href="/admin" class="card p-6 hidden" data-role="Admin">
         <div class="flex items-start gap-4">
           <div class="text-4xl">👤</div>
           <div>
@@ -129,7 +132,7 @@
         </div>
       </a>
 
-      <a id="cardChecklist" href="/checklist_admin.html" class="card p-6 hidden">
+      <a id="cardChecklist" href="/checklist_admin.html" class="card p-6 hidden" data-role="Admin">
         <div class="flex items-start gap-4">
           <div class="text-4xl">📑</div>
           <div>
@@ -138,6 +141,11 @@
           </div>
         </div>
       </a>
+
+      <!-- Skeleton 3 thẻ khi chờ -->
+      <div class="card p-6 skeleton" id="sk1"></div>
+      <div class="card p-6 skeleton" id="sk2"></div>
+      <div class="card p-6 skeleton" id="sk3"></div>
 
     </div>
   </main>
@@ -149,8 +157,7 @@
         <p class="font-semibold uppercase">VIỆN HỢP TÁC VÀ PHÁT TRIỂN ĐÀO TẠO</p>
         <p class="uppercase">TRƯỜNG ĐẠI HỌC CÔNG NGHỆ TPHCM (HUTECH)</p>
         <p><b>Sài Gòn Campus:</b> 475A Điện Biên Phủ, Phường Thạnh Mỹ Tây, TP.HCM</p>
-        <p>
-          <b>ĐT:</b> (028) 6686 6465 · 
+        <p><b>ĐT:</b> (028) 6686 6465 · 
           <b>Email:</b> <a href="mailto:daotaotructuyen@hutech.edu.vn" class="underline hover:text-yellow-300">daotaotructuyen@hutech.edu.vn</a>
         </p>
       </div>
@@ -158,82 +165,112 @@
     </div>
   </footer>
 
+  <!-- Toast + Modal logout -->
+  <div id="toast-wrap"></div>
+
+  <div class="overlay" id="logoutModal" role="dialog" aria-modal="true" aria-labelledby="lgTitle">
+    <div class="modal" role="document" aria-describedby="lgDesc" tabindex="-1" id="logoutBox">
+      <div class="px-6 py-4 border-b flex items-center justify-between">
+        <div id="lgTitle" class="font-semibold text-gray-800">Xác nhận</div>
+        <button class="btn btn-outline btn-xs" id="lgClose" aria-label="Đóng">✕</button>
+      </div>
+      <div class="px-6 py-5" id="lgDesc">
+        <p class="text-gray-700">Bạn có chắc chắn muốn đăng xuất không?</p>
+      </div>
+      <div class="px-6 py-4 border-t flex justify-end gap-2 bg-gray-50 rounded-b-2xl">
+        <button class="btn btn-outline" id="lgCancel">Hủy</button>
+        <button class="btn btn-primary" id="lgOK">Đăng xuất</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    /* ===== Helpers ===== */
     async function api(path, opt={}) {
-      try { return await fetch('/api' + path, { credentials:'include', ...opt }); }
+      try { return await fetch('/api'+path, { credentials:'include', ...opt }); }
       catch { return null; }
     }
-    function show(id){ document.getElementById(id)?.classList.remove('hidden'); }
+    function show(elId){ const el=document.getElementById(elId); el && el.classList.remove('hidden'); }
+    function hide(el){ el && el.classList.add('hidden'); }
+    function killSkeleton(){ ['sk1','sk2','sk3'].forEach(id=>{ const n=document.getElementById(id); n && n.remove(); }); }
+    function showToast(msg,type='info',ms=3200){
+      const wrap=document.getElementById('toast-wrap'); if(!wrap) return alert(msg);
+      const el=document.createElement('div'); el.className=`toast ${type}`; el.textContent=String(msg);
+      wrap.appendChild(el); requestAnimationFrame(()=>el.classList.add('show'));
+      const close=()=>{ el.classList.remove('show'); el.addEventListener('transitionend',()=>el.remove(),{once:true}); };
+      const t=setTimeout(close,ms); el.addEventListener('click',()=>{clearTimeout(t); close();});
+    }
 
-    // Toggle dropdown
+    /* ===== Dropdown menu ===== */
     (function menuSetup(){
       const btn = document.getElementById('userMenuBtn');
       const menu = document.getElementById('userMenu');
       if(!btn || !menu) return;
-
-      function openMenu(open){
-        menu.classList.toggle('hidden', !open);
-        btn.setAttribute('aria-expanded', String(open));
-      }
-      btn.addEventListener('click', (e)=>{
-        e.stopPropagation();
-        openMenu(menu.classList.contains('hidden'));
-      });
-      document.addEventListener('click', ()=>{
-        if(!menu.classList.contains('hidden')) openMenu(false);
-      });
-      document.addEventListener('keydown', (e)=>{
-        if(e.key === 'Escape') openMenu(false);
-      });
-
-    // Menu logout (có xác nhận)
-    document.getElementById('btnMenuLogout')?.addEventListener('click', async ()=>{
-      const confirmLogout = confirm("Bạn có chắc chắn muốn đăng xuất không?");
-      if (!confirmLogout) return;
-      await api('/logout', { method:'POST' });
-      location.href = '/auth_login.html';
-    });
+      function openMenu(on){ menu.classList.toggle('show', on); btn.setAttribute('aria-expanded', String(on)); }
+      btn.addEventListener('click', (e)=>{ e.stopPropagation(); openMenu(!menu.classList.contains('show')); });
+      document.addEventListener('click', ()=> menu.classList.contains('show') && openMenu(false));
+      document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') openMenu(false); });
+      // Logout -> mở modal xác nhận
+      document.getElementById('btnMenuLogout')?.addEventListener('click', ()=>{ openMenu(false); openLogout(); });
     })();
 
+    /* ===== Modal logout ===== */
+    (function(){
+      const wrap = document.getElementById('logoutModal');
+      const box  = document.getElementById('logoutBox');
+      const ok   = document.getElementById('lgOK');
+      const cxl  = document.getElementById('lgCancel');
+      const x    = document.getElementById('lgClose');
+      let last=null;
+      function open(){ last=document.activeElement; wrap.classList.add('show'); requestAnimationFrame(()=>box.focus()); document.body.classList.add('overflow-hidden'); }
+      function close(){ wrap.classList.remove('show'); document.body.classList.remove('overflow-hidden'); last?.focus?.(); }
+      function trap(e){
+        if(e.key!=='Tab') return;
+        const f=box.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
+        if(!f.length) return;
+        const first=f[0], last=f[f.length-1];
+        if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+      }
+      window.openLogout=open;
+      ok.addEventListener('click', async ()=>{ try{ await api('/logout',{method:'POST'});}catch{} location.href='/auth_login.html'; });
+      cxl.addEventListener('click', close); x.addEventListener('click', close);
+      wrap.addEventListener('click', e=>{ if(e.target===wrap) close(); });
+      box.addEventListener('keydown', trap);
+    })();
+
+    /* ===== Boot ===== */
     async function boot(){
       const r = await api('/me');
       if (!r || !r.ok) { location.href = '/auth_login.html'; return; }
       const me = await r.json();
-      const role = me.role || '';
+      // Header text (an toàn, không innerHTML)
       const name = me.full_name || me.username || 'Người dùng';
-      document.getElementById('hello').innerHTML = `<b>${name}</b> <span class="text-gray-500">(${role})</span>`;
-      // Nếu bắt đổi mật khẩu lần đầu → đưa thẳng sang account (phòng trường hợp bypass)
-      if (me.must_change_password) {
-        location.href = '/account?first=1';
-        return;
-      }
-      // Phân quyền
-      if (role === 'Admin') {
-        ['cardNhap','cardDSHS','cardImport','cardJournal','cardAdmin','cardChecklist'].forEach(show);
-      } else if (role === 'NhanVien') {
-        ['cardNhap','cardDSHS','cardImport','cardJournal'].forEach(show);
-      } else {
-        ['cardNhap','cardDSHS'].forEach(show);
-      }
+      (document.getElementById('helloName')||{}).textContent = name;
+      (document.getElementById('helloRole')||{}).textContent = me.role || '';
+
+      // Nếu bắt đổi mật khẩu lần đầu -> chuyển ngay
+      if (me.must_change_password) { location.href = '/account?first=1'; return; }
+
+      // Hiển thị card theo role bằng data-role
+      const role = me.role || '';
+      document.querySelectorAll('[data-role]').forEach(el=>{
+        const allow = (el.getAttribute('data-role')||'').split(',').map(s=>s.trim());
+        if (allow.includes(role)) el.classList.remove('hidden');
+      });
+
+      killSkeleton();
     }
     boot();
+
+    /* ===== Session hết hạn -> toast/alert ===== */
     (function () {
-      // Ưu tiên query expired=1 (khi bị redirect)
       const params = new URLSearchParams(location.search);
       const byQuery = params.get('expired') === '1';
-
-      // Hoặc cookie cờ do BE set
       const byCookie = document.cookie.split(';').some(c => c.trim().startsWith('__session_expired=1'));
-
       if (byQuery || byCookie) {
-        // Hiện thông báo rộng rãi
-        if (typeof showToast === 'function') {
-          showToast('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.', 'warn', 4500);
-        } else {
-          // Fallback nếu trang không có showToast
-          alert('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
-        }
-        // Xóa cookie cờ để khỏi lặp lại
+        if (typeof showToast === 'function') showToast('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.','warn',4500);
+        else alert('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
         document.cookie = '__session_expired=; Max-Age=0; Path=/; SameSite=Lax';
       }
     })();

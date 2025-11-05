@@ -27,7 +27,6 @@ from app.utils.soft_delete import exclude_deleted, ensure_not_deleted
 
 router = APIRouter()  # không prefix; main sẽ mount /api
 
-
 # ================= Helpers chung =================
 def _parse_day_any(raw: str) -> date:
     """
@@ -43,7 +42,6 @@ def _parse_day_any(raw: str) -> date:
         status_code=400,
         detail="Sai định dạng ngày. Dùng 'date=dd/MM/YYYY' (khuyến nghị) hoặc 'day=YYYY-MM-DD'.",
     )
-
 
 def _items_merged_by_versions(db: Session, version_ids: set) -> List[ChecklistItem]:
     code_seen = set()
@@ -62,7 +60,6 @@ def _items_merged_by_versions(db: Session, version_ids: set) -> List[ChecklistIt
                 items.append(it)
     return items
 
-
 def _docs_map_by_mssv(docs: List[ApplicantDoc]) -> Dict[str, Dict[str, int]]:
     """
     Nhóm theo MSSV:
@@ -72,7 +69,6 @@ def _docs_map_by_mssv(docs: List[ApplicantDoc]) -> Dict[str, Dict[str, int]]:
     for d in docs:
         out.setdefault(d.applicant_ma_so_hv, {})[d.code] = int(d.so_luong or 0)
     return out
-
 
 def _fmt_date_excel(v: Optional[object]) -> str:
     """
@@ -92,19 +88,40 @@ def _fmt_date_excel(v: Optional[object]) -> str:
             continue
     return s
 
+# ==== helper tên hiển thị (ưu tiên ho_dem + ten, fallback ho_ten) ====
+def _display_name(a: Applicant) -> str:
+    hd = (getattr(a, "ho_dem", None) or "").strip()
+    t = (getattr(a, "ten", None) or "").strip()
+    if hd or t:
+        return f"{hd} {t}".strip()
+    return (getattr(a, "ho_ten", None) or "").strip()
+# ===================================================================
 
-def _build_excel_bytes(apps: List[Applicant], docs: List[ApplicantDoc], items_all: List[ChecklistItem]) -> bytes:
+def _build_excel_bytes(
+    apps: List[Applicant],
+    docs: List[ApplicantDoc],
+    items_all: List[ChecklistItem],
+    *,
+    split_name: bool = False,
+) -> bytes:
     """
     Xuất 1 sheet duy nhất 'Ho so' theo header cố định + các cột checklist.
     Group tài liệu theo MSSV.
+    - split_name=False: 1 cột 'Họ tên' (mặc định)
+    - split_name=True : 2 cột 'Họ và tên đệm' + 'Tên'
     """
     wb = Workbook()
     ws = wb.active
     ws.title = "Ho so"
-
     # Header cố định (+ Dân tộc)
     base_headers = [
-        "STT", "Mã hồ sơ", "Ngày nhận", "Email học viên", "Họ tên",
+        "STT", "Mã hồ sơ", "Ngày nhận", "Email học viên",
+    ]
+    if split_name:
+        base_headers += ["Họ và tên đệm", "Tên"]
+    else:
+        base_headers += ["Họ tên"]
+    base_headers += [
         "MSHV", "Ngày sinh", "Số ĐT", "Ngành nhập học", "Đợt", "Khóa",
         "Đã TN trước đó", "Ghi chú", "Người nhận (ký tên)",
         "Dân tộc",  # ✅ thêm cột Dân tộc
@@ -118,12 +135,19 @@ def _build_excel_bytes(apps: List[Applicant], docs: List[ApplicantDoc], items_al
     docs_by_mssv = _docs_map_by_mssv(docs)
 
     for idx, a in enumerate(apps, start=1):
-        base_row = [
+        common_prefix = [
             idx,
             a.ma_ho_so or "",
             _fmt_date_excel(getattr(a, "ngay_nhan_hs", None)),
             a.email_hoc_vien or "",
-            a.ho_ten or "",
+        ]
+        if split_name:
+            ln = getattr(a, "ho_dem", None) or ""
+            fn = getattr(a, "ten", None) or ""
+            name_cells = [ln, fn]
+        else:
+            name_cells = [_display_name(a)]
+        common_suffix = [
             a.ma_so_hv or "",
             _fmt_date_excel(getattr(a, "ngay_sinh", None)),
             a.so_dt or "",
@@ -137,7 +161,7 @@ def _build_excel_bytes(apps: List[Applicant], docs: List[ApplicantDoc], items_al
         ]
         dm = docs_by_mssv.get(a.ma_so_hv, {})
         doc_row = [int(dm.get(it.code, 0)) for it in items_all]
-        ws.append(base_row + doc_row)
+        ws.append(common_prefix + name_cells + common_suffix + doc_row)
 
     # Freeze header & auto width
     ws.freeze_panes = "A2"
@@ -149,11 +173,9 @@ def _build_excel_bytes(apps: List[Applicant], docs: List[ApplicantDoc], items_al
             if len(val) > max_len:
                 max_len = len(val)
         ws.column_dimensions[letter].width = min(max(10, max_len + 2), 40)
-
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
-
 
 def _get_app_by_mssv(db: Session, ma_so_hv: str) -> Applicant:
     a = db.query(Applicant).filter(Applicant.ma_so_hv == ma_so_hv).first()
@@ -161,7 +183,6 @@ def _get_app_by_mssv(db: Session, ma_so_hv: str) -> Applicant:
         raise HTTPException(status_code=404, detail="Applicant not found")
     ensure_not_deleted(a)  # 🔒 hồ sơ xoá -> 410
     return a
-
 
 def _get_items_for_app(db: Session, app: Applicant):
     ver_id = getattr(app, "checklist_version_id", None)
@@ -176,16 +197,15 @@ def _get_items_for_app(db: Session, app: Applicant):
         q = q.order_by(ChecklistItem.id.asc())
     return q.all()
 
-
 def _get_docs_for_mssv(db: Session, ma_so_hv: str):
     return db.query(ApplicantDoc).filter(ApplicantDoc.applicant_ma_so_hv == ma_so_hv).all()
-
 
 # ================= EXPORT EXCEL THEO NGÀY =================
 @router.get("/export/excel")
 def export_excel(
     day: str | None = Query(None, description="YYYY-MM-DD"),
     date_q: str | None = Query(None, alias="date", description="dd/MM/YYYY"),
+    name: str = Query("full", description="Kiểu cột tên: 'full' (mặc định) hoặc 'split'"),
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "NhanVien")),
 ):
@@ -217,20 +237,21 @@ def export_excel(
     version_ids = {a.checklist_version_id for a in apps if a.checklist_version_id}
     items_all = _items_merged_by_versions(db, version_ids) if version_ids else []
 
-    xls_bytes = _build_excel_bytes(apps, docs, items_all)
-    filename = f"Export_{d.strftime('%d-%m-%Y')}.xlsx"
+    xls_bytes = _build_excel_bytes(apps, docs, items_all, split_name=(name == "split"))
+    suffix = "_split" if name == "split" else ""
+    filename = f"Export_{d.strftime('%d-%m-%Y')}{suffix}.xlsx"
     return StreamingResponse(
         io.BytesIO(xls_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename=\"{filename}\"'},
     )
 
-
 # ================= EXPORT EXCEL THEO ĐỢT =================
 @router.get("/export/excel-dot")
 def export_excel_dot(
     dot: str = Query(..., description="Ví dụ: 'Đợt 1/2025' hoặc '9'"),
     khoa: str | None = Query(None, description="(Tuỳ chọn) Lọc theo Khóa, ví dụ: '27'"),
+    name: str = Query("full", description="Kiểu cột tên: 'full' (mặc định) hoặc 'split'"),
     db: Session = Depends(get_db),
     user=Depends(require_roles("Admin", "NhanVien")),
 ):
@@ -260,17 +281,17 @@ def export_excel_dot(
     # Hợp nhất danh mục nhiều version
     items_all = _items_merged_by_versions(db, {a.checklist_version_id for a in apps if a.checklist_version_id})
 
-    xls_bytes = _build_excel_bytes(apps, docs, items_all)
+    xls_bytes = _build_excel_bytes(apps, docs, items_all, split_name=(name == "split"))
     safe_dot = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in key)
     safe_khoa = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in (khoa or ""))
     suffix = f"{safe_dot}" + (f"_Khoa_{safe_khoa}" if safe_khoa else "")
-    filename = f"Export_Dot_{suffix}.xlsx"
+    suffix2 = "_split" if name == "split" else ""
+    filename = f"Export_Dot_{suffix}{suffix2}.xlsx"
     return StreamingResponse(
         io.BytesIO(xls_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename=\"{filename}\"'},
     )
-
 
 # ================= PRINT 1 HỒ SƠ (theo MSSV) =================
 @router.get("/print/a5/{ma_so_hv}", summary="In 01 hồ sơ A5 (ngang) theo MSSV")
@@ -284,7 +305,6 @@ def print_a5(ma_so_hv: str, db: Session = Depends(get_db)):
         media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename=\"{app.ma_ho_so or ma_so_hv}_A5.pdf\"'},
     )
-
 
 @router.get("/print/a4/{ma_so_hv}", summary="In 01 hồ sơ A4 (dọc) theo MSSV")
 def print_a4(ma_so_hv: str, db: Session = Depends(get_db)):

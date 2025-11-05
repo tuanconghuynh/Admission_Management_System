@@ -9,8 +9,6 @@
   <link rel="icon" type="image/png" href="hutech.png" sizes="32x32">
   <link rel="apple-touch-icon" href="hutech.png">
   <meta name="theme-color" content="#2563eb">
-
-  <!-- Strip query/hash NGAY LÚC VÀO TRANG -->
   <script>
   const isJournal = /\/journal\.html$/.test(location.pathname);
   if (isJournal && (location.search || location.hash)) {
@@ -189,31 +187,37 @@
           <button class="btn btn-outline btn-xs" id="btnClose">Đóng</button>
         </div>
       </div>
-
-      <!-- Ô xác nhận hard delete -->
       <div id="hardDelConfirm" class="hidden px-4 pt-3">
-        <div class="flex items-center gap-2">
-          <select id="hardDelSelect" class="input w-56">
-            <option value="">-- Chọn để xác nhận --</option>
-            <option value="CONFIRM_DELETE">Tôi xác nhận xóa vĩnh viễn</option>
-          </select>
-          <input id="hardDelReason" class="input flex-1" placeholder="(Tuỳ chọn) Lý do xóa…" />
-        </div>
-        <p class="text-xs text-rose-600 mt-1 mb-2">Hành động không thể hoàn tác. Vui lòng xác nhận trước khi xóa!</p>
-      </div>
+        <div class="space-y-2">
+          <div class="flex flex-wrap items-center gap-3">
+            <!-- Checkbox xác nhận -->
+            <label class="inline-flex items-center gap-2 select-none">
+              <input id="hardDelConfirmChk" type="checkbox" class="w-4 h-4 accent-red-600" />
+              <span class="text-sm font-medium text-gray-700">Tôi xác nhận xóa vĩnh viễn</span>
+            </label>
 
-      <!-- Modal xác nhận xóa đẹp -->
-      <div id="confirmHardDel" class="hidden fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center">
-        <div class="bg-white p-6 rounded-2xl shadow-xl max-w-sm text-center space-y-4">
-          <div class="text-lg font-semibold text-gray-800">Xóa vĩnh viễn hồ sơ này?</div>
-          <div class="text-sm text-gray-500">Hành động này không thể hoàn tác.<br> Bạn có chắc chắn muốn tiếp tục?</div>
-          <div class="flex justify-center gap-3 pt-2">
-            <button id="btnConfirmHardDelYes" class="btn btn-primary px-4 py-1.5">OK</button>
-            <button id="btnConfirmHardDelNo" class="btn btn-outline px-4 py-1.5">Hủy</button>
+            <!-- Lý do -->
+            <select id="hardDelReasonSel" class="input w-64">
+              <option value="">-- Chọn lý do --</option>
+              <option value="TRUNG_LAP">Hồ sơ trùng lặp</option>
+              <option value="NHAM_MSSV">Nhầm MSSV/mục tiêu</option>
+              <option value="YEU_CAU_NGUOI_DUNG">Yêu cầu người dùng xóa dữ liệu</option>
+              <option value="TEST_DATA">Dữ liệu thử nghiệm</option>
+              <option value="OTHER">Lý do khác…</option>
+            </select>
           </div>
+
+          <!-- Chỉ hiện khi OTHER -->
+          <div id="hardDelReasonWrap" class="hidden">
+            <input id="hardDelReasonText" class="input w-full" placeholder="Nhập lý do khác (bắt buộc)" />
+            <p class="text-xs text-rose-600 mt-1">Bắt buộc khi chọn “Lý do khác…”.</p>
+          </div>
+
+          <p class="text-xs text-rose-600 mt-1 mb-2">
+            Hành động này không thể hoàn tác. Vui lòng xác nhận trước khi xóa!
+          </p>
         </div>
       </div>
-
       <!-- Modal xác nhận khôi phục -->
       <div id="confirmRestore" class="hidden fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center">
         <div class="bg-white p-6 rounded-2xl shadow-xl max-w-sm text-center space-y-4">
@@ -294,7 +298,8 @@
   const actionVi = c => ACTION_LABELS[(c||'').toUpperCase()] || (c||'—');
 
   const FIELD_LABELS = {
-    checklist_version_name:"Version danh mục",
+    checklist_version_name: "Version danh mục",
+    checklist_version_id:   "Version danh mục (ID)",
     da_tn_truoc_do:"Đã TN trước đó",
     deleted_at:"Thời điểm xóa",
     deleted_by:"Người xóa",
@@ -314,7 +319,7 @@
     status:"Trạng thái",
     so_dt:"Số điện thoại",
     gioi_tinh:"Giới tính",
-    dan_toc:"Dân tộc",  
+    dan_toc:"Dân tộc",
     update_reason: "Lý do cập nhật",
   };
   const getFieldLabel = (k) => FIELD_LABELS[k] || k;
@@ -438,13 +443,54 @@
     const get = t => parts.find(p => p.type === t)?.value || '00';
     return `${get('day')}/${get('month')}/${get('year')}`;
   }
+function maybeFormatDateLike(v) {
+  if (v == null || v === '') return null;
 
-  function maybeFormatDateLike(v) {
-    if (!v) return null;
-    if (v instanceof Date) return formatVNDateTime(v);
-    if (typeof v === 'string' && (/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(v) || /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(v))) return formatVNDateTime(v);
-    return null;
+  // Chỉ parse ngày-giờ cho các field "ngày giờ"
+  const f = (window.currentRenderField || '').toLowerCase();
+  const DATE_FIELDS = new Set([
+    'occurred_at', 'deleted_at', 'created_at', 'updated_at',
+    'ngay_sinh', 'ngay_nhan_hs'
+  ]);
+  const looksLikeDateField =
+    DATE_FIELDS.has(f) || /^ngay_/.test(f) || /_at$/.test(f);
+
+  if (!looksLikeDateField) return null;   // ⬅️ khóa lại: ID/Code không bị parse
+
+  // số epoch (seconds/millis)
+  if (typeof v === 'number') {
+    const ms = v > 1e12 ? v : v * 1000;
+    return formatVNDateTime(new Date(ms));
   }
+
+  if (typeof v === 'string') {
+    const s = v.trim();
+
+    // ISO: YYYY-MM-DD / YYYY-MM-DDTHH:mm:ssZ / YYYY-MM-DD HH:mm:ss
+    if (/^\d{4}-\d{2}-\d{2}([T\s].*)?$/.test(s)) {
+      const d = new Date(s.replace(' ', 'T'));
+      if (!isNaN(d)) return formatVNDateTime(d);
+    }
+
+    // HH:mm:ss DD/MM/YYYY
+    const m1 = s.match(/^(\d{2}):(\d{2}):(\d{2})\s+(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (m1) {
+      const [_, hh, mm, ss, dd, MM, yyyy] = m1.map(Number);
+      const d = new Date(Date.UTC(yyyy, MM - 1, dd, hh, mm, ss));
+      return formatVNDateTime(d);
+    }
+
+    // DD/MM/YYYY
+    const m2 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (m2) {
+      const [_, dd, MM, yyyy] = m2.map(Number);
+      const d = new Date(Date.UTC(yyyy, MM - 1, dd, 0, 0, 0));
+      return formatVNDateTime(d);
+    }
+  }
+
+  return null;
+}
 
   /* ====== Table list ====== */
   function renderTable(items){
@@ -518,8 +564,9 @@ function cellVal(x) {
   if (x === null || x === undefined || x === '')
     return '<span class="text-gray-400">—</span>';
 
-  // Giới tính
-  if (typeof x === 'string') {
+  // ⬇️ Chỉ map Nam/Nữ khi đang render trường "gioi_tinh"
+  const fieldCtx = (window.currentRenderField || '').toLowerCase();
+  if (fieldCtx === 'gioi_tinh' && typeof x === 'string') {
     const s = x.trim().toLowerCase();
     if (s === 'm' || s === 'nam' || s === 'male' || s === '1') return 'Nam';
     if (s === 'f' || s === 'nu' || s === 'nữ'  || s === 'female' || s === '0') return 'Nữ';
@@ -628,6 +675,29 @@ function cellVal(x) {
     return {};
   }
 
+  let __VER_NAME_CACHE = {};
+
+  async function getChecklistVersionName(id) {
+    if (!id && id !== 0) return null;
+    const key = String(id);
+    if (__VER_NAME_CACHE[key]) return __VER_NAME_CACHE[key];
+
+    // Ưu tiên BE nếu có field name trong /checklist/version/:id
+    try {
+      const r = await apiFetch('/checklist/version/' + encodeURIComponent(key));
+      if (r?.ok) {
+        const j = await r.json().catch(() => null);
+        const name =
+          j?.display_name || j?.name || j?.title || j?.version_name || key;
+        __VER_NAME_CACHE[key] = name;
+        return name;
+      }
+    } catch (_) {}
+
+    // Fallback: trả về chính ID nếu không lấy được
+    __VER_NAME_CACHE[key] = key;
+    return key;
+  }
   /* ====== Render bảng danh mục hiện tại ====== */
   function renderDocsCurrentTable(docsObj={}, nameMap={}){
     const safe = (docsObj && typeof docsObj === 'object') ? docsObj : {};
@@ -710,6 +780,7 @@ async function openDetail(id) {
     if (!r || !r.ok) throw new Error('Không tải được chi tiết');
     const d = await r.json();
     state.currentLog = d;
+    resetHardDeleteUI();
 
     // ⚙️ Hiển thị MSSV thay cho STT
     const label = d?.target_id ? `MSSV: ${String(d.target_id)}` : `STT: ${String(id)}`;
@@ -725,7 +796,7 @@ async function openDetail(id) {
     const isHardDeleted      = (String(d?.action || '').toUpperCase() === 'DELETE_HARD') || (d?.new_values?.hard_deleted === true);
     const isSoftDeleteAction = ['DELETE_SOFT', 'DELETE'].includes(String(d?.action || '').toUpperCase());
 
-    // ===== Chuẩn hoá snapshot trước/sau (dùng cho quyết định hiển thị nút)
+    // ===== Chuẩn hoá snapshot trước/sau
     const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
     const asObj = (x) => (isObj(x) ? x : {});
     const prev  = asObj(d.prev_values);
@@ -741,46 +812,108 @@ async function openDetail(id) {
     const hasPrev = Object.keys(prev).length > 0;
     const restorableActions = new Set(['UPDATE', 'DELETE_SOFT', 'DELETE']);
 
-    // nếu là xóa tạm / delete mềm -> kiểm tra xem hiện tại đã bị xóa vĩnh viễn chưa
     let purgedNow = (action === 'DELETE_HARD') || (d?.new_values?.hard_deleted === true);
     if (!purgedNow && ['DELETE_SOFT','DELETE'].includes(action) && d?.target_id) {
-      purgedNow = await alreadyPurgedByLog(d.target_id);   // hỏi Journal xem có log DELETE_HARD không
+      purgedNow = await alreadyPurgedByLog(d.target_id);
     }
 
     const isRestorable =
-      isApplicant &&
-      canTarget &&
-      !purgedNow &&                 // <-- đã bị xóa vĩnh viễn thì KHÔNG cho khôi phục
-      restorableActions.has(action) &&
-      hasPrev;                      // UPDATE/DELETE_* đều cần snapshot trước
+      isApplicant && canTarget && !purgedNow &&
+      restorableActions.has(action) && hasPrev;
 
     if (isRestorable) {
       btnRestore.style.display = '';
     } else {
-      // btnRestore.style.display = 'none';
-      // nếu anh muốn hiện mờ (disabled) thay vì ẩn hẳn, dùng 3 dòng dưới và bỏ dòng display = 'none'
       btnRestore.style.display = '';
       btnRestore.disabled = true;
       btnRestore.title = purgedNow ? 'Dữ liệu đã bị xóa vĩnh viễn, không thể khôi phục.' : 'Không có dữ liệu cũ để khôi phục.';
     }
 
-    // ===== Nút "Xoá vĩnh viễn" (Admin + log xóa mềm/DELETE + có target + chưa bị hard-delete)
+    // ===== Nút "Xoá vĩnh viễn"
     const btnHardDelete = document.getElementById('btnHardDelete');
-    const showHardDel = IS_ADMIN && isApplicant && canTarget && isSoftDeleteAction && !isHardDeleted;
+    
+    // Ẩn nếu đối tượng đã bị xóa vĩnh viễn ở log khác (purgedNow)
+    const showHardDel =
+      IS_ADMIN &&
+      isApplicant &&
+      canTarget &&
+      isSoftDeleteAction &&
+      !isHardDeleted &&
+      !purgedNow;
+
     btnHardDelete.style.display = showHardDel ? '' : 'none';
 
     // ===== Phần render chi tiết
     const nameMap = await getChecklistNameMap();
-    const current = Object.keys(next).length ? next : prev;
-
     const isDeleteAction = ['DELETE_SOFT', 'DELETE', 'DELETE_HARD'].includes(action);
 
-    // Chọn snapshot & docs cho phần “Dữ liệu …”
-    const snapshotForView = isDeleteAction ? prev : (Object.keys(next).length ? next : prev);
+    // Lấy Version Name từ ID (cache nhẹ)
+    const getChecklistVersionName = async (idVal) => {
+      // if (!idVal && idVal !== 0) return null;
+      // const key = String(idVal);
+      // if (__VER_NAME_CACHE[key]) return __VER_NAME_CACHE[key];
+
+      // // Ưu tiên BE nếu có field name trong /checklist/version/:id
+      // try {
+      //   const r = await apiFetch('/checklist/version/' + encodeURIComponent(key));
+      //   if (r?.ok) {
+      //     const j = await r.json().catch(() => null);
+      //     const name =
+      //       j?.display_name || j?.name || j?.title || j?.version_name || key;
+      //     __VER_NAME_CACHE[key] = name;
+      //     return name;
+      //   }
+      // } catch (_) {}
+
+      // // Fallback: trả về chính ID nếu không lấy được
+      // __VER_NAME_CACHE[key] = key;
+      // return key;
+    };
+
+    // Chọn snapshot & gộp metadata xóa (hiển thị trong “Dữ liệu trước khi xóa”)
+    const baseSnap = isDeleteAction ? prev : (Object.keys(next).length ? next : prev);
+
+    // Thêm tên Version vào snapshot để show
+    const verId =
+      next?.checklist_version_id ??
+      prev?.checklist_version_id ??
+      d?.checklist_version_id ?? null;
+
+    const verName = await getChecklistVersionName(verId);
+
+    const deletionMeta = {
+      deleted_at:     next?.deleted_at     ?? d?.deleted_at     ?? baseSnap?.deleted_at     ?? null,
+      deleted_by:     next?.deleted_by     ?? d?.deleted_by     ?? baseSnap?.deleted_by     ?? null,
+      deleted_reason: next?.deleted_reason ?? d?.deleted_reason ?? baseSnap?.deleted_reason ?? null,
+    };
+
+    const snapshotForView = {
+      ...baseSnap,
+      checklist_version_name: verName || baseSnap?.checklist_version_name || null,
+      ...deletionMeta
+    };
 
     const asDict = (x) => (isObj(x) ? x : {});
     const docsBefore = asDict(prev.docs_before) || asDict(prev.docs);
     const docsAfter  = asDict(next.docs_after)  || asDict(next.docs);
+
+    // Chuẩn hoá docsDiff từ log/snapshot
+    let docsDiff = Array.isArray(next.docs_diff)
+      ? next.docs_diff
+      : (Array.isArray(d.docs_diff) ? d.docs_diff : []);
+
+    if (!Array.isArray(docsDiff) || docsDiff.length === 0) {
+      const beforeKeys = Object.keys(docsBefore || {});
+      const afterKeys  = Object.keys(docsAfter  || {});
+      const all = new Set([...beforeKeys, ...afterKeys]);
+      docsDiff = Array.from(all)
+        .map(code => ({
+          code,
+          from: Number((docsBefore || {})[code] || 0),
+          to:   Number((docsAfter  || {})[code]  || 0)
+        }))
+        .filter(x => x.from !== x.to);
+    }
 
     const docsForView = isDeleteAction
       ? (Object.keys(docsBefore).length ? docsBefore : docsAfter)
@@ -789,29 +922,28 @@ async function openDetail(id) {
     // Tính diff thường (bỏ qua docs*)
     const diffs = diffKeysFiltered(prev, next);
 
-    // docs_diff có thể là array/object/null — chuẩn hóa
-    let docsDiff = Array.isArray(next.docs_diff) ? next.docs_diff : (Array.isArray(d.docs_diff) ? d.docs_diff : []);
-    if (!Array.isArray(docsDiff) || docsDiff.length === 0) {
-      const beforeKeys = Object.keys(asDict(docsBefore));
-      const afterKeys  = Object.keys(asDict(docsAfter));
-      const all = new Set([...beforeKeys, ...afterKeys]);
-      docsDiff = Array.from(all)
-        .map(code => ({
-          code,
-          from: Number((docsBefore || {})[code] || 0),
-          to:   Number((docsAfter  || {})[code] || 0)
-        }))
-        .filter(x => x.from !== x.to);
-    }
+    // Đổi diff checklist_version_id -> checklist_version_name (tên)
+    const diffsResolved = await Promise.all(
+      diffs.map(async (x) => {
+        if (String(x.field) === 'checklist_version_id') {
+          return {
+            field: 'checklist_version_name',
+            from: await getChecklistVersionName(x.from),
+            to:   await getChecklistVersionName(x.to)
+          };
+        }
+        return x;
+      })
+    );
 
     /* Thông tin chung */
     const infoHtml = `
       <h4 class="mt-1 mb-2 font-bold text-blue-800">Thông tin chung</h4>
       <div class="grid grid-cols-[220px_1fr] border border-gray-200 rounded-xl overflow-hidden">
-        <div class="bg-slate-50 font-semibold p-2">Thời gian</div>     <div class="p-2">${cellVal(d.occurred_at)}</div>
+        <div class="bg-slate-50 font-semibold p-2">Thời gian</div>     <div class="p-2">${cellValFor('occurred_at', d.occurred_at)}</div>
         <div class="bg-slate-50 font-semibold p-2">Người thao tác</div><div class="p-2">${escapeHtml(d.actor_name || d.actor_id || '—')}</div>
         <div class="bg-slate-50 font-semibold p-2">Hành động</div>     <div class="p-2">${escapeHtml(actionVi(d.action))}</div>
-        <div class="bg-slate-50 font-semibold p.2">Trạng thái</div>    <div class="p-2">${escapeHtml(d.status || '')}</div>
+        <div class="bg-slate-50 font-semibold p-2">Trạng thái</div>    <div class="p-2">${escapeHtml(d.status || '')}</div>
         <div class="bg-slate-50 font-semibold p-2">Đối tượng (MSSV)</div><div class="p-2">${escapeHtml(d.target_id || '—')}</div>
         <div class="bg-slate-50 font-semibold p-2">Đường dẫn</div>     <div class="p-2">${escapeHtml(d.path || '')}</div>
         <div class="bg-slate-50 font-semibold p-2">IP</div>             <div class="p-2">${escapeHtml(d.ip_address || '')}</div>
@@ -830,13 +962,14 @@ async function openDetail(id) {
       ["Số điện thoại","so_dt"],
       ["Email học viên","email_hoc_vien"],
       ["Ngành nhập học","nganh_nhap_hoc"],
+      ["Version danh mục","checklist_version_name"],
       ["Đợt","dot"],
       ["Khóa","khoa"],
       ["Đã TN trước đó","da_tn_truoc_do"],
       ["Ghi chú","ghi_chu"],
       ["Người nhận","nguoi_nhan_ky_ten"],
       ["Trạng thái","status"],
-      ["Thời điểm xóa","deleted_at"],
+      ["Thời điểm xóa (UTC)","deleted_at"],
       ["Người xóa","deleted_by"],
       ["Lý do xóa","deleted_reason"]
     ];
@@ -855,7 +988,10 @@ async function openDetail(id) {
     `;
 
     /* Trường thay đổi */
-    const diffHtml = diffs.length
+    const diffsFiltered = diffsResolved.filter(x =>
+        !['ho_dem','ten','checklist_version_id'].includes(String(x.field))
+      );
+    const diffHtml = diffsFiltered.length
       ? `<h4 class="mt-6 mb-2 font-bold text-blue-800">Trường thay đổi</h4>
           <table class="w-full text-sm border border-gray-200 rounded-xl overflow-hidden">
             <thead class="bg-slate-50">
@@ -866,7 +1002,7 @@ async function openDetail(id) {
               </tr>
             </thead>
             <tbody>
-              ${diffs.map(x => `
+              ${diffsFiltered.map(x => `
                 <tr class="border-t">
                   <td class="p-2 font-semibold">${escapeHtml(getFieldLabel(x.field))}</td>
                   <td class="p-2">${cellValFor(x.field, x.from)}</td>
@@ -888,17 +1024,19 @@ async function openDetail(id) {
 
     // Admin-only hard delete button (phòng hờ lần nữa)
     const isDel = ['DELETE','DELETE_SOFT'].includes(action);
-    $('#btnHardDelete').style.display = (isDel && IS_ADMIN) ? '' : 'none';
+    if (!(isDel && IS_ADMIN)) {
+      $('#btnHardDelete').style.display = 'none';  // chỉ ẩn thêm, KHÔNG bật lại
+    }
 
     $('#detail').style.display = 'flex';
   } catch (e) {
     showNoti('Không tải được chi tiết: ' + (e.message || 'unknown'), 'error');
   } finally {
-    // reset marker dùng cho cellVal
     window.currentRenderSection = null;
     window.currentRenderField   = null;
   }
 }
+
   // === Helper: kiểm tra đã bị xóa vĩnh viễn chưa (dựa vào Journal)
   async function alreadyPurgedByLog(targetId){
     if (!targetId) return false;
@@ -945,9 +1083,9 @@ async function openDetail(id) {
           headers:{'Content-Type':'application/json'},
           body:'{}'
         });
-        if (!r) throw new Error('Không kết nối được máy chủ.');
+        if (!r) throw new Error('Không kết nối được máy chủ!');
         if (!r.ok){
-          let msg = 'Khôi phục thất bại.', reason='';
+          let msg = 'Khôi phục thất bại!', reason='';
           try{
             const ct = r.headers?.get?.('content-type') || '';
             if (ct.includes('application/json')){
@@ -1017,8 +1155,7 @@ async function openDetail(id) {
 
     yes.addEventListener('click', onYes, { once:true });
     no.addEventListener('click', onNo,   { once:true });
-  }
-
+  };
 
   /* ====== Filters / UI ====== */
   function grabFilters(){
@@ -1096,78 +1233,179 @@ async function openDetail(id) {
   });
 
   $('#apiBase').addEventListener('change', ()=>{ localStorage.setItem(STORAGE_KEY, $('#apiBase').value.trim()); });
+/* ====== Hard delete (Admin only) ====== */
+const btnHardDelete       = document.getElementById('btnHardDelete');
+const btnHardDeleteGo     = document.getElementById('btnHardDeleteGo');
+const btnHardDeleteCancel = document.getElementById('btnHardDeleteCancel');
+const hardDelBox          = document.getElementById('hardDelConfirm');
 
-  /* ====== Hard delete (Admin only) ====== */
-  const btnHardDelete = document.getElementById('btnHardDelete');
-  const btnHardDeleteGo = document.getElementById('btnHardDeleteGo');
-  const btnHardDeleteCancel = document.getElementById('btnHardDeleteCancel');
-  const hardDelBox = document.getElementById('hardDelConfirm');
-  const hardDelSel = document.getElementById('hardDelSelect');
-  const hardDelReason = document.getElementById('hardDelReason');
+const hardDelConfirmChk   = document.getElementById('hardDelConfirmChk');  // ✅ checkbox xác nhận
+const hardDelReasonSel    = document.getElementById('hardDelReasonSel');   // ✅ select lý do
+const hardDelReasonWrap   = document.getElementById('hardDelReasonWrap');  // ✅ khối nhập “khác”
+const hardDelReasonText   = document.getElementById('hardDelReasonText');  // ✅ ô nhập “khác”
 
-  btnHardDelete.onclick = () => {
-    if (!IS_ADMIN) { showNoti('Chỉ Admin mới được xóa vĩnh viễn.', 'error'); return; }
-    hardDelBox.classList.remove('hidden');
-    btnHardDeleteGo.classList.remove('hidden');
-    btnHardDeleteCancel.classList.remove('hidden');
-    btnHardDeleteGo.disabled = (hardDelSel.value !== 'CONFIRM_DELETE');
+function getHardDelReason() {
+  const code = (hardDelReasonSel?.value || '').trim();
+  if (!code) return { code: '', text: '' };
+
+  if (code === 'OTHER') {
+    return { code, text: (hardDelReasonText?.value || '').trim() };
+  }
+  const map = {
+    TRUNG_LAP: 'Hồ sơ trùng lặp',
+    NHAM_MSSV: 'Nhầm MSSV/mục tiêu',
+    YEU_CAU_NGUOI_DUNG: 'Yêu cầu người dùng xóa dữ liệu',
+    TEST_DATA: 'Dữ liệu thử nghiệm',
   };
-  hardDelSel?.addEventListener('change', () => { btnHardDeleteGo.disabled = (hardDelSel.value !== 'CONFIRM_DELETE'); });
-  btnHardDeleteCancel.onclick = () => {
-    hardDelBox.classList.add('hidden');
-    btnHardDeleteGo.classList.add('hidden');
-    btnHardDeleteCancel.classList.add('hidden');
-    if (hardDelSel) hardDelSel.value = '';
-    if (hardDelReason) hardDelReason.value = '';
-  };
-  btnHardDeleteGo.onclick = async () => {
-    if (!IS_ADMIN) { showNoti('Chỉ Admin mới được xóa vĩnh viễn.', 'error'); return; }
-    const log = state.currentLog; if (!log) return;
-    if (hardDelSel.value !== 'CONFIRM_DELETE'){ showNoti('Bạn chưa xác nhận xóa vĩnh viễn.', 'warning'); return; }
+  return { code, text: map[code] || code };
+}
 
-    const confirmBox = document.getElementById('confirmHardDel');
-    const yesBtn = document.getElementById('btnConfirmHardDelYes');
-    const noBtn  = document.getElementById('btnConfirmHardDelNo');
-    confirmBox.classList.remove('hidden');
-    const onNo = () => { confirmBox.classList.add('hidden'); };
-    const onYes = async () => {
-      confirmBox.classList.add('hidden'); btnHardDeleteGo.disabled = true;
-      try{
-        const r = await apiFetch('/journal/hard-delete', {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({
-            log_id: log.id, target_type: log.target_type, target_id: log.target_id,
-            confirm: 'CONFIRM_DELETE', reason: (hardDelReason?.value || '').trim()
-          })
-        });
-        if (!r) throw new Error('Không kết nối được máy chủ.');
-        if (!r.ok) {
-          let msg = `Hard-delete thất bại (HTTP ${r.status})`;
-          try {
-            const ct = r.headers?.get?.('content-type') || '';
-            if (ct.includes('application/json')) {
-              const j = await r.json().catch(()=>null);
-              if (j?.detail) msg = j.detail;
-            } else {
-              const t = await r.text().catch(()=> '');
-              if (t) msg = t;
-            }
-          } catch(_) {}
-          showNoti(msg, 'error');
-          return;
+function updateHardDelOkState() {
+  const confirmed = !!(hardDelConfirmChk?.checked);
+  const code      = (hardDelReasonSel?.value || '');
+  const needText  = (code === 'OTHER');
+  const hasText   = (hardDelReasonText?.value || '').trim().length > 0;
+
+  if (hardDelReasonWrap) hardDelReasonWrap.classList.toggle('hidden', !needText);
+
+  const hasReason = code && (!needText || hasText);
+  btnHardDeleteGo.disabled = !(confirmed && hasReason);
+}
+
+// mở panel
+btnHardDelete.onclick = () => {
+  if (!IS_ADMIN) { showNoti('Chỉ Admin mới được xóa vĩnh viễn.', 'error'); return; }
+
+  // reset UI
+  if (hardDelConfirmChk)  hardDelConfirmChk.checked = false;
+  if (hardDelReasonSel)   hardDelReasonSel.value = '';
+  if (hardDelReasonText)  hardDelReasonText.value = '';
+  if (hardDelReasonWrap)  hardDelReasonWrap.classList.add('hidden');
+
+  hardDelBox.classList.remove('hidden');
+  btnHardDeleteGo.classList.remove('hidden');
+  btnHardDeleteCancel.classList.remove('hidden');
+  updateHardDelOkState();
+};
+
+// bind change
+hardDelConfirmChk?.addEventListener('change', updateHardDelOkState);
+hardDelReasonSel?.addEventListener('change', updateHardDelOkState);
+hardDelReasonText?.addEventListener('input', updateHardDelOkState);
+
+// hủy panel
+btnHardDeleteCancel.onclick = () => {
+  hardDelBox.classList.add('hidden');
+  btnHardDeleteGo.classList.add('hidden');
+  btnHardDeleteCancel.classList.add('hidden');
+  if (hardDelConfirmChk) hardDelConfirmChk.checked = false;
+  if (hardDelReasonSel)  hardDelReasonSel.value = '';
+  if (hardDelReasonText) hardDelReasonText.value = '';
+  if (hardDelReasonWrap) hardDelReasonWrap.classList.add('hidden');
+  updateHardDelOkState();
+};
+// ==== Hàm thực thi gọi API xóa vĩnh viễn ====
+async function doHardDelete() {
+  const log = state.currentLog;
+  if (!log) return;
+
+  const { code, text } = getHardDelReason();
+
+  try {
+    const r = await apiFetch('/journal/hard-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        log_id: log.id,
+        target_type: log.target_type,
+        target_id: log.target_id,
+        confirm: 'CONFIRM_DELETE',
+        reason_code: code,
+        reason: text,
+      }),
+    });
+
+    if (!r) throw new Error('Không kết nối được máy chủ.');
+    if (!r.ok) {
+      let msg = `Hard-delete thất bại (HTTP ${r.status})`;
+      try {
+        const ct = r.headers?.get?.('content-type') || '';
+        if (ct.includes('application/json')) {
+          const j = await r.json().catch(() => null);
+          if (j?.detail) msg = j.detail;
+        } else {
+          const t = await r.text().catch(() => '');
+          if (t) msg = t;
         }
-        showNoti('Đã xóa vĩnh viễn!','success');
-        btnHardDeleteCancel.click();
-        document.getElementById('detail').style.display = 'none';
-        load();
-      }catch(e){ showNoti('Hard-delete lỗi: '+(e.message||'unknown'),'error'); }
-      finally{ btnHardDeleteGo.disabled = false; }
-      yesBtn.removeEventListener('click', onYes); noBtn.removeEventListener('click', onNo);
-    };
-    noBtn.addEventListener('click', onNo, { once:true });
-    yesBtn.addEventListener('click', onYes, { once:true });
+      } catch (_) {}
+      showNoti(msg, 'error');
+      return;
+    }
+
+    showNoti('Đã xóa vĩnh viễn!', 'success');
+    btnHardDeleteCancel.click();
+    document.getElementById('detail').style.display = 'none';
+    load();
+  } catch (e) {
+    showNoti('Hard-delete lỗi: ' + (e.message || 'unknown'), 'error');
+  }
+}
+
+// thực thi xóa
+btnHardDeleteGo.onclick = async () => {
+  if (!IS_ADMIN) { showNoti('Chỉ Admin mới được xóa vĩnh viễn.', 'error'); return; }
+  const log = state.currentLog; if (!log) return;
+
+  // điều kiện đủ
+  if (!hardDelConfirmChk?.checked) { showNoti('Bạn chưa xác nhận xóa vĩnh viễn.', 'warning'); return; }
+  const { code, text } = getHardDelReason();
+  if (!code) { showNoti('Vui lòng chọn lý do xóa.', 'warning'); return; }
+  if (code === 'OTHER' && !text) { showNoti('Vui lòng nhập lý do khác.', 'warning'); return; }
+
+  // popup xác nhận lần cuối (nếu không có modal thì dùng confirm đơn giản)
+  const confirmBox = document.getElementById('confirmHardDel');
+  const yesBtn = document.getElementById('btnConfirmHardDelYes');
+  const noBtn  = document.getElementById('btnConfirmHardDelNo');
+
+  if (!confirmBox || !yesBtn || !noBtn) {
+    if (!window.confirm('Xác nhận xóa vĩnh viễn hồ sơ này?')) return;
+    await doHardDelete();
+    return;
+  }
+
+  confirmBox.classList.remove('hidden');
+
+  const onNo = () => { confirmBox.classList.add('hidden'); };
+  const onYes = async () => {
+    confirmBox.classList.add('hidden');
+    btnHardDeleteGo.disabled = true;
+    await doHardDelete();
+    btnHardDeleteGo.disabled = false;
+    yesBtn.removeEventListener('click', onYes);
+    noBtn.removeEventListener('click', onNo);
   };
-  (function () {
+
+  noBtn.addEventListener('click', onNo,  { once: true });
+  yesBtn.addEventListener('click', onYes, { once: true });
+};
+
+function resetHardDeleteUI() {
+  // Ẩn toàn bộ khu vực xác nhận
+  hardDelBox.classList.add('hidden');
+  btnHardDeleteGo.classList.add('hidden');
+  btnHardDeleteCancel.classList.add('hidden');
+
+  // Reset trạng thái
+  const chk = document.getElementById('hardDelConfirmChk');
+  if (chk) chk.checked = false;
+  if (hardDelReasonSel) hardDelReasonSel.value = '';
+  if (hardDelReasonText) hardDelReasonText.value = '';
+  if (hardDelReasonWrap) hardDelReasonWrap.classList.add('hidden');
+
+  btnHardDeleteGo.disabled = true;
+}
+
+(function () {
     // Ưu tiên query expired=1 (khi bị redirect)
     const params = new URLSearchParams(location.search);
     const byQuery = params.get('expired') === '1';

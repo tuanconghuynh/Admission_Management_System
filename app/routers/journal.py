@@ -23,6 +23,22 @@ router = APIRouter(prefix="/journal", tags=["Journal"])
 # Chỉ Admin hoặc Nhân viên được phép thao tác với nhật ký
 RequireAdmin = Depends(require_roles("Admin", "NhanVien"))
 
+# ---------------- helpers tên ----------------
+def _display_name_from_obj(a: Applicant) -> str:
+    hd = (getattr(a, "ho_dem", None) or "").strip()
+    t = (getattr(a, "ten", None) or "").strip()
+    if hd or t:
+        return f"{hd} {t}".strip()
+    return (getattr(a, "ho_ten", None) or "").strip()
+
+def _sync_full_name(a: Applicant):
+    """
+    Đồng bộ ho_ten từ ho_dem + ten (giai đoạn chuyển tiếp).
+    Không raise nếu model chưa có cột tách.
+    """
+    if hasattr(a, "ho_dem") and hasattr(a, "ten") and hasattr(a, "ho_ten"):
+        a.ho_ten = _display_name_from_obj(a) or None
+
 # ===================== LIST =====================
 @router.get("/", dependencies=[RequireAdmin])
 def list_logs(
@@ -50,7 +66,6 @@ def list_logs(
         qset = qset.filter(AuditLog.target_type == target_type)
     if target_id:
         qset = qset.filter(AuditLog.target_id == target_id)
-
     # Keyword (nhiều cột)
     if q:
         like = f"%{q.strip()}%"
@@ -62,11 +77,9 @@ def list_logs(
             (AuditLog.action.ilike(like)) |
             (AuditLog.target_id.ilike(like))
         )
-
     # Người thao tác
     if actor:
         qset = qset.filter(AuditLog.actor_name.ilike(f"%{actor.strip()}%"))
-
     # Khoảng ngày theo occurred_at (ISO yyyy-mm-dd)
     from_dt = None
     to_dt = None
@@ -105,7 +118,6 @@ def list_logs(
             order_dir = "asc" if dir_ == "asc" else "desc"
         except Exception:
             pass
-
     total = qset.count()
     qset = qset.order_by(order_col.asc() if order_dir == "asc" else order_col.desc())
     items = (
@@ -113,7 +125,6 @@ def list_logs(
            .limit(page_size)
            .all()
     )
-
     return {
         "total": total,
         "page": page,
@@ -127,8 +138,20 @@ def log_detail(log_id: int, db: Session = Depends(get_db)):
     row = db.query(AuditLog).get(log_id)
     if not row:
         raise HTTPException(404, "Không tìm thấy log")
-    return row.to_dict()
 
+    data = row.to_dict()
+
+    # cờ đã xóa vĩnh viễn cho cùng target
+    already_hard = False
+    if row.target_id:
+        already_hard = db.query(AuditLog).filter(
+            AuditLog.target_type == row.target_type,
+            AuditLog.target_id == row.target_id,
+            AuditLog.action == "DELETE_HARD",
+        ).count() > 0
+
+    data["already_hard_deleted_target"] = already_hard
+    return data
 # ===================== RESTORE =====================
 @router.post("/restore/{log_id}", dependencies=[RequireAdmin])
 def restore_from_log(
@@ -169,16 +192,15 @@ def restore_from_log(
         })
         if hasattr(obj, "is_deleted"):
             apply_values["is_deleted"] = False
-
     # Áp lại giá trị
     for k, v in apply_values.items():
         if hasattr(obj, k):
             setattr(obj, k, v)
-
+    # Đồng bộ lại ho_ten từ ho_dem + ten nếu có
+    _sync_full_name(obj)
     db.add(obj)
     db.commit()
     db.refresh(obj)
-
     # Huỷ DeletionRequest liên quan (nếu có)
     try:
         reqs = (
@@ -195,7 +217,6 @@ def restore_from_log(
             db.commit()
     except Exception:
         pass  # không chặn luồng nếu lỗi nhỏ
-
     # Ghi audit
     write_audit(
         db,
@@ -231,7 +252,6 @@ def list_deletion_requests(
          .limit(size)
          .all()
     )
-
     def to_dict(r):
         return {
             "id": r.id,
@@ -257,37 +277,68 @@ def hard_delete(
     db: Session = Depends(get_db),
 ):
     """
-    Xoá VĨNH VIỄN dữ liệu mà không cần admin key.
-    Body:
+    Xóa VĨNH VIỄN dữ liệu (không cần admin key bổ sung).
+
+    Payload mới (UI mới - RECOMMENDED):
       {
         "log_id": 123,
         "target_type": "Applicant",
         "target_id": "2310000040",
-        "confirm": "CONFIRM_DELETE",      # <== bắt buộc
-        "reason": "Lý do ..."              # tuỳ chọn
+        "confirm": "CONFIRM_DELETE",     # bắt buộc
+        "reason_code": "TRUNG_LAP" | "NHAM_MSSV" | "YEU_CAU_NGUOI_DUNG" | "TEST_DATA" | "OTHER",  # bắt buộc
+        "reason": "… (bắt buộc nếu reason_code=OTHER, ngược lại là mô tả auto)"
       }
+
+    Tương thích ngược (UI cũ):
+      - Nếu không gửi reason_code mà chỉ có reason: vẫn chấp nhận,
+        sẽ map reason_code = "OTHER" nếu không nhận diện được.
     """
+    # ----------- Lấy tham số cơ bản -----------
     log_id = payload.get("log_id")
     ttype = (payload.get("target_type") or "").strip() or "Applicant"
     tid = str(payload.get("target_id") or "").strip()
     confirm = (payload.get("confirm") or "").strip()
-    reason = (payload.get("reason") or "").strip()
 
     if not log_id or not ttype or not tid:
         raise HTTPException(400, "Thiếu tham số")
 
-    # xác nhận từ dropdown ở client
     if confirm != "CONFIRM_DELETE":
         raise HTTPException(400, "Bạn chưa xác nhận xóa vĩnh viễn")
 
     if ttype != "Applicant":
         raise HTTPException(400, f"Chưa hỗ trợ hard-delete cho {ttype}")
 
+    # ----------- Xử lý reason_code + reason -----------
+    raw_code = (payload.get("reason_code") or "").strip().upper()
+    raw_text = (payload.get("reason") or "").strip()
+
+    # Map mã -> mô tả mặc định
+    REASON_MAP = {
+        "TRUNG_LAP": "Hồ sơ trùng lặp",
+        "NHAM_MSSV": "Nhầm MSSV/mục tiêu",
+        "YEU_CAU_NGUOI_DUNG": "Yêu cầu người dùng xóa dữ liệu",
+        "TEST_DATA": "Dữ liệu thử nghiệm",
+        "OTHER": "Lý do khác",
+    }
+
+    if not raw_code:
+        # Tương thích ngược: nếu UI cũ chỉ gửi 'reason', auto OTHER
+        raw_code = "OTHER" if raw_text else ""
+    if not raw_code:
+        raise HTTPException(400, "Vui lòng chọn lý do xóa (reason_code).")
+
+    # Nếu chọn OTHER thì bắt buộc có text người dùng nhập
+    if raw_code == "OTHER" and not raw_text:
+        raise HTTPException(400, "Vui lòng nhập lý do khác (reason).")
+
+    # Chuẩn hóa final_text: nếu không phải OTHER, lấy mô tả default
+    final_text = raw_text if raw_code == "OTHER" else REASON_MAP.get(raw_code, raw_code)
+
+    # ----------- Tải đối tượng & snapshot -----------
     a = db.query(Applicant).get(tid)
     if not a:
         raise HTTPException(404, "Không tìm thấy bản ghi")
 
-    # snapshot trước khi xoá để ghi audit (kèm dan_toc)
     def iso(v):
         if not v:
             return None
@@ -301,6 +352,9 @@ def hard_delete(
         "ma_so_hv": a.ma_so_hv,
         "ma_ho_so": a.ma_ho_so,
         "ho_ten": a.ho_ten,
+        "ho_dem": getattr(a, "ho_dem", None),
+        "ten": getattr(a, "ten", None),
+        "full_name": _display_name_from_obj(a),
         "email_hoc_vien": getattr(a, "email_hoc_vien", None),
         "ngay_nhan_hs": iso(getattr(a, "ngay_nhan_hs", None)),
         "ngay_sinh": iso(getattr(a, "ngay_sinh", None)),
@@ -308,28 +362,41 @@ def hard_delete(
         "nganh_nhap_hoc": getattr(a, "nganh_nhap_hoc", None) if hasattr(a, "nganh_nhap_hoc") else getattr(a, "nganh", None),
         "dot": getattr(a, "dot", None),
         "khoa": getattr(a, "khoa", None),
+        "da_tn_truoc_do": getattr(a, "da_tn_truoc_do", None),
+        "ghi_chu": getattr(a, "ghi_chu", None),
+        "nguoi_nhan_ky_ten": getattr(a, "nguoi_nhan_ky_ten", None),
         "status": getattr(a, "status", None),
         "printed": getattr(a, "printed", None),
         "gioi_tinh": getattr(a, "gioi_tinh", None),
-        "dan_toc": getattr(a, "dan_toc", None),  # ✅ thêm dân tộc vào snapshot
+        "dan_toc": getattr(a, "dan_toc", None),
+        "checklist_version_id": getattr(a, "checklist_version_id", None),
     }
 
-    # Xoá chi tiết trước (nếu DB không ON DELETE CASCADE)
+    # ----------- Xóa dữ liệu + chi tiết (nếu không có CASCADE) -----------
     db.execute(delete(ApplicantDoc).where(ApplicantDoc.applicant_ma_so_hv == a.ma_so_hv))
     db.delete(a)
     db.commit()
 
-    # Ghi audit
+    # ----------- Ghi audit với cấu trúc mới -----------
+    new_values = {
+        "hard_deleted": True,
+        "reason_code": raw_code,  # <-- mã lý do
+        "reason": final_text,     # <-- mô tả cuối cùng
+        # giữ tương thích (UI/BE cũ nếu có đọc 'delete_reason'):
+        "deleted_reason": final_text,
+    }
+
     write_audit(
         db,
         action="DELETE_HARD",
         target_type="Applicant",
         target_id=tid,
         prev_values=before,
-        new_values={"hard_deleted": True, "reason": reason},
+        new_values=new_values,
         status="SUCCESS",
         request=request,
     )
     db.commit()
 
-    return {"ok": True, "target_type": ttype, "target_id": tid}
+    return {"ok": True, "target_type": ttype, "target_id": tid, "reason_code": raw_code}
+

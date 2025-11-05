@@ -57,6 +57,7 @@ git push
 
 
 reset database
+
 -- Tắt ràng buộc khóa ngoại tạm thời
 SET FOREIGN_KEY_CHECKS = 0;
 
@@ -82,3 +83,31 @@ ALTER TABLE checklist_items AUTO_INCREMENT = 1;
 ALTER TABLE checklist_versions AUTO_INCREMENT = 1;
 ALTER TABLE deletion_requests AUTO_INCREMENT = 1;
 ALTER TABLE students AUTO_INCREMENT = 1;
+
+
+
+Chạy test:
+
+Mở CMD chạy lệnh: C:\laragon\bin\ngrok\ngrok.exe" http 8000
+
+Tại server chạy lệnh: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --proxy-headers --forwarded-allow-ips="*"
+
+hoặc mở server như bình thường: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+Cách 2 chạy test"
+
+1️⃣ Mở lại server FastAPI
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips="*"
+
+2️⃣ Mở CMD khác và chạy tunnel
+"C:\laragon\bin\ngrok\ngrok.exe" http 8000
+
+hoặc qua tài khoản:
+"C:\laragon\bin\ngrok\ngrok.exe" http 8000 --basic-auth "loginAMS:hutech@AMS"
+- Tài khoản: loginAMS
+- Pass: hutech@AMS
+
+
+→ Ngrok sẽ in ra dòng:
+
+Forwarding  https://xxxxx.ngrok-free.dev (truy cập vào đây để chạy) -> http://localhost:8000

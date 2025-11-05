@@ -7,6 +7,8 @@
   <link rel="icon" href="hutech.png" type="image/png" />
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Optional: chống clickjacking cơ bản (chỉ hiệu lực khi set qua header là tốt nhất) -->
+  <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
 </head>
 <body class="bg-gray-50 min-h-screen p-6 flex flex-col">
   <div class="max-w-4xl mx-auto w-full space-y-6">
@@ -19,7 +21,7 @@
         </a>
         <h1 class="text-2xl md:text-3xl font-bold">Thông tin tài khoản</h1>
       </div>
-      <button id="btnLogout" class="btn btn-outline">Đăng xuất</button>
+      <button id="btnLogout" class="btn btn-outline" type="button" aria-haspopup="dialog" aria-controls="logoutModal">Đăng xuất</button>
     </header>
 
     <!-- Flash từ BE -->
@@ -36,17 +38,17 @@
     </div>
 
     <!-- Thông tin -->
-    <section class="card">
+    <section class="card" aria-labelledby="info-title">
       <div class="flex items-center justify-between">
-        <h2 class="section-title">Thông tin của tôi</h2>
+        <h2 id="info-title" class="section-title">Thông tin của tôi</h2>
         <div class="flex items-center gap-2">
-          <button id="btnToggleProfile" type="button" class="btn btn-outline">Chỉnh sửa hồ sơ</button>
-          <button id="btnTogglePw" type="button" class="btn btn-primary">Đổi mật khẩu</button>
+          <button id="btnToggleProfile" type="button" class="btn btn-outline" aria-controls="profileForm" aria-expanded="false">Chỉnh sửa hồ sơ</button>
+          <button id="btnTogglePw" type="button" class="btn btn-primary" aria-controls="pwForm" aria-expanded="false">Đổi mật khẩu</button>
         </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-        <div><div class="label">Username</div><div class="font-mono">{{ me.username }}</div></div>
+        <div><div class="label">Username</div><div class="font-mono break-all">{{ me.username }}</div></div>
         <div><div class="label">Họ tên</div><div>{{ me.full_name or '—' }}</div></div>
 
         <div>
@@ -54,7 +56,7 @@
           <div data-dateonly>{{ me.dob or '—' }}</div>
         </div>
 
-        <div><div class="label">Email</div><div>{{ me.email or '—' }}</div></div>
+        <div><div class="label">Email</div><div class="break-all">{{ me.email or '—' }}</div></div>
         <div><div class="label">Quyền</div><div>{{ me.role }}</div></div>
         <div><div class="label">Trạng thái</div><div>{{ "Đang hoạt động" if me.is_active else "Đã khóa" }}</div></div>
         <div><div class="label">Lần đổi mật khẩu</div><div data-datetime>{{ me.password_changed_at or '—' }}</div></div>
@@ -63,53 +65,61 @@
     </section>
 
     <!-- Cập nhật hồ sơ -->
-    <section id="profileForm" class="card hidden">
-      <h2 class="section-title">Cập nhật hồ sơ</h2>
+    <section id="profileForm" class="card hidden" aria-labelledby="profile-title">
+      <h2 id="profile-title" class="section-title">Cập nhật hồ sơ</h2>
       <form method="post" action="/account/profile" class="grid md:grid-cols-3 gap-3" onsubmit="return lockSubmit(this)">
+        <!-- CSRF (nếu BE có) -->
+        {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token }}">{% endif %}
+
         <div class="md:col-span-1">
-          <div class="label">Họ và tên</div>
-          <input class="input" name="full_name" value="{{ me.full_name or '' }}">
+          <label class="label" for="pf-fullname">Họ và tên</label>
+          <input id="pf-fullname" class="input" name="full_name" value="{{ me.full_name or '' }}" maxlength="255" autocomplete="name">
         </div>
         <div class="md:col-span-1">
-          <div class="label">Email</div>
-          <input class="input" type="email" name="email" value="{{ me.email or '' }}">
+          <label class="label" for="pf-email">Email</label>
+          <input id="pf-email" class="input" type="email" name="email" value="{{ me.email or '' }}" maxlength="255" autocomplete="email" inputmode="email">
         </div>
         <div class="md:col-span-1">
-          <div class="label">Ngày sinh</div>
-          <input class="input" type="date" name="dob" value="{{ (me.dob|string)[:10] if me.dob else '' }}">
+          <label class="label" for="pf-dob">Ngày sinh</label>
+          <input id="pf-dob" class="input" type="date" name="dob" value="{{ (me.dob|string)[:10] if me.dob else '' }}" autocomplete="bday">
         </div>
         <div class="md:col-span-3 flex justify-end">
-          <button class="btn btn-primary">Lưu thông tin</button>
+          <button class="btn btn-primary" type="submit">Lưu thông tin</button>
         </div>
       </form>
     </section>
 
     <!-- Đổi mật khẩu -->
-    <section id="pwForm" class="card hidden">
-      <h2 class="section-title">Đổi mật khẩu</h2>
-      <form method="post" action="/account/change-password" class="grid gap-3 md:grid-cols-2" onsubmit="return lockSubmit(this)">
+    <section id="pwForm" class="card hidden" aria-labelledby="pw-title">
+      <h2 id="pw-title" class="section-title">Đổi mật khẩu</h2>
+      <form id="pwChangeForm" method="post" action="/account/change-password" class="grid gap-3 md:grid-cols-2" onsubmit="return validatePasswordForm(this)">
+        {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token }}">{% endif %}
+
         <div class="md:col-span-2 relative">
-          <label class="label">Mật khẩu hiện tại</label>
-          <input id="old" name="old_password" type="password" class="input pr-10" required autocomplete="current-password">
-          <button type="button" class="absolute right-2 top-9 text-gray-500" data-toggle-eye="#old">👁️</button>
+          <label class="label" for="old">Mật khẩu hiện tại</label>
+          <input id="old" name="old_password" type="password" class="input pr-10" required autocomplete="current-password" minlength="1" aria-required="true">
+          <button type="button" class="absolute right-2 top-9 text-gray-500" data-toggle-eye="#old" aria-label="Hiện/ẩn mật khẩu hiện tại">👁️</button>
         </div>
         <div class="relative">
-          <label class="label">Mật khẩu mới (≥6 ký tự)</label>
-          <input id="new" name="new_password" type="password" minlength="6" class="input pr-10" required autocomplete="new-password">
-          <button type="button" class="absolute right-2 top-9 text-gray-500" data-toggle-eye="#new">👁️</button>
+          <label class="label" for="new">Mật khẩu mới (≥6 ký tự)</label>
+          <input id="new" name="new_password" type="password" minlength="6" class="input pr-10" required autocomplete="new-password" aria-describedby="pwHelp pwStrength">
+          <button type="button" class="absolute right-2 top-9 text-gray-500" data-toggle-eye="#new" aria-label="Hiện/ẩn mật khẩu mới">👁️</button>
+          <small id="pwHelp" class="text-muted block mt-1">Nên có chữ hoa, số và ký tự đặc biệt.</small>
+          <div id="pwStrength" class="mt-1 text-xs font-medium text-gray-600"></div>
         </div>
         <div class="relative">
-          <label class="label">Xác nhận mật khẩu mới</label>
+          <label class="label" for="cf">Xác nhận mật khẩu mới</label>
           <input id="cf" name="confirm_password" type="password" minlength="6" class="input pr-10" required autocomplete="new-password">
-          <button type="button" class="absolute right-2 top-9 text-gray-500" data-toggle-eye="#cf">👁️</button>
+          <button type="button" class="absolute right-2 top-9 text-gray-500" data-toggle-eye="#cf" aria-label="Hiện/ẩn xác nhận mật khẩu">👁️</button>
+          <small id="pwMatchMsg" class="text-xs mt-1 block"></small>
         </div>
 
-        <div class="md:col-span-2 flex items-center justify-between">
+        <div class="md:col-span-2 flex items-start md:items-center justify-between gap-3">
           <small class="text-muted">
             Tip: Dùng mật khẩu mạnh, không trùng nơi khác.<br>
             Quên mật khẩu? Liên hệ Admin để được reset.
           </small>
-          <button class="btn btn-primary">Đổi mật khẩu</button>
+          <button id="btnSubmitPw" class="btn btn-primary" type="submit" disabled>Đổi mật khẩu</button>
         </div>
       </form>
     </section>
@@ -132,19 +142,21 @@
   </footer>
 
   <!-- Toast -->
-  <div id="toast-wrap"></div>
+  <div id="toast-wrap" aria-live="polite" aria-atomic="true"></div>
+
   <!-- Modal xác nhận đăng xuất -->
   <div id="logoutModal"
-      class="fixed inset-0 hidden z-[1000] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center">
+       class="fixed inset-0 hidden z-[1000] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center"
+       role="dialog" aria-modal="true" aria-labelledby="logoutTitle" aria-describedby="logoutDesc">
     <div class="bg-white rounded-2xl shadow-2xl w-[92vw] max-w-md transform transition-all scale-95 opacity-0"
-        id="logoutBox">
+         id="logoutBox" tabindex="-1">
       <div class="px-6 py-4 border-b flex items-center justify-between">
-        <div class="font-semibold text-gray-800">Xác nhận</div>
+        <div id="logoutTitle" class="font-semibold text-gray-800">Xác nhận</div>
         <button id="lgClose" class="btn btn-outline btn-xs" aria-label="Đóng">✕</button>
       </div>
 
       <div class="px-6 py-5">
-        <p class="text-gray-700">Bạn có chắc muốn đăng xuất không?</p>
+        <p id="logoutDesc" class="text-gray-700">Bạn có chắc muốn đăng xuất không?</p>
       </div>
 
       <div class="px-6 py-4 border-t flex justify-end gap-2 bg-gray-50 rounded-b-2xl">
@@ -156,28 +168,17 @@
 
 <script>
 /* ====== Định dạng thời gian VN ====== */
-// --- Parse an toàn: nếu không có offset thì coi là UTC ---
 function parseToDate(raw) {
   if (!raw) return null;
   let s = String(raw).trim();
-  // nếu có khoảng trắng giữa ngày và giờ -> đổi thành T cho chắc
   if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/.test(s)) s = s.replace(' ', 'T');
 
-  // match ISO basic + optional offset
-  const m = s.match(
-    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+\-]\d{2}:?\d{2})?$/
-  );
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+\-]\d{2}:?\d{2})?$/);
   if (m) {
-    const [_, Y, M, D, h, mnt, sec, ms, tz] = m;
-    if (!tz) {
-      // KHÔNG có timezone -> coi là UTC
-      return new Date(Date.UTC(+Y, +M - 1, +D, +h, +mnt, +sec, +(ms || 0)));
-    }
-    // có timezone -> để JS parse
+    const [, Y, M, D, h, mi, sec, ms, tz] = m;
+    if (!tz) return new Date(Date.UTC(+Y, +M - 1, +D, +h, +mi, +sec, +(ms || 0)));
     return new Date(s);
   }
-
-  // fallback: để JS tự hiểu (chuẩn ISO có Z/offset sẽ OK)
   const d = new Date(s);
   return isNaN(d) ? null : d;
 }
@@ -189,7 +190,7 @@ function formatVNTime(selector) {
     const d = parseToDate(raw);
     if (!d) return;
     el.textContent = new Intl.DateTimeFormat('vi-VN', {
-      timeZone: 'Asia/Ho_Chi_Minh', // UTC+7
+      timeZone: 'Asia/Ho_Chi_Minh',
       hour: '2-digit', minute: '2-digit', second: '2-digit',
       day: '2-digit', month: '2-digit', year: 'numeric'
     }).format(d).replace(',', '');
@@ -200,15 +201,10 @@ function formatVNDate(selector) {
   document.querySelectorAll(selector).forEach(el => {
     const raw = (el.textContent || '').trim();
     if (!raw || raw === '—') return;
-
-    // đã format sẵn dd/MM/yyyy thì bỏ qua
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) return;
-
-    // date-only chuẩn YYYY-MM-DD -> format
     const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     let d = m ? new Date(Date.UTC(+m[1], +m[2]-1, +m[3])) : parseToDate(raw);
     if (!d) return;
-
     el.textContent = new Intl.DateTimeFormat('vi-VN', {
       timeZone: 'Asia/Ho_Chi_Minh',
       day: '2-digit', month: '2-digit', year: 'numeric'
@@ -221,15 +217,23 @@ document.querySelectorAll('[data-toggle-eye]').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     const input=document.querySelector(btn.getAttribute('data-toggle-eye'));
     if(!input) return;
-    input.type = (input.type==='password')?'text':'password';
-    btn.textContent = (input.type==='password')?'👁️':'🙈';
+    const isPw = input.type==='password';
+    input.type = isPw?'text':'password';
+    btn.setAttribute('aria-pressed', String(isPw));
+    btn.textContent = isPw ? '🙈' : '👁️';
   });
 });
 
 /* ====== Chống double submit ====== */
 function lockSubmit(form){
   const btn=form.querySelector('button[type=submit]');
-  if(btn){ btn.disabled=true; btn.classList.add('opacity-60'); }
+  if(btn){
+    btn.disabled=true;
+    btn.dataset.origText = btn.textContent;
+    btn.textContent='Đang lưu...';
+    btn.classList.add('opacity-60', 'cursor-not-allowed');
+  }
+  form.querySelectorAll('input,select,textarea,button').forEach(el=>el.readOnly = true);
   return true;
 }
 
@@ -237,7 +241,8 @@ function lockSubmit(form){
 function showToast(message, level='info', ms=4000){
   const wrap=document.getElementById('toast-wrap');
   const t=document.createElement('div');
-  t.className='toast '+(level==='success'?'success':level==='error'?'error':level==='warn'?'warn':'');
+  t.className='toast '+(level==='success'?'success':level==='error'?'error':level==='warn'?'warn':'' );
+  t.role='status'; t.ariaLive='polite';
   t.textContent=message;
   wrap.appendChild(t);
   requestAnimationFrame(()=> t.classList.add('show'));
@@ -246,13 +251,15 @@ function showToast(message, level='info', ms=4000){
   setTimeout(hide, ms);
 }
 
-// === Modal Confirm Logout ===
+/* ====== Modal Confirm Logout (focus trap) ====== */
 function askConfirmLogout() {
   const wrap = document.getElementById('logoutModal');
   const box = document.getElementById('logoutBox');
   const okBtn = document.getElementById('lgOK');
   const cancel = document.getElementById('lgCancel');
   const closeX = document.getElementById('lgClose');
+  const focusablesSel = 'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])';
+  const lastActive = document.activeElement;
 
   return new Promise(resolve => {
     const done = (val) => {
@@ -261,6 +268,7 @@ function askConfirmLogout() {
       setTimeout(() => wrap.classList.add('hidden'), 200);
       document.body.classList.remove('overflow-hidden');
       cleanup();
+      lastActive && lastActive.focus?.();
       resolve(val);
     };
 
@@ -270,14 +278,25 @@ function askConfirmLogout() {
       closeX.removeEventListener('click', onCancel);
       wrap.removeEventListener('click', onBackdrop);
       document.removeEventListener('keydown', onKey);
+      box.removeEventListener('keydown', trap);
     };
 
     const onOK = () => done(true);
     const onCancel = () => done(false);
     const onBackdrop = (e) => { if (e.target === wrap) done(false); };
+
+    const trap = (e) => {
+      if (e.key !== 'Tab') return;
+      const f = box.querySelectorAll(focusablesSel);
+      if (f.length === 0) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+
     const onKey = (e) => {
-      if (e.key === 'Escape') done(false);
-      if (e.key === 'Enter') done(true);
+      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Enter') onOK();
     };
 
     okBtn.addEventListener('click', onOK);
@@ -285,6 +304,7 @@ function askConfirmLogout() {
     closeX.addEventListener('click', onCancel);
     wrap.addEventListener('click', onBackdrop);
     document.addEventListener('keydown', onKey);
+    box.addEventListener('keydown', trap);
 
     // Hiển thị modal
     wrap.classList.remove('hidden');
@@ -297,21 +317,61 @@ function askConfirmLogout() {
   });
 }
 
-// Gắn vào nút Đăng xuất
 document.getElementById('btnLogout')?.addEventListener('click', async () => {
   const ok = await askConfirmLogout();
   if (!ok) return;
-  try { await fetch('/logout', { method: 'POST' }); } catch (_) {}
+  try { await fetch('/logout', { method: 'POST', headers: { 'X-Requested-With': 'fetch' } }); } catch (_) {}
   location.href = '/login';
 });
 
+/* ====== Mật khẩu: strength + match ====== */
+(function bindPasswordHelpers(){
+  const newPw = document.getElementById('new');
+  const cfPw  = document.getElementById('cf');
+  const msg   = document.getElementById('pwMatchMsg');
+  const strength = document.getElementById('pwStrength');
+  const submit = document.getElementById('btnSubmitPw');
+
+  if(!newPw || !cfPw) return;
+
+  function zxcvbnLiteScore(pw){
+    let score = 0;
+    if (pw.length >= 6) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/\d/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    if (pw.length >= 12) score++;
+    return Math.min(score, 4);
+  }
+
+  function renderStrength(pw){
+    const s = zxcvbnLiteScore(pw);
+    const label = ['Rất yếu','Yếu','Trung bình','Khá','Mạnh'][s] || '';
+    strength.textContent = pw ? `Độ mạnh: ${label}` : '';
+    strength.className = 'mt-1 text-xs font-medium ' + (s<=1?'text-red-600':s===2?'text-yellow-600':'text-green-600');
+    return s;
+  }
+
+  function sync(){
+    const s = renderStrength(newPw.value);
+    const okMatch = !!newPw.value && newPw.value === cfPw.value;
+    msg.textContent = cfPw.value ? (okMatch ? 'Khớp mật khẩu ✅' : 'Chưa khớp mật khẩu ❌') : '';
+    msg.className = 'text-xs mt-1 ' + (okMatch ? 'text-green-600' : 'text-red-600');
+    submit.disabled = !(okMatch && s >= 2); // yêu cầu >= Trung bình + khớp
+  }
+
+  newPw.addEventListener('input', sync);
+  cfPw.addEventListener('input', sync);
+  // không cho paste vào xác nhận để giảm sai sót vô ý
+  cfPw.addEventListener('paste', e => e.preventDefault());
+  sync();
+})();
+
 /* ====== Boot ====== */
 window.addEventListener('DOMContentLoaded', ()=>{
-  // format giờ VN ban đầu
   formatVNTime('[data-datetime]');
   formatVNDate('[data-dateonly]');
 
-  // flash từ BE
   const flashEl=document.getElementById('flash-data');
   if(flashEl){
     const lvl=flashEl.dataset.level||'info';
@@ -321,7 +381,6 @@ window.addEventListener('DOMContentLoaded', ()=>{
     flashEl.remove();
   }
 
-  // Tự mở đổi mật khẩu khi lần đầu
   const url=new URL(window.location.href);
   const qFirst = url.searchParams.get('first')==='1';
   const flagsEl=document.getElementById('acct-flags');
@@ -335,13 +394,14 @@ window.addEventListener('DOMContentLoaded', ()=>{
   }
 });
 
-/* ====== Toggle ẩn/hiện 2 form ====== */
+/* ====== Toggle ẩn/hiện 2 form (cập nhật ARIA) ====== */
 function showSection(id,on=true){
   const el=document.getElementById(id);
   if(!el) return;
   el.classList.toggle('hidden', !on);
+  const trigger = id==='profileForm' ? document.getElementById('btnToggleProfile') : document.getElementById('btnTogglePw');
+  trigger?.setAttribute('aria-expanded', String(on));
   if(on) el.scrollIntoView({behavior:'smooth', block:'start'});
-  // re-format (phòng khi nội dung động)
   formatVNTime('[data-datetime]');
   formatVNDate('[data-dateonly]');
 }
@@ -362,23 +422,18 @@ function showSection(id,on=true){
   });
 })();
 
+/* ====== Thông báo hết hạn phiên (query/cookie flag) ====== */
 (function () {
-  // Ưu tiên query expired=1 (khi bị redirect)
   const params = new URLSearchParams(location.search);
   const byQuery = params.get('expired') === '1';
-
-  // Hoặc cookie cờ do BE set
   const byCookie = document.cookie.split(';').some(c => c.trim().startsWith('__session_expired=1'));
 
   if (byQuery || byCookie) {
-    // Hiện thông báo rộng rãi
     if (typeof showToast === 'function') {
       showToast('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.', 'warn', 4500);
     } else {
-      // Fallback nếu trang không có showToast
       alert('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
     }
-    // Xóa cookie cờ để khỏi lặp lại
     document.cookie = '__session_expired=; Max-Age=0; Path=/; SameSite=Lax';
   }
 })();

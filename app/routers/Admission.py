@@ -2,21 +2,28 @@
 import os
 import pandas as pd
 from fastapi import APIRouter, Request, Depends, UploadFile, File, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-
 from app.db.session import get_db
-from app.models import Student, Application, User
-from .auth import require_roles, get_current_user
-from app.routers.checklist import _get_active
-
+from app.models import Student, User
+from .auth import require_roles
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "web"))
 
 router = APIRouter(prefix="/Admission", tags=["Admission"])
+
+# ========= helper tách tên Việt (trong trường hợp chỉ có full_name) =========
+def _split_vn(fullname: str):
+    s = " ".join((fullname or "").split())
+    if not s:
+        return "", ""
+    parts = s.split(" ")
+    if len(parts) == 1:
+        return "", parts[0]
+    return " ".join(parts[:-1]), parts[-1]
 
 # =====================
 # Import học viên
@@ -25,7 +32,7 @@ router = APIRouter(prefix="/Admission", tags=["Admission"])
 @router.get("/import", response_class=HTMLResponse)
 def import_page(
     request: Request,
-    me: User = Depends(require_roles("Admin", "NhanVien")),   # quyền import: Admin + Nhân viên
+    me: User = Depends(require_roles("Admin", "NhanVien")),
 ):
     return templates.TemplateResponse("import_students.html", {"request": request, "me": me, "msg": None})
 
@@ -38,7 +45,7 @@ def import_students(
     db: Session = Depends(get_db),
 ):
     # Đọc file
-    fname = file.filename.lower()
+    fname = (file.filename or "").lower()
     try:
         if fname.endswith(".csv"):
             df = pd.read_csv(file.file, dtype=str).fillna("")
@@ -49,31 +56,69 @@ def import_students(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Lỗi đọc file: {e}")
 
-    # Cột tối thiểu
-    required_cols = {"student_code", "full_name"}
-    missing = [c for c in required_cols if c not in df.columns]
-    if missing:
-        raise HTTPException(status_code=400, detail=f"Thiếu cột bắt buộc: {', '.join(missing)}")
+    # Kiểm tra cột bắt buộc
+    cols = set(df.columns)
+    if "student_code" not in cols:
+        raise HTTPException(status_code=400, detail="Thiếu cột bắt buộc: student_code")
+
+    # Các cột tên có thể dùng:
+    #   A) ho_dem + ten
+    #   B) last_name + first_name
+    #   C) full_name / ho_ten
+    has_split = ("ho_dem" in cols and "ten" in cols) or ("last_name" in cols and "first_name" in cols)
+    has_full = "full_name" in cols or "ho_ten" in cols
+
+    if not (has_split or has_full):
+        raise HTTPException(
+            status_code=400,
+            detail="Thiếu thông tin tên. Cần 'ho_dem' + 'ten' (hoặc 'last_name' + 'first_name') hoặc 'full_name'."
+        )
 
     created, skipped = 0, 0
+
     for _, row in df.iterrows():
         code = (row.get("student_code") or "").strip()
-        name = (row.get("full_name") or "").strip()
-        if not code or not name:
+        if not code:
             continue
 
-        # bỏ qua nếu đã có
+        # Bỏ qua nếu đã tồn tại
         if db.query(Student).filter(Student.student_code == code).first():
             skipped += 1
             continue
 
-        # ✅ thêm dân tộc nếu có trong file
+        # Lấy tên từ các cột có sẵn
+        ho_dem = (row.get("ho_dem") or row.get("last_name") or "").strip()
+        ten = (row.get("ten") or row.get("first_name") or "").strip()
+
+        # Nếu chưa có thì fallback sang full_name / ho_ten
+        if not (ho_dem or ten):
+            full = (row.get("full_name") or row.get("ho_ten") or "").strip()
+            if not full:
+                continue
+            ho_dem, ten = _split_vn(full)
+
+        full_name = f"{ho_dem} {ten}".strip()
+
+        # Dân tộc (nếu có)
         dan_toc_val = (row.get("dan_toc") or row.get("Dân tộc") or "").strip()
 
+        # Parse ngày sinh (nếu có)
+        dob_raw = (row.get("dob") or "").strip()
+        dob_val = None
+        if dob_raw:
+            from datetime import date
+            try:
+                dob_val = date.fromisoformat(dob_raw)
+            except Exception:
+                dob_val = None
+
+        # Tạo đối tượng học viên
         s = Student(
             student_code=code,
-            full_name=name,
-            dob=(row.get("dob") or "").strip(),
+            last_name=ho_dem or None,     # Họ đệm
+            first_name=ten or None,       # Tên
+            full_name=full_name or None,  # Họ tên đầy đủ
+            dob=dob_val,
             gender=(row.get("gender") or "").strip(),
             phone=(row.get("phone") or "").strip(),
             email=(row.get("email") or "").strip(),
@@ -83,6 +128,7 @@ def import_students(
             note=(row.get("note") or "").strip(),
             created_by_user_id=me.id,
         )
+
         db.add(s)
         created += 1
 
@@ -90,48 +136,4 @@ def import_students(
     msg = f"Tạo {created} học viên mới, bỏ qua {skipped} (đã tồn tại)."
     return templates.TemplateResponse("import_students.html", {"request": request, "me": me, "msg": msg})
 
-# =====================
-# Danh sách học viên
-# =====================
-
-@router.get("/students", response_class=HTMLResponse)
-def students_list(
-    request: Request,
-    me: User = Depends(require_roles("Admin", "NhanVien", "CongTacVien")),
-    db: Session = Depends(get_db),
-):
-    students = db.query(Student).order_by(Student.created_at.desc()).all()
-    # ✅ truyền thêm trường dan_toc sang template
-    return templates.TemplateResponse(
-        "students_list.html",
-        {"request": request, "me": me, "students": students},
-    )
-
-# =====================
-# Tạo hồ sơ nộp (Application) cho học viên
-# =====================
-
-@router.post("/applications/create/{student_id}")
-def create_application(
-    student_id: int,
-    me: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    student = db.get(Student, student_id)
-    if not student:
-        raise HTTPException(status_code=404, detail="Không tìm thấy học viên")
-
-    # Lấy version danh mục hồ sơ đang active
-    active_ver = _get_active(db)
-
-    app_row = Application(
-        student_id=student_id,
-        status="Draft",
-        assigned_to_user_id=me.id,
-        last_modified_by_user_id=me.id,
-        checklist_version_id=active_ver.id,          # ✅ gắn version_id
-        checklist_version_name=active_ver.version_name,  # ✅ gắn tên version
-    )
-    db.add(app_row)
-    db.commit()
-    return RedirectResponse(url="/Admission/students", status_code=302)
+# End of file
