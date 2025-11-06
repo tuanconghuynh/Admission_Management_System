@@ -110,7 +110,6 @@ def _wrap_lines(text: str, font: str, size: int, max_w: float):
         lines.append(cur)
     return lines
 
-
 # ===== Helper tên: ưu tiên ho_dem + ten, fallback ho_ten =====
 def _name_parts(a: Applicant):
     """
@@ -134,7 +133,6 @@ def _full_name(a: Applicant) -> str:
         return f"{ln} {fn}".strip()
     return (getattr(a, "ho_ten", None) or "").strip()
 
-
 # ===== Vẽ cặp "Nhãn: Giá trị" bám sát dấu ":" =====
 def _draw_kv(c, x_label, _x_val_ignored, y, label, value, step=KV_STEP, gap=1.4*mm):
     """
@@ -153,7 +151,6 @@ def _draw_kv(c, x_label, _x_val_ignored, y, label, value, step=KV_STEP, gap=1.4*
 
     return y - step
 
-
 # ================== Danh mục hồ sơ (có STT) ==================
 def _build_checklist_rows(items: List[ChecklistItem], docs: List[ApplicantDoc]):
     doc_map = {d.code: d.so_luong for d in docs}
@@ -164,7 +161,6 @@ def _build_checklist_rows(items: List[ChecklistItem], docs: List[ApplicantDoc]):
         rows.append([str(stt), it.display_name, "" if qty == 0 else str(qty)])
         stt += 1
     return rows
-
 
 def _draw_checklist_table(c: rl_canvas.Canvas, x, y, w, rows):
     """Bảng danh mục 3 cột (STT/Danh mục/Số lượng)."""
@@ -187,7 +183,6 @@ def _draw_checklist_table(c: rl_canvas.Canvas, x, y, w, rows):
     return y - table._height
 # ============================================================
 
-
 # ===== Chuẩn hóa ngày dd/mm/yyyy =====
 def _fmt_dmy(v) -> str:
     if not v:
@@ -206,7 +201,6 @@ def _fmt_dmy(v) -> str:
         return dt.strftime("%d/%m/%Y")
     except Exception:
         return s
-
 
 def _header_block(c: rl_canvas.Canvas, W, H, khoa: str, ma_hs: str, ngay_nhan):
     """
@@ -250,7 +244,6 @@ def _header_block(c: rl_canvas.Canvas, W, H, khoa: str, ma_hs: str, ngay_nhan):
         y -= PARA_LEADING
     return y
 
-
 def _draw_signature_block(c: rl_canvas.Canvas, y, W, receiver_name: str):
     """Bảng chữ ký 2 cột × 3 hàng (1 hàng trống + nhãn + tên)."""
     table_w = W - LM - RM
@@ -277,7 +270,6 @@ def _draw_signature_block(c: rl_canvas.Canvas, y, W, receiver_name: str):
     t.drawOn(c, LM, y - total_h)
     return y - total_h
 
-
 def _vn_date_line(d: date | datetime | None, location: str = "TP.HCM") -> str:
     """
     Trả về chuỗi: 'TP.HCM, ngày dd tháng mm năm yyyy'
@@ -289,7 +281,6 @@ def _vn_date_line(d: date | datetime | None, location: str = "TP.HCM") -> str:
     if isinstance(d, date) and not isinstance(d, datetime):
         d = datetime(d.year, d.month, d.day)
     return f"{location}, ngày {d.day:02d} tháng {d.month:02d} năm {d.year}"
-
 
 def _onpage_footer_a5(canvas, doc, a: Applicant, location: str = "TP.HCM"):
     """Vẽ footer cố định (A5 ngang)."""
@@ -316,7 +307,6 @@ def _onpage_footer_a5(canvas, doc, a: Applicant, location: str = "TP.HCM"):
     canvas.line(left_x - line_w/2,  y0, left_x + line_w/2,  y0)
     canvas.line(right_x - line_w/2, y0, right_x + line_w/2, y0)
     canvas.restoreState()
-
 
 # ================== A4: 1 hồ sơ ==================
 def render_single_pdf(a: Applicant, items: List[ChecklistItem], docs: List[ApplicantDoc]) -> bytes:
@@ -385,7 +375,6 @@ def render_single_pdf(a: Applicant, items: List[ChecklistItem], docs: List[Appli
 
     c.showPage(); c.save()
     return buf.getvalue()
-
 
 # ================== A4: in gộp ==================
 def render_batch_pdf(

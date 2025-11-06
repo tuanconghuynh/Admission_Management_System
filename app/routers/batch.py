@@ -1,7 +1,10 @@
 # app/routers/batch.py
+from __future__ import annotations
+
 from datetime import datetime, timedelta, date
 import io
-from fastapi import APIRouter, Depends, HTTPException, Query
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -12,9 +15,58 @@ from app.models.checklist import ChecklistItem
 from app.services.pdf_service import render_batch_pdf
 from app.utils.soft_delete import exclude_deleted, ensure_not_deleted
 
+# Lấy actor & ghi audit
+from app.routers.auth import require_roles
+from app.services.audit import write_audit
+
 router = APIRouter(prefix="/batch", tags=["Batch"])
 
-# -------- helpers --------
+
+# ------------------- Audit helper -------------------
+def _audit_print_or_export(
+    *,
+    request: Request,
+    db: Session,
+    user,
+    action: str,             # "PRINT" | "EXPORT"
+    scope: str,              # "day" | "dot"
+    filters: dict,
+    count: int,
+    status: str,             # "SUCCESS" | "FAIL"
+    error: str | None = None,
+    name_mode: str | None = None,   # "full"/"split" (nếu là export excel)
+    target_type: str = "ApplicantBatch",
+    target_id: str | None = None
+):
+    payload = {
+        "scope": scope,
+        "filters": filters or {},
+        "count": int(count or 0),
+        "name_mode": name_mode,
+        "actor_id": getattr(user, "id", None),
+        "actor_name": getattr(user, "full_name", None) or getattr(user, "username", None),
+    }
+    if error:
+        payload["error"] = str(error)
+
+    try:
+        write_audit(
+            db,
+            action=action,
+            target_type=target_type,
+            target_id=target_id,
+            prev_values=None,
+            new_values=payload,
+            status=status,
+            request=request,
+        )
+        db.commit()
+    except Exception:
+        try: db.rollback()
+        except Exception: pass
+
+
+# ------------------- helpers -------------------
 def _parse_day(raw: str) -> date:
     s = (raw or "").strip()
     for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
@@ -44,9 +96,6 @@ def _load_items_by_version(db: Session, version_ids):
     return items_by_version
 
 def _docs_by_mssv(db: Session, mssv_list):
-    """
-    Trả về dict { ma_so_hv: [ApplicantDoc, ...] }
-    """
     out = {}
     if not mssv_list:
         return out
@@ -59,7 +108,6 @@ def _docs_by_mssv(db: Session, mssv_list):
         out.setdefault(d.applicant_ma_so_hv, []).append(d)
     return out
 
-# Lọc cứng hồ sơ chưa xoá (không phụ thuộc utils)
 def _is_not_deleted(a: Applicant) -> bool:
     if hasattr(a, "deleted_at") and getattr(a, "deleted_at", None):
         return False
@@ -78,40 +126,48 @@ def _dedup_latest_by_mssv(apps):
     return list(by.values())
 
 
-# -------- In PDF gộp theo NGÀY --------
+# ------------------- In PDF gộp theo NGÀY -------------------
 @router.get("/print")
 def batch_print(
+    request: Request,
     day: str | None = Query(None, description="YYYY-MM-DD (tùy chọn)"),
     date_q: str | None = Query(None, alias="date", description="dd/MM/YYYY (khuyến nghị)"),
     db: Session = Depends(get_db),
+    user=Depends(require_roles("Admin", "NhanVien")),
 ):
     raw = date_q or day
     if not raw:
+        _audit_print_or_export(
+            request=request, db=db, user=user,
+            action="PRINT", scope="day",
+            filters={"date": None}, count=0,
+            status="FAIL", error="MISSING_DATE"
+        )
         raise HTTPException(status_code=400, detail="Thiếu tham số 'date=dd/MM/YYYY' hoặc 'day=YYYY-MM-DD'.")
 
     d = _parse_day(raw)
 
-    # Bao phủ cả DATE lẫn DATETIME: [d, d+1)
     d1 = datetime.combine(d, datetime.min.time())
     d2 = d1 + timedelta(days=1)
 
-    # Truy vấn theo khoảng trước
     q = db.query(Applicant).filter(Applicant.ngay_nhan_hs >= d1, Applicant.ngay_nhan_hs < d2)
     q = exclude_deleted(Applicant, q)
     apps = q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()).all()
 
-    # Fallback nếu cột DB là DATE thuần (== d)
     if not apps:
         q = exclude_deleted(Applicant, db.query(Applicant).filter(Applicant.ngay_nhan_hs == d))
         apps = q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()).all()
 
-    # Lọc cứng lần cuối (3 kiểu soft-delete) + tránh phụ thuộc utils
     apps = [a for a in apps if _is_not_deleted(a) and ensure_not_deleted(a, raise_http_exception=False)]
-
-    # Dedup theo MSSV, ưu tiên bản mới nhất
     apps = _dedup_latest_by_mssv(apps)
 
     if not apps:
+        _audit_print_or_export(
+            request=request, db=db, user=user,
+            action="PRINT", scope="day",
+            filters={"date": d.isoformat()}, count=0,
+            status="FAIL", error="NO_DATA"
+        )
         raise HTTPException(status_code=404, detail=f"Không có hồ sơ nào trong ngày { _fmt_dmy(d) }")
 
     version_ids = {a.checklist_version_id for a in apps if a.checklist_version_id is not None}
@@ -119,10 +175,17 @@ def batch_print(
 
     valid_mssv = {a.ma_so_hv for a in apps}
     docs_by_app = _docs_by_mssv(db, valid_mssv)
-    # khóa lại lần nữa chỉ theo MSHV hợp lệ
     docs_by_app = {m: ds for (m, ds) in docs_by_app.items() if m in valid_mssv}
 
     pdf_bytes = render_batch_pdf(apps, items_by_version, docs_by_app)
+
+    # Audit OK
+    _audit_print_or_export(
+        request=request, db=db, user=user,
+        action="PRINT", scope="day",
+        filters={"date": d.isoformat()}, count=len(apps),
+        status="SUCCESS"
+    )
 
     filename = f"Batch_{d.strftime('%d-%m-%Y')}.pdf"
     return StreamingResponse(
@@ -131,15 +194,24 @@ def batch_print(
         headers={"Content-Disposition": f'inline; filename=\"{filename}\"'},
     )
 
-# -------- In PDF gộp theo ĐỢT --------
+
+# ------------------- In PDF gộp theo ĐỢT -------------------
 @router.get("/print-dot")
 def batch_print_dot(
+    request: Request,
     dot: str = Query(..., description="Tên đợt, ví dụ: 'Đợt 1/2025' hoặc '9'"),
     khoa: str | None = Query(None, description="(Tuỳ chọn) Lọc theo Khóa, ví dụ: '27'"),
     db: Session = Depends(get_db),
+    user=Depends(require_roles("Admin", "NhanVien")),
 ):
     dot_norm = (dot or "").strip()
     if not dot_norm:
+        _audit_print_or_export(
+            request=request, db=db, user=user,
+            action="PRINT", scope="dot",
+            filters={"dot": None, "khoa": (khoa or "")}, count=0,
+            status="FAIL", error="MISSING_DOT"
+        )
         raise HTTPException(status_code=400, detail="Thiếu tham số 'dot'.")
 
     q = (
@@ -154,11 +226,16 @@ def batch_print_dot(
     q = exclude_deleted(Applicant, q)
     apps = q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()).all()
 
-    # Lọc cứng lần cuối + dedup
     apps = [a for a in apps if _is_not_deleted(a) and ensure_not_deleted(a, raise_http_exception=False)]
     apps = _dedup_latest_by_mssv(apps)
 
     if not apps:
+        _audit_print_or_export(
+            request=request, db=db, user=user,
+            action="PRINT", scope="dot",
+            filters={"dot": dot_norm, "khoa": (khoa or "")}, count=0,
+            status="FAIL", error="NO_DATA"
+        )
         raise HTTPException(status_code=404, detail="Không có hồ sơ nào thuộc đợt đã chọn.")
 
     version_ids = {a.checklist_version_id for a in apps if a.checklist_version_id is not None}
@@ -170,6 +247,13 @@ def batch_print_dot(
 
     pdf_bytes = render_batch_pdf(apps, items_by_version, docs_by_app)
 
+    _audit_print_or_export(
+        request=request, db=db, user=user,
+        action="PRINT", scope="dot",
+        filters={"dot": dot_norm, "khoa": (khoa or "")}, count=len(apps),
+        status="SUCCESS"
+    )
+
     safe_dot = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in dot_norm)
     safe_khoa = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in (khoa or ""))
     suffix = f"{safe_dot}" + (f"_Khoa_{safe_khoa}" if safe_khoa else "")
@@ -180,10 +264,12 @@ def batch_print_dot(
         headers={"Content-Disposition": f'inline; filename=\"{filename}\"'},
     )
 
-# -------- Giữ route cũ để tương thích --------
+# Giữ route cũ để tương thích
 @router.get("/print-by-dot")
 def batch_print_by_dot_compat(
+    request: Request,
     dot: str = Query(..., description="Tên đợt cũ"),
     db: Session = Depends(get_db),
+    user=Depends(require_roles("Admin", "NhanVien")),
 ):
-    return batch_print_dot(dot=dot, db=db)
+    return batch_print_dot(request=request, dot=dot, db=db, user=user)

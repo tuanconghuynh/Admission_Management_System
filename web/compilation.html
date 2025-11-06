@@ -90,7 +90,13 @@
             <input class="input" id="ten" placeholder="An" />
           </div>
 
+          <!-- Hiển thị gộp để người nhập thấy ngay -->
+          <div class="md:col-span-2 text-xs text-gray-500 -mt-2">
+            Họ và tên: <b id="fullNameMirror"></b>
+          </div>
+
           <input type="hidden" id="ho_ten" />
+
           <div>
             <label class="label">Mã số HV</label>
             <input class="input" id="ma_so_hv" placeholder="2510200xxx" />
@@ -333,6 +339,17 @@
   }
   const makeUrl = (path)=> apiBase() + (API_PREFIX || "") + path;
   async function apiFetch(path, init={}){ const opts={credentials:"include", ...init}; return await fetch(makeUrl(path), opts).catch(()=>null); }
+  // --- Ghi log vào Journal
+  async function journalTrack(payload){
+    try{
+      await apiFetch('/journal/track', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload || {})
+      });
+    }catch(_){ /* không chặn luồng in nếu log lỗi */ }
+  }
+
   function handleAuth(r){ if(r && (r.status===401||r.status===403)){ showToast("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.","warn",2500); setTimeout(()=>location.href="/login",700); return true; } return false; }
   const safeJson = async (r)=>{ try{ return await r.json(); }catch{ return {}; } };
 
@@ -509,21 +526,41 @@
   })();
 
   /* ===== Bind name inputs in form ===== */
-  function bindNameInputs(){
-    const elHD = $('ho_dem'), elT = $('ten'), elFull = $('ho_ten');
-    if(!elHD || !elT || !elFull) return;
-    const sync = ()=>{
-      elHD.value = titleCaseVN(elHD.value);
-      elT.value  = titleCaseVN(elT.value);
-      elFull.value = joinFullName(elHD.value, elT.value);
-    };
-    ['blur','change','input'].forEach(ev=>{
-      elHD.addEventListener(ev, sync);
-      elT.addEventListener(ev, sync);
-    });
-    sync();
-  }
+function bindNameInputs(){
+  const elHD = $('ho_dem'), elT = $('ten'), elFull = $('ho_ten');
+  const mir  = $('fullNameMirror');
+  if(!elHD || !elT || !elFull) return;
 
+  // chỉ dùng lúc KẾT THÚC nhập (blur/change) để title-case + gọn khoảng trắng
+  const normalizeNow = ()=>{
+    elHD.value = titleCaseVN(elHD.value);
+    elT.value  = titleCaseVN(elT.value);
+    const full = joinFullName(elHD.value, elT.value);
+    elFull.value = full;
+    if (mir) mir.textContent = full;
+  };
+
+  // khi đang gõ (input): KHÔNG chuẩn hoá, chỉ cập nhật mirror & hidden
+  const liveMirror = ()=>{
+    const full = [elHD.value, elT.value].filter(Boolean).join(' ');
+    elFull.value = full;           // để BE vẫn nhận đúng ngay khi đang gõ
+    if (mir) mir.textContent = full;
+  };
+
+  // đang gõ: không đụng vào khoảng trắng của người dùng
+  elHD.addEventListener('input', liveMirror);
+  elT .addEventListener('input', liveMirror);
+
+  // kết thúc nhập mới chuẩn hoá
+  ['blur','change'].forEach(ev=>{
+    elHD.addEventListener(ev, normalizeNow);
+    elT .addEventListener(ev, normalizeNow);
+  });
+
+  // khởi tạo mirror lần đầu
+  liveMirror();
+}
+  bindNameInputs();
   // ===== Mã HS theo NHÓM (Khóa, Đợt) + helper hiển thị 4 số =====
   function composeMaHoSoByGroup(khoa, dot, seq) { return `HS-${String(khoa).trim()}-${String(dot).trim()}-${String(seq).padStart(4,'0')}`; }
   function extractSeq4(code) { const m = String(code || '').match(/(\d{4})$/); return m ? m[1] : ''; }
@@ -835,17 +872,26 @@
         }
         const res = await r.json();
         showToast(`Đã cập nhật MSHV ${res.ma_so_hv}`, 'success');
-        $('lookupMsg').textContent = `Cập nhật xong MSHV ${res.ma_so_hv}.`;
-        resetToNewForm();
-        return;
-      }
-
+        // 👉 Tải lại dữ liệu mới nhất và đổ lại form (không xóa)
+        const mshv = res.ma_so_hv || window.loadedApplicant?.ma_so_hv;
+        if (mshv) {
+          const a = await loadApplicantByMSHV(mshv);
+          window.loadedApplicant = { ma_so_hv: a.ma_so_hv, ma_ho_so: a.ma_ho_so };
+          populateFormFromApplicant(a, a.docs || []);
+          setPrintButtonsEnabled(true);
+          $('lookupMsg').textContent = `Đã cập nhật xong MSHV ${a.ma_so_hv}.`;
+        } else {
+          $('lookupMsg').textContent = 'Đã cập nhật.';
+        }
+    } else {
+      // ===== CREATE =====
       const created = await createApplicant();
       if (created) {
         showToast(`Đã lưu hồ sơ mới: ${created.ma_so_hv}`, 'success');
         $('msg').textContent = `Đã lưu MSHV ${created.ma_so_hv}`;
         resetToNewForm();
       }
+    }
     } catch (err) {
       $('lookupMsg').textContent = err.message || 'Lỗi xử lý.';
       showToast(err.message || 'Lỗi xử lý!', 'error');
@@ -1221,16 +1267,31 @@
       showToast('Trình duyệt đang chặn pop-up. Hãy bật pop-up cho trang này rồi bấm lại.', 'warn', 4000);
     }
   }
-  $("btnPrintLoadedA5").onclick = (e) => { e.preventDefault();
+  $("btnPrintLoadedA5").onclick = async (e) => { e.preventDefault();
     const cur = window.loadedApplicant;
     if (!cur?.ma_so_hv) { showToast("Chưa tải hồ sơ nào.", "warn"); return; }
     if (isMarkedDeleted(cur.ma_so_hv) || isSoftDeleted(cur)) { showToast("Hồ sơ đã bị xóa, không thể in!", "warn"); return; }
+
+    // 🧠 Ghi nhật ký
+    await journalTrack({
+      action: 'PRINT_IN',
+      detail: { scope: 'SINGLE', filters: { mshv: cur.ma_so_hv }, name_mode: 'A5', count: 1 }
+    });
+
     openPdf(makeUrl(`/applicants/${encodeURIComponent(cur.ma_so_hv)}/print-a5`));
   };
-  $("btnPrintLoadedA4").onclick = (e) => { e.preventDefault();
+
+  $("btnPrintLoadedA4").onclick = async (e) => { e.preventDefault();
     const cur = window.loadedApplicant;
     if (!cur?.ma_so_hv) { showToast("Chưa tải hồ sơ nào!", "warn"); return; }
     if (isMarkedDeleted(cur.ma_so_hv) || isSoftDeleted(cur)) { showToast("Hồ sơ đã bị xóa, không thể in!", "warn"); return; }
+
+    // 🧠 Ghi nhật ký
+    await journalTrack({
+      action: 'PRINT_IN',
+      detail: { scope: 'SINGLE', filters: { mshv: cur.ma_so_hv }, name_mode: 'A4', count: 1 }
+    });
+
     openPdf(makeUrl(`/applicants/${encodeURIComponent(cur.ma_so_hv)}/print`));
   };
 
@@ -1258,7 +1319,8 @@
       window.loadedApplicant = { ma_so_hv: a.ma_so_hv, ma_ho_so: a.ma_ho_so };
       populateFormFromApplicant(a, a.docs || []);
       setPrintButtonsEnabled(true);
-      $('lookupMsg').textContent = `Đã tải hồ sơ: ${a.ho_ten} • Mã HS ${a.ma_ho_so} • MSHV ${a.ma_so_hv}`;
+      const displayFull = a.ho_ten || joinFullName(a.ho_dem, a.ten);
+      $('lookupMsg').textContent = `Đã tải hồ sơ: ${displayFull} • Mã HS ${a.ma_ho_so} • MSHV ${a.ma_so_hv}`;
     } catch (e) {
       $('lookupMsg').textContent = e.message || 'Không tải được hồ sơ.';
       window.loadedApplicant = null;

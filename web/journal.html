@@ -9,22 +9,39 @@
   <link rel="icon" type="image/png" href="hutech.png" sizes="32x32">
   <link rel="apple-touch-icon" href="hutech.png">
   <meta name="theme-color" content="#2563eb">
+
   <script>
-  const isJournal = /\/journal\.html$/.test(location.pathname);
-  if (isJournal && (location.search || location.hash)) {
-    history.replaceState(null, '', location.pathname);
-  }
+    const isJournal = /\/journal\.html$/.test(location.pathname);
+    if (isJournal && (location.search || location.hash)) {
+      history.replaceState(null, '', location.pathname);
+    }
   </script>
 
   <style>
-    /* Hiệu ứng hover nhẹ cho logo */
+    /* Hover nhẹ logo */
     a:hover img { transform: scale(1.05); transition: transform 0.2s ease; }
 
-    /* Ẩn triệt để các phần xóa vĩnh viễn nếu không phải Admin (phòng hờ) */
+    /* Ẩn triệt để phần hard-delete nếu không phải Admin (phòng hờ) */
     :root[data-role="NhanVien"] #btnHardDelete,
     :root[data-role="NhanVien"] #hardDelConfirm,
     :root[data-role="NhanVien"] #btnHardDeleteGo,
     :root[data-role="NhanVien"] #btnHardDeleteCancel { display: none !important; }
+
+    /* Chip action + status */
+    .chip{display:inline-block;padding:.125rem .5rem;border-radius:9999px;border:1px solid #e5e7eb;background:#f8fafc;font-weight:600}
+    .chip.PRINT,.chip.EXPORT{background:#eef2ff;border-color:#c7d2fe}
+    .chip.UPDATE{background:#ecfeff;border-color:#a5f3fc}
+    .chip.CREATE{background:#ecfdf5;border-color:#a7f3d0}
+    .chip.DELETE_SOFT{background:#fff7ed;border-color:#fed7aa}
+    .chip.DELETE,.chip.DELETE_HARD{background:#fef2f2;border-color:#fecaca}
+    .chip.RESTORE{background:#f0fdf4;border-color:#bbf7d0}
+    .chip.EXCEPTION{background:#fff1f2;border-color:#fecdd3}
+    .status-ok{color:#16a34a;font-weight:700}
+    .status-fail{color:#dc2626;font-weight:700}
+    /* Batch update */
+    .chip.BATCH_UPDATE{background:#eef2ff;border-color:#c7d2fe}
+    .chip.BATCH_UPDATE_PREVIEW{background:#f5f3ff;border-color:#ddd6fe}
+
   </style>
 </head>
 <body class="bg-gray-50">
@@ -44,7 +61,6 @@
         <label class="text-sm text-gray-500" for="apiBase">API Base</label>
         <input id="apiBase" class="input w-52 md:w-72" placeholder="" />
         <span class="hidden md:inline-block w-px h-6 bg-gray-200"></span>
-        <!-- <a class="btn btn-outline" href="/students_list.html" title="Danh sách hồ sơ">📋 Danh sách hồ sơ</a> -->
         <a class="btn btn-outline" href="/ams_home.html" title="Trang chủ">← Trang chủ</a>
       </div>
     </header>
@@ -53,11 +69,11 @@
     <section class="card space-y-3">
       <div class="grid grid-cols-1 lg:grid-cols-6 gap-3 items-end">
         <div class="lg:col-span-2">
-          <label class="text-sm text-gray-600">Từ khóa</label>
+          <label class="text-sm text-gray-700 font-semibold">Từ khóa</label>
           <input id="q" class="input" placeholder="actor, path, correlation, IP…" />
         </div>
         <div>
-          <label class="text-sm text-gray-600">Thao tác</label>
+          <label class="text-sm text-gray-700 font-semibold">Thao tác</label>
           <select id="qActionSel" class="input">
             <option value="">(Tất cả)</option>
             <option value="CREATE">Tạo mới</option>
@@ -65,21 +81,24 @@
             <option value="DELETE_SOFT">Xóa tạm</option>
             <option value="DELETE">Xóa vĩnh viễn</option>
             <option value="RESTORE">Khôi phục</option>
-            <option value="PRINT">In / Xuất</option>
+            <option value="PRINT_IN">In</option>   <!-- ✅ đổi từ PRINT -> PRINT_IN -->
+            <option value="EXPORT">Xuất Excel</option>
             <option value="EXCEPTION">Lỗi hệ thống</option>
             <option value="READ">Tra cứu</option>
+            <option value="BATCH_UPDATE">Cập nhật hàng loạt</option>
+            <option value="BATCH_UPDATE_PREVIEW">Xem trước (batch)</option>
           </select>
         </div>
         <div class="hidden">
-          <label class="text-sm text-gray-600">Target type</label>
+          <label class="text-sm text-gray-700 font-semibold">Target type</label>
           <input id="qType" class="input" placeholder="Applicant / User / …" />
         </div>
         <div>
-          <label class="text-sm text-gray-600">Mã số HV</label>
+          <label class="text-sm text-gray-700 font-semibold">Mã số HV</label>
           <input id="qId" class="input" placeholder="2510xxxxxx" />
         </div>
         <div>
-          <label class="text-sm text-gray-600">Người thao tác</label>
+          <label class="text-sm text-gray-700 font-semibold">Người thao tác</label>
           <input id="qActor" class="input" placeholder="Tên người thực hiện" />
         </div>
       </div>
@@ -87,11 +106,11 @@
       <div class="flex flex-wrap gap-2 items-center justify-between">
         <div class="flex flex-wrap gap-2 items-end">
           <div>
-            <label class="text-sm text-gray-600">Từ ngày</label>
+            <label class="text-sm text-gray-700 font-semibold">Từ ngày</label>
             <input id="qFrom" type="date" class="input w-40" />
           </div>
           <div>
-            <label class="text-sm text-gray-600">Đến ngày</label>
+            <label class="text-sm text-gray-700 font-semibold">Đến ngày</label>
             <input id="qTo" type="date" class="input w-40" />
           </div>
         </div>
@@ -117,6 +136,7 @@
         </div>
         <div id="msg" class="text-sm text-gray-600" role="status" aria-live="polite"></div>
       </div>
+
       <div class="flex items-center justify-between gap-3">
         <div></div>
         <div class="flex items-center gap-1 text-sm pager" data-position="top">
@@ -145,6 +165,7 @@
                 <th class="th-sortable text-center" data-sort="action">Thao tác <span class="arrow">▲▼</span></th>
                 <th class="th-sortable text-center" data-sort="target">MSSV <span class="arrow">▲▼</span></th>
                 <th class="th-sortable text-center" data-sort="status">Trạng thái <span class="arrow">▲▼</span></th>
+                <th class="text-center">Corr</th>
                 <th class="text-center">Chi tiết</th>
               </tr>
             </thead>
@@ -177,26 +198,23 @@
           <button class="btn btn-outline btn-xs" id="btnCopy">📋 Sao chép</button>
           <button class="btn btn-primary btn-xs" id="btnRestore">♻ Khôi phục</button>
 
-          <!-- Nút mở xác nhận xóa -->
+          <!-- Hard delete -->
           <button class="btn btn-outline btn-xs" id="btnHardDelete" style="border-color:#dc2626;color:#dc2626">🗑️ Xóa vĩnh viễn</button>
-          <!-- Nút OK Xóa (ẩn mặc định) -->
           <button class="btn btn-primary btn-xs hidden" id="btnHardDeleteGo" style="background:#dc2626;border-color:#dc2626">OK Xóa</button>
-          <!-- Nút Hủy (ẩn mặc định) -->
           <button class="btn btn-outline btn-xs hidden" id="btnHardDeleteCancel">Hủy</button>
 
           <button class="btn btn-outline btn-xs" id="btnClose">Đóng</button>
         </div>
       </div>
+
+      <!-- Panel xác nhận hard delete -->
       <div id="hardDelConfirm" class="hidden px-4 pt-3">
         <div class="space-y-2">
           <div class="flex flex-wrap items-center gap-3">
-            <!-- Checkbox xác nhận -->
             <label class="inline-flex items-center gap-2 select-none">
               <input id="hardDelConfirmChk" type="checkbox" class="w-4 h-4 accent-red-600" />
               <span class="text-sm font-medium text-gray-700">Tôi xác nhận xóa vĩnh viễn</span>
             </label>
-
-            <!-- Lý do -->
             <select id="hardDelReasonSel" class="input w-64">
               <option value="">-- Chọn lý do --</option>
               <option value="TRUNG_LAP">Hồ sơ trùng lặp</option>
@@ -206,19 +224,15 @@
               <option value="OTHER">Lý do khác…</option>
             </select>
           </div>
-
-          <!-- Chỉ hiện khi OTHER -->
           <div id="hardDelReasonWrap" class="hidden">
             <input id="hardDelReasonText" class="input w-full" placeholder="Nhập lý do khác (bắt buộc)" />
             <p class="text-xs text-rose-600 mt-1">Bắt buộc khi chọn “Lý do khác…”.</p>
           </div>
-
-          <p class="text-xs text-rose-600 mt-1 mb-2">
-            Hành động này không thể hoàn tác. Vui lòng xác nhận trước khi xóa!
-          </p>
+          <p class="text-xs text-rose-600 mt-1 mb-2">Hành động này không thể hoàn tác. Vui lòng xác nhận trước khi xóa!</p>
         </div>
       </div>
-      <!-- Modal xác nhận khôi phục -->
+
+      <!-- Modal confirm restore -->
       <div id="confirmRestore" class="hidden fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center">
         <div class="bg-white p-6 rounded-2xl shadow-xl max-w-sm text-center space-y-4">
           <div class="text-lg font-semibold text-gray-800">Khôi phục dữ liệu?</div>
@@ -242,17 +256,15 @@
   </div>
 
 <script>
-  /* ====== Khoá URL sạch ====== */
+  /* ====== Khóa URL sạch ====== */
   (function lockCleanJournalURL(){
     const clean = () => { if (location.pathname !== '/journal.html' || location.search || location.hash) history.replaceState(null, '', '/journal.html'); };
     clean();
     const _replace = history.replaceState.bind(history);
     const _push    = history.pushState.bind(history);
     const toClean = (url) => {
-      try {
-        const u = new URL(url, location.origin);
-        return (/\/journal\.html$/.test(u.pathname)) ? u.pathname : url;
-      } catch { return url; }
+      try { const u = new URL(url, location.origin); return (/\/journal\.html$/.test(u.pathname)) ? u.pathname : url; }
+      catch { return url; }
     };
     history.replaceState = (s,t,u)=> _replace(s,t,toClean(u));
     history.pushState    = (s,t,u)=> _push(s,t,toClean(u));
@@ -287,13 +299,21 @@
     }
     return r;
   }
-
   /* ====== Labels ====== */
   const ACTION_LABELS = {
-    CREATE:"Tạo mới", UPDATE:"Cập nhật", DELETE_SOFT:"Xóa tạm",
-    DELETE_HARD:"Xóa vĩnh viễn", DELETE:"Xóa vĩnh viễn",
-    DELETE_REQUEST:"Yêu cầu xóa", RESTORE:"Khôi phục",
-    PRINT:"In / Xuất", READ:"Tra cứu", EXCEPTION:"Lỗi hệ thống"
+    CREATE:"Tạo mới",
+    UPDATE:"Cập nhật",
+    DELETE_SOFT:"Xóa tạm",
+    DELETE_HARD:"Xóa vĩnh viễn",
+    DELETE:"Xóa vĩnh viễn",
+    DELETE_REQUEST:"Yêu cầu xóa",
+    RESTORE:"Khôi phục",
+    PRINT_IN:"In",     // ✅ thêm
+    EXPORT:"Xuất Excel", // ✅ thêm
+    EXCEPTION:"Lỗi hệ thống",
+    READ:"Tra cứu",
+    BATCH_UPDATE: "Cập nhật hàng loạt",
+    BATCH_UPDATE_PREVIEW: "Xem trước (batch)",
   };
   const actionVi = c => ACTION_LABELS[(c||'').toUpperCase()] || (c||'—');
 
@@ -321,6 +341,9 @@
     gioi_tinh:"Giới tính",
     dan_toc:"Dân tộc",
     update_reason: "Lý do cập nhật",
+    ho_dem: "Họ đệm",
+    ten: "Tên",
+    ho_ten: "Họ và tên",
   };
   const getFieldLabel = (k) => FIELD_LABELS[k] || k;
 
@@ -351,6 +374,9 @@
     p.set('page', state.page);
     p.set('page_size', state.size);
     const f = state.filters;
+    if (f.action === 'PRINT_IN')      p.set('action', 'PRINT');
+    else if (f.action === 'PRINT_EXPORT') p.set('action', 'EXPORT');
+    else if (f.action)                    p.set('action', f.action);
     if (f.q) p.set('q', f.q);
     if (f.action) p.set('action', f.action);
     if (f.type) p.set('target_type', f.type);
@@ -367,9 +393,9 @@
   }
 
   function syncUrl(){
-  if (location.pathname === '/journal.html' && (location.search || location.hash)) {
-    history.replaceState(null, '', '/journal.html');
-  }
+    if (location.pathname === '/journal.html' && (location.search || location.hash)) {
+      history.replaceState(null, '', '/journal.html');
+    }
   }
 
   async function load() {
@@ -381,10 +407,8 @@
       const res = await apiFetch('/journal/?' + qs());
       if (!res || !res.ok) throw new Error('Không kết nối được máy chủ');
 
-      // Dùng tên payload để tránh đụng "data" ngoài phạm vi
       const payload = await res.json();
 
-      // Chuẩn hóa dữ liệu trả về
       const items = Array.isArray(payload.items)
         ? payload.items
         : (Array.isArray(payload.data) ? payload.data : []);
@@ -392,11 +416,9 @@
       const total = Number(payload.total ?? payload.count ?? items.length ?? 0);
       state.total = total;
 
-      // Nếu trang hiện tại vượt quá tổng trang mới -> nhảy về trang cuối rồi nạp lại
       const pages = pagesTotal();
       if (state.page > pages) {
         state.page = pages;
-        // Dừng luồng hiện tại và nạp lại với trang hợp lệ
         return load();
       }
 
@@ -429,7 +451,6 @@
     return `${get('hour')}:${get('minute')}:${get('second')} ${get('day')}/${get('month')}/${get('year')}`;
   }
 
-  // ➕ Hàm rút gọn chỉ lấy ngày (dành cho phần dữ liệu hiện tại)
   function formatVNDateOnly(input) {
     if (!input) return '';
     const d = input instanceof Date ? input : new Date(String(input));
@@ -443,54 +464,42 @@
     const get = t => parts.find(p => p.type === t)?.value || '00';
     return `${get('day')}/${get('month')}/${get('year')}`;
   }
-function maybeFormatDateLike(v) {
-  if (v == null || v === '') return null;
 
-  // Chỉ parse ngày-giờ cho các field "ngày giờ"
-  const f = (window.currentRenderField || '').toLowerCase();
-  const DATE_FIELDS = new Set([
-    'occurred_at', 'deleted_at', 'created_at', 'updated_at',
-    'ngay_sinh', 'ngay_nhan_hs'
-  ]);
-  const looksLikeDateField =
-    DATE_FIELDS.has(f) || /^ngay_/.test(f) || /_at$/.test(f);
+  function maybeFormatDateLike(v) {
+    if (v == null || v === '') return null;
+    const f = (window.currentRenderField || '').toLowerCase();
+    const DATE_FIELDS = new Set([
+      'occurred_at', 'deleted_at', 'created_at', 'updated_at',
+      'ngay_sinh', 'ngay_nhan_hs'
+    ]);
+    const looksLikeDateField = DATE_FIELDS.has(f) || /^ngay_/.test(f) || /_at$/.test(f);
+    if (!looksLikeDateField) return null;
 
-  if (!looksLikeDateField) return null;   // ⬅️ khóa lại: ID/Code không bị parse
-
-  // số epoch (seconds/millis)
-  if (typeof v === 'number') {
-    const ms = v > 1e12 ? v : v * 1000;
-    return formatVNDateTime(new Date(ms));
+    if (typeof v === 'number') {
+      const ms = v > 1e12 ? v : v * 1000;
+      return formatVNDateTime(new Date(ms));
+    }
+    if (typeof v === 'string') {
+      const s = v.trim();
+      if (/^\d{4}-\d{2}-\d{2}([T\s].*)?$/.test(s)) {
+        const d = new Date(s.replace(' ', 'T'));
+        if (!isNaN(d)) return formatVNDateTime(d);
+      }
+      const m1 = s.match(/^(\d{2}):(\d{2}):(\d{2})\s+(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (m1) {
+        const [_, hh, mm, ss, dd, MM, yyyy] = m1.map(Number);
+        const d = new Date(Date.UTC(yyyy, MM - 1, dd, hh, mm, ss));
+        return formatVNDateTime(d);
+      }
+      const m2 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (m2) {
+        const [_, dd, MM, yyyy] = m2.map(Number);
+        const d = new Date(Date.UTC(yyyy, MM - 1, dd, 0, 0, 0));
+        return formatVNDateTime(d);
+      }
+    }
+    return null;
   }
-
-  if (typeof v === 'string') {
-    const s = v.trim();
-
-    // ISO: YYYY-MM-DD / YYYY-MM-DDTHH:mm:ssZ / YYYY-MM-DD HH:mm:ss
-    if (/^\d{4}-\d{2}-\d{2}([T\s].*)?$/.test(s)) {
-      const d = new Date(s.replace(' ', 'T'));
-      if (!isNaN(d)) return formatVNDateTime(d);
-    }
-
-    // HH:mm:ss DD/MM/YYYY
-    const m1 = s.match(/^(\d{2}):(\d{2}):(\d{2})\s+(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (m1) {
-      const [_, hh, mm, ss, dd, MM, yyyy] = m1.map(Number);
-      const d = new Date(Date.UTC(yyyy, MM - 1, dd, hh, mm, ss));
-      return formatVNDateTime(d);
-    }
-
-    // DD/MM/YYYY
-    const m2 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (m2) {
-      const [_, dd, MM, yyyy] = m2.map(Number);
-      const d = new Date(Date.UTC(yyyy, MM - 1, dd, 0, 0, 0));
-      return formatVNDateTime(d);
-    }
-  }
-
-  return null;
-}
 
   /* ====== Table list ====== */
   function renderTable(items){
@@ -522,14 +531,24 @@ function maybeFormatDateLike(v) {
       const tr = document.createElement('tr');
       const when = row.occurred_at ? new Date(row.occurred_at) : null;
       const actionLabel = actionVi(row.action);
+      const actionCls = String(row.action||'').toUpperCase();
       tr.innerHTML = `
         <td class="text-left whitespace-nowrap">${row.id}</td>
         <td class="text-center whitespace-nowrap">${when ? formatVNDateTime(when) : ''}</td>
         <td class="text-center">${escapeHtml(displayActor(row))}</td>
-        <td class="text-center"><span class="chip">${escapeHtml(actionLabel)}</span></td>
+        <td class="text-center"><span class="chip ${escapeHtml(actionCls)}">${escapeHtml(actionLabel)}</span></td>
         <td class="text-center whitespace-nowrap">${escapeHtml(row.target_id ?? '—')}</td>
         <td class="text-center">
           ${row.status === 'SUCCESS' ? '<span class="status-ok">OK</span>' : '<span class="status-fail">FAIL</span>'}
+        </td>
+        <td class="text-center">
+          ${
+            row.correlation_id
+              ? `<button class="btn btn-outline btn-xxs" data-corr="${row.correlation_id}" title="Lọc theo đợt">
+                  ${String(row.correlation_id).slice(0,8)}
+                </button>`
+              : '—'
+          }
         </td>
         <td class="text-center">
           <button class="btn btn-outline btn-xs" data-id="${row.id}">View👁️‍🗨️</button>
@@ -538,6 +557,18 @@ function maybeFormatDateLike(v) {
     });
 
     $$('button[data-id]').forEach(b=> b.onclick=()=> openDetail(b.dataset.id));
+    $$('button[data-corr]').forEach(b=>{
+      b.onclick = ()=>{
+        const corr = b.dataset.corr || '';
+        if (!corr) return;
+        // nhét vào ô Từ khóa để giữ đơn giản (BE đang hỗ trợ q/correlation match)
+        const q = document.getElementById('q');
+        if (q) q.value = corr;
+        state.page = 1;
+        grabFilters();
+        load();
+      };
+    });
   }
 
   function renderPager(){
@@ -553,82 +584,68 @@ function maybeFormatDateLike(v) {
 
   /* ====== Common helpers for detail ====== */
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c])); }
- 
-  function cellValFor(field, v) {
-    // context để biết đang render field nào (phục vụ rút gọn ngày)
-    window.currentRenderField = field || null;
-    return cellVal(v);
-  }
+  function cellValFor(field, v) { window.currentRenderField = field || null; return cellVal(v); }
 
-function cellVal(x) {
-  if (x === null || x === undefined || x === '')
-    return '<span class="text-gray-400">—</span>';
+  function cellVal(x) {
+    if (x === null || x === undefined || x === '')
+      return '<span class="text-gray-400">—</span>';
 
-  // ⬇️ Chỉ map Nam/Nữ khi đang render trường "gioi_tinh"
-  const fieldCtx = (window.currentRenderField || '').toLowerCase();
-  if (fieldCtx === 'gioi_tinh' && typeof x === 'string') {
-    const s = x.trim().toLowerCase();
-    if (s === 'm' || s === 'nam' || s === 'male' || s === '1') return 'Nam';
-    if (s === 'f' || s === 'nu' || s === 'nữ'  || s === 'female' || s === '0') return 'Nữ';
-  }
+    const fieldCtx = (window.currentRenderField || '').toLowerCase();
+    if (fieldCtx === 'gioi_tinh' && typeof x === 'string') {
+      const s = x.trim().toLowerCase();
+      if (s === 'm' || s === 'nam' || s === 'male' || s === '1') return 'Nam';
+      if (s === 'f' || s === 'nu' || s === 'nữ'  || s === 'female' || s === '0') return 'Nữ';
+    }
 
-  // Lý do cập nhật
-  if (typeof x === 'object' && x && ('key' in x || 'text' in x)) {
-    const key  = (x.key  || '').toString();
-    const text = (x.text || '').toString();
-    const MAP = {
-      capnhat_thongtin: 'Cập nhật thông tin học viên',
-      capnhat_hoso_moi: 'Cập nhật hồ sơ mới',
-      bosung_hoso:      'Bổ sung hồ sơ',
-      capnhat_chungchi: 'Cập nhật chứng chỉ',
-      chinhsua_hoso:    'Chỉnh sửa hồ sơ',
-      khac:             `Lý do khác${text ? ': ' + text : ''}`
-    };
-    if (key) return escapeHtml(MAP[key] || key);
-  }
-  if (typeof x === 'string') {
-    const MAP = {
-      capnhat_thongtin: 'Cập nhật thông tin học viên',
-      capnhat_hoso_moi: 'Cập nhật hồ sơ mới',
-      bosung_hoso:      'Bổ sung hồ sơ',
-      capnhat_chungchi: 'Cập nhật chứng chỉ',
-      chinhsua_hoso:    'Chỉnh sửa hồ sơ',
-      khac:             'Lý do khác'
-    };
-    const k = x.trim();
-    if (MAP[k]) return MAP[k];
-  }
+    if (typeof x === 'object' && x && ('key' in x || 'text' in x)) {
+      const key  = (x.key  || '').toString();
+      const text = (x.text || '').toString();
+      const MAP = {
+        capnhat_thongtin: 'Cập nhật thông tin học viên',
+        capnhat_hoso_moi: 'Cập nhật hồ sơ mới',
+        bosung_hoso:      'Bổ sung hồ sơ',
+        capnhat_chungchi: 'Cập nhật chứng chỉ',
+        chinhsua_hoso:    'Chỉnh sửa hồ sơ',
+        khac:             `Lý do khác${text ? ': ' + text : ''}`
+      };
+      if (key) return escapeHtml(MAP[key] || key);
+    }
+    if (typeof x === 'string') {
+      const MAP = {
+        capnhat_thongtin: 'Cập nhật thông tin học viên',
+        capnhat_hoso_moi: 'Cập nhật hồ sơ mới',
+        bosung_hoso:      'Bổ sung hồ sơ',
+        capnhat_chungchi: 'Cập nhật chứng chỉ',
+        chinhsua_hoso:    'Chỉnh sửa hồ sơ',
+        khac:             'Lý do khác'
+      };
+      const k = x.trim();
+      if (MAP[k]) return MAP[k];
+    }
 
-  // Ngày: nếu là ngày/ISO -> rút gọn tuỳ ngữ cảnh
-  const maybe = maybeFormatDateLike(x);
-  if (maybe) {
-    const field = (window.currentRenderField || '').toLowerCase();
-
-    // deleted_at: luôn hiển thị đầy đủ theo giờ VN
-    if (field === 'deleted_at') {
-      const d = new Date(x);
-      if (!isNaN(d)) {
-        const vn = new Intl.DateTimeFormat('vi-VN', {
-          timeZone: 'Asia/Ho_Chi_Minh',
-          year: 'numeric', month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-        }).format(d);
-        return escapeHtml(vn);
+    const maybe = maybeFormatDateLike(x);
+    if (maybe) {
+      const field = (window.currentRenderField || '').toLowerCase();
+      if (field === 'deleted_at') {
+        const d = new Date(x);
+        if (!isNaN(d)) {
+          const vn = new Intl.DateTimeFormat('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+          }).format(d);
+          return escapeHtml(vn);
+        }
       }
+      if (/^ngay_(nhan_hs|sinh)$/.test(field)) return escapeHtml(formatVNDateOnly(x));
+      return escapeHtml(maybe);
     }
 
-    // Các field ngày “ngay_nhan_hs/ngay_sinh” chỉ lấy ngày
-    if (/^ngay_(nhan_hs|sinh)$/.test(field)) {
-      return escapeHtml(formatVNDateOnly(x));
+    if (typeof x === 'object') {
+      return `<pre class="bg-white border border-dashed border-gray-200 rounded-lg p-2 overflow-auto text-xs">${escapeHtml(JSON.stringify(x, null, 2))}</pre>`;
     }
-    return escapeHtml(maybe);
+    return escapeHtml(String(x));
   }
-
-  if (typeof x === 'object') {
-    return `<pre class="bg-white border border-dashed border-gray-200 rounded-lg p-2 overflow-auto text-xs">${escapeHtml(JSON.stringify(x, null, 2))}</pre>`;
-  }
-  return escapeHtml(String(x));
-}
 
   function diffKeysFiltered(prev={}, next={}){
     const ignore = new Set(['docs_before','docs_after','docs_diff']);
@@ -655,8 +672,7 @@ function cellVal(x) {
       </div>`;
   }
 
-
-  /* ====== Lấy map code -> tên danh mục checklist (cache) ====== */
+  /* ====== Checklist name map cache ====== */
   let __NAME_MAP_CACHE = null;
   async function getChecklistNameMap(){
     if (__NAME_MAP_CACHE) return __NAME_MAP_CACHE;
@@ -676,39 +692,30 @@ function cellVal(x) {
   }
 
   let __VER_NAME_CACHE = {};
-
   async function getChecklistVersionName(id) {
     if (!id && id !== 0) return null;
     const key = String(id);
     if (__VER_NAME_CACHE[key]) return __VER_NAME_CACHE[key];
-
-    // Ưu tiên BE nếu có field name trong /checklist/version/:id
     try {
       const r = await apiFetch('/checklist/version/' + encodeURIComponent(key));
       if (r?.ok) {
         const j = await r.json().catch(() => null);
-        const name =
-          j?.display_name || j?.name || j?.title || j?.version_name || key;
+        const name = j?.display_name || j?.name || j?.title || j?.version_name || key;
         __VER_NAME_CACHE[key] = name;
         return name;
       }
     } catch (_) {}
-
-    // Fallback: trả về chính ID nếu không lấy được
     __VER_NAME_CACHE[key] = key;
     return key;
   }
-  /* ====== Render bảng danh mục hiện tại ====== */
+
+  /* ====== Docs tables ====== */
   function renderDocsCurrentTable(docsObj={}, nameMap={}){
     const safe = (docsObj && typeof docsObj === 'object') ? docsObj : {};
-    const entries = Object.entries(safe).map(([code, n])=>({
-      code, name: nameMap[code] || code, qty: Number(n)||0
-    })).filter(x=>x.qty>0);
-
+    const entries = Object.entries(safe).map(([code, n])=>({ code, name: nameMap[code] || code, qty: Number(n)||0 }))
+                                       .filter(x=>x.qty>0);
     if (!entries.length) return `<div class="text-gray-500">Không có danh mục hồ sơ.</div>`;
-
     entries.sort((a,b)=> a.name.localeCompare(b.name,'vi',{sensitivity:'base'}));
-
     return `
       <table class="w-full text-sm border border-gray-200 rounded-xl overflow-hidden">
         <thead class="bg-slate-50">
@@ -727,7 +734,6 @@ function cellVal(x) {
       </table>`;
   }
 
-  /* ====== Render bảng danh mục thay đổi (chỉ tên + trước/sau/±) ====== */
   function renderDocsDiffTable(diffs=[], nameMap={}){
     if (!Array.isArray(diffs) && diffs && typeof diffs === 'object') {
       diffs = Object.entries(diffs).map(([code, v]) => {
@@ -743,12 +749,7 @@ function cellVal(x) {
     const rows = diffs.map(x=>{
       const delta = Number(x.to) - Number(x.from);
       const sign  = delta>0 ? '↑' : (delta<0 ? '↓' : '—');
-      return {
-        name: nameMap[x.code] || x.code,
-        from: Number(x.from)||0,
-        to:   Number(x.to)||0,
-        delta, sign
-      };
+      return { name: nameMap[x.code] || x.code, from: Number(x.from)||0, to: Number(x.to)||0, delta, sign };
     }).sort((a,b)=> a.name.localeCompare(b.name,'vi',{sensitivity:'base'}));
 
     return `
@@ -773,271 +774,335 @@ function cellVal(x) {
       </table>`;
   }
 
-/* ====== OPEN DETAIL ====== */
-async function openDetail(id) {
-  try {
-    const r = await apiFetch('/journal/detail/' + id);
-    if (!r || !r.ok) throw new Error('Không tải được chi tiết');
-    const d = await r.json();
-    state.currentLog = d;
-    resetHardDeleteUI();
-
-    // ⚙️ Hiển thị MSSV thay cho STT
-    const label = d?.target_id ? `MSSV: ${String(d.target_id)}` : `STT: ${String(id)}`;
-    $('#d_id').textContent = label;
-
-    // Ẩn nút mở hồ sơ (không dùng)
-    const btnOpenApplicant = document.getElementById('btnOpenApplicant');
-    if (btnOpenApplicant) btnOpenApplicant.style.display = 'none';
-
-    // ===== Ngữ cảnh chung
-    const canTarget          = !!(d?.target_id);
-    const isApplicant        = (d?.target_type === 'Applicant');
-    const isHardDeleted      = (String(d?.action || '').toUpperCase() === 'DELETE_HARD') || (d?.new_values?.hard_deleted === true);
-    const isSoftDeleteAction = ['DELETE_SOFT', 'DELETE'].includes(String(d?.action || '').toUpperCase());
-
-    // ===== Chuẩn hoá snapshot trước/sau
-    const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
-    const asObj = (x) => (isObj(x) ? x : {});
-    const prev  = asObj(d.prev_values);
-    const next  = asObj(d.new_values);
-
-    // ===== Quyết định HIỆN nút "Khôi phục"
-    const btnRestore = document.getElementById('btnRestore');
-    btnRestore.style.display = 'none';
-    btnRestore.disabled = false;
-    btnRestore.title = '';
-
-    const action = String(d?.action || '').toUpperCase();
-    const hasPrev = Object.keys(prev).length > 0;
-    const restorableActions = new Set(['UPDATE', 'DELETE_SOFT', 'DELETE']);
-
-    let purgedNow = (action === 'DELETE_HARD') || (d?.new_values?.hard_deleted === true);
-    if (!purgedNow && ['DELETE_SOFT','DELETE'].includes(action) && d?.target_id) {
-      purgedNow = await alreadyPurgedByLog(d.target_id);
-    }
-
-    const isRestorable =
-      isApplicant && canTarget && !purgedNow &&
-      restorableActions.has(action) && hasPrev;
-
-    if (isRestorable) {
-      btnRestore.style.display = '';
-    } else {
-      btnRestore.style.display = '';
-      btnRestore.disabled = true;
-      btnRestore.title = purgedNow ? 'Dữ liệu đã bị xóa vĩnh viễn, không thể khôi phục.' : 'Không có dữ liệu cũ để khôi phục.';
-    }
-
-    // ===== Nút "Xoá vĩnh viễn"
-    const btnHardDelete = document.getElementById('btnHardDelete');
+  /* ====== Batch (PRINT/EXPORT) detail ====== */
+  function renderBatchActionDetail(d){
+    const nv = (d?.new_values || {});
+    const scope = nv.scope || '—';
+    const filters = nv.filters || {};
+    const nameMode = nv.name_mode || '—';
+    const count = (typeof nv.count === 'number') ? nv.count : (d?.count ?? '—');
     
-    // Ẩn nếu đối tượng đã bị xóa vĩnh viễn ở log khác (purgedNow)
-    const showHardDel =
-      IS_ADMIN &&
-      isApplicant &&
-      canTarget &&
-      isSoftDeleteAction &&
-      !isHardDeleted &&
-      !purgedNow;
 
-    btnHardDelete.style.display = showHardDel ? '' : 'none';
+    const filterRows = Object.keys(filters).length
+      ? Object.entries(filters).map(([k,v])=>`
+          <div class="bg-slate-50 font-semibold p-2">${escapeHtml(String(k))}</div>
+          <div class="p-2">${escapeHtml(String(v ?? ''))}</div>
+        `).join('')
+      : '<div class="p-3 text-gray-500 col-span-2">Không có bộ lọc.</div>';
 
-    // ===== Phần render chi tiết
-    const nameMap = await getChecklistNameMap();
-    const isDeleteAction = ['DELETE_SOFT', 'DELETE', 'DELETE_HARD'].includes(action);
-
-    // Lấy Version Name từ ID (cache nhẹ)
-    const getChecklistVersionName = async (idVal) => {
-      // if (!idVal && idVal !== 0) return null;
-      // const key = String(idVal);
-      // if (__VER_NAME_CACHE[key]) return __VER_NAME_CACHE[key];
-
-      // // Ưu tiên BE nếu có field name trong /checklist/version/:id
-      // try {
-      //   const r = await apiFetch('/checklist/version/' + encodeURIComponent(key));
-      //   if (r?.ok) {
-      //     const j = await r.json().catch(() => null);
-      //     const name =
-      //       j?.display_name || j?.name || j?.title || j?.version_name || key;
-      //     __VER_NAME_CACHE[key] = name;
-      //     return name;
-      //   }
-      // } catch (_) {}
-
-      // // Fallback: trả về chính ID nếu không lấy được
-      // __VER_NAME_CACHE[key] = key;
-      // return key;
-    };
-
-    // Chọn snapshot & gộp metadata xóa (hiển thị trong “Dữ liệu trước khi xóa”)
-    const baseSnap = isDeleteAction ? prev : (Object.keys(next).length ? next : prev);
-
-    // Thêm tên Version vào snapshot để show
-    const verId =
-      next?.checklist_version_id ??
-      prev?.checklist_version_id ??
-      d?.checklist_version_id ?? null;
-
-    const verName = await getChecklistVersionName(verId);
-
-    const deletionMeta = {
-      deleted_at:     next?.deleted_at     ?? d?.deleted_at     ?? baseSnap?.deleted_at     ?? null,
-      deleted_by:     next?.deleted_by     ?? d?.deleted_by     ?? baseSnap?.deleted_by     ?? null,
-      deleted_reason: next?.deleted_reason ?? d?.deleted_reason ?? baseSnap?.deleted_reason ?? null,
-    };
-
-    const snapshotForView = {
-      ...baseSnap,
-      checklist_version_name: verName || baseSnap?.checklist_version_name || null,
-      ...deletionMeta
-    };
-
-    const asDict = (x) => (isObj(x) ? x : {});
-    const docsBefore = asDict(prev.docs_before) || asDict(prev.docs);
-    const docsAfter  = asDict(next.docs_after)  || asDict(next.docs);
-
-    // Chuẩn hoá docsDiff từ log/snapshot
-    let docsDiff = Array.isArray(next.docs_diff)
-      ? next.docs_diff
-      : (Array.isArray(d.docs_diff) ? d.docs_diff : []);
-
-    if (!Array.isArray(docsDiff) || docsDiff.length === 0) {
-      const beforeKeys = Object.keys(docsBefore || {});
-      const afterKeys  = Object.keys(docsAfter  || {});
-      const all = new Set([...beforeKeys, ...afterKeys]);
-      docsDiff = Array.from(all)
-        .map(code => ({
-          code,
-          from: Number((docsBefore || {})[code] || 0),
-          to:   Number((docsAfter  || {})[code]  || 0)
-        }))
-        .filter(x => x.from !== x.to);
-    }
-
-    const docsForView = isDeleteAction
-      ? (Object.keys(docsBefore).length ? docsBefore : docsAfter)
-      : (Object.keys(docsAfter).length  ? docsAfter  : docsBefore);
-
-    // Tính diff thường (bỏ qua docs*)
-    const diffs = diffKeysFiltered(prev, next);
-
-    // Đổi diff checklist_version_id -> checklist_version_name (tên)
-    const diffsResolved = await Promise.all(
-      diffs.map(async (x) => {
-        if (String(x.field) === 'checklist_version_id') {
-          return {
-            field: 'checklist_version_name',
-            from: await getChecklistVersionName(x.from),
-            to:   await getChecklistVersionName(x.to)
-          };
-        }
-        return x;
-      })
-    );
-
-    /* Thông tin chung */
-    const infoHtml = `
+    return `
       <h4 class="mt-1 mb-2 font-bold text-blue-800">Thông tin chung</h4>
       <div class="grid grid-cols-[220px_1fr] border border-gray-200 rounded-xl overflow-hidden">
         <div class="bg-slate-50 font-semibold p-2">Thời gian</div>     <div class="p-2">${cellValFor('occurred_at', d.occurred_at)}</div>
         <div class="bg-slate-50 font-semibold p-2">Người thao tác</div><div class="p-2">${escapeHtml(d.actor_name || d.actor_id || '—')}</div>
         <div class="bg-slate-50 font-semibold p-2">Hành động</div>     <div class="p-2">${escapeHtml(actionVi(d.action))}</div>
         <div class="bg-slate-50 font-semibold p-2">Trạng thái</div>    <div class="p-2">${escapeHtml(d.status || '')}</div>
-        <div class="bg-slate-50 font-semibold p-2">Đối tượng (MSSV)</div><div class="p-2">${escapeHtml(d.target_id || '—')}</div>
         <div class="bg-slate-50 font-semibold p-2">Đường dẫn</div>     <div class="p-2">${escapeHtml(d.path || '')}</div>
-        <div class="bg-slate-50 font-semibold p-2">IP</div>             <div class="p-2">${escapeHtml(d.ip_address || '')}</div>
-        <div class="bg-slate-50 font-semibold p-2">Correlation ID</div><div class="p-2">${escapeHtml(d.correlation_id || '')}</div>
-      </div>`;
+        <div class="bg-slate-50 font-semibold p-2">Scope</div>         <div class="p-2">${escapeHtml(String(scope))}</div>
+        <div class="bg-slate-50 font-semibold p-2">Name mode</div>     <div class="p-2">${escapeHtml(String(nameMode))}</div>
+        <div class="bg-slate-50 font-semibold p-2">Số bản ghi</div>    <div class="p-2">${escapeHtml(String(count))}</div>
+      </div>
 
-    /* Dữ liệu (snapshot) */
-    const currentPicks = [
-      ["Mã hồ sơ","ma_ho_so"],
-      ["Ngày nhận hồ sơ","ngay_nhan_hs"],
-      ["Mã số học viên","ma_so_hv"],
-      ["Họ tên","ho_ten"],
-      ["Ngày sinh","ngay_sinh"],
-      ["Giới tính","gioi_tinh"],
-      ["Dân tộc","dan_toc"],
-      ["Số điện thoại","so_dt"],
-      ["Email học viên","email_hoc_vien"],
-      ["Ngành nhập học","nganh_nhap_hoc"],
-      ["Version danh mục","checklist_version_name"],
-      ["Đợt","dot"],
-      ["Khóa","khoa"],
-      ["Đã TN trước đó","da_tn_truoc_do"],
-      ["Ghi chú","ghi_chu"],
-      ["Người nhận","nguoi_nhan_ky_ten"],
-      ["Trạng thái","status"],
-      ["Thời điểm xóa (UTC)","deleted_at"],
-      ["Người xóa","deleted_by"],
-      ["Lý do xóa","deleted_reason"]
-    ];
-
-    const snapshotTitle = isDeleteAction ? 'Dữ liệu trước khi xóa' : 'Dữ liệu hiện tại';
-
-    window.currentRenderSection = 'snapshot';
-    window.currentRenderField   = null;
-
-    const currentHtml = `
-      <h4 class="mt-6 mb-2 font-bold text-blue-800">${snapshotTitle}</h4>
-      ${snapshotGrid(snapshotForView, currentPicks)}
-
-      <h4 class="mt-6 mb-2 font-bold text-blue-800">Danh mục hồ sơ (${isDeleteAction ? 'trước khi xóa' : 'hiện tại'})</h4>
-      ${renderDocsCurrentTable(docsForView, nameMap)}
+      <h4 class="mt-6 mb-2 font-bold text-blue-800">Bộ lọc</h4>
+      <div class="grid grid-cols-[220px_1fr] border border-gray-200 rounded-xl overflow-hidden">
+        ${filterRows}
+      </div>
     `;
-
-    /* Trường thay đổi */
-    const diffsFiltered = diffsResolved.filter(x =>
-        !['ho_dem','ten','checklist_version_id'].includes(String(x.field))
-      );
-    const diffHtml = diffsFiltered.length
-      ? `<h4 class="mt-6 mb-2 font-bold text-blue-800">Trường thay đổi</h4>
-          <table class="w-full text-sm border border-gray-200 rounded-xl overflow-hidden">
-            <thead class="bg-slate-50">
-              <tr>
-                <th class="p-2 text-left">Trường</th>
-                <th class="p-2 text-left">Giá trị cũ</th>
-                <th class="p-2 text-left">Giá trị mới</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${diffsFiltered.map(x => `
-                <tr class="border-t">
-                  <td class="p-2 font-semibold">${escapeHtml(getFieldLabel(x.field))}</td>
-                  <td class="p-2">${cellValFor(x.field, x.from)}</td>
-                  <td class="p-2">${cellValFor(x.field, x.to)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>`
-      : `<div class="text-gray-500 mt-4">Không có trường thay đổi.</div>`;
-
-    /* Danh mục hồ sơ thay đổi */
-    const docsHtml = `
-      <h4 class="mt-6 mb-2 font-bold text-blue-800">Danh mục hồ sơ thay đổi</h4>
-      ${renderDocsDiffTable(docsDiff, nameMap)}
-    `;
-
-    // Render
-    $('#d_view').innerHTML = infoHtml + currentHtml + diffHtml + docsHtml;
-
-    // Admin-only hard delete button (phòng hờ lần nữa)
-    const isDel = ['DELETE','DELETE_SOFT'].includes(action);
-    if (!(isDel && IS_ADMIN)) {
-      $('#btnHardDelete').style.display = 'none';  // chỉ ẩn thêm, KHÔNG bật lại
-    }
-
-    $('#detail').style.display = 'flex';
-  } catch (e) {
-    showNoti('Không tải được chi tiết: ' + (e.message || 'unknown'), 'error');
-  } finally {
-    window.currentRenderSection = null;
-    window.currentRenderField   = null;
   }
+
+  function renderBatchUpdateDetail(d){
+  // new_values từ server đang là { field: newValue, ... }
+  const changes = (d?.new_values && typeof d.new_values === 'object') ? d.new_values : {};
+  const rows = Object.entries(changes);
+
+  const changesTable = rows.length
+    ? `<table class="w-full text-sm border border-gray-200 rounded-xl overflow-hidden">
+         <thead class="bg-slate-50">
+           <tr>
+             <th class="p-2 text-left font-semibold text-gray-800">Trường</th>
+             <th class="p-2 text-left font-semibold text-gray-800">Giá trị mới</th>
+           </tr>
+         </thead>
+         <tbody>
+           ${rows.map(([k,v])=>`
+             <tr class="border-t">
+               <td class="p-2 font-semibold text-gray-800">${escapeHtml(getFieldLabel(k))}</td>
+               <td class="p-2">${cellValFor(k, v)}</td>
+             </tr>`).join('')}
+         </tbody>
+       </table>`
+    : `<div class="text-gray-500 text-sm">Không thấy trường thay đổi.</div>`;
+
+  return `
+    <h4 class="mt-1 mb-2 font-bold text-blue-800">Thông tin chung</h4>
+    <div class="grid grid-cols-[220px_1fr] border border-gray-200 rounded-xl overflow-hidden">
+      <div class="bg-slate-50 font-semibold p-2">Thời gian</div>       <div class="p-2">${cellValFor('occurred_at', d.occurred_at)}</div>
+      <div class="bg-slate-50 font-semibold p-2">Người thao tác</div>  <div class="p-2">${escapeHtml(d.actor_name || d.actor_id || '—')}</div>
+      <div class="bg-slate-50 font-semibold p-2">Hành động</div>       <div class="p-2">${escapeHtml(actionVi(d.action))}</div>
+      <div class="bg-slate-50 font-semibold p-2">Trạng thái</div>      <div class="p-2">${escapeHtml(d.status || '')}</div>
+      <div class="bg-slate-50 font-semibold p-2">Đối tượng</div>       <div class="p-2">${escapeHtml(d.target_type || '—')}</div>
+      <div class="bg-slate-50 font-semibold p-2">MSSV</div>            <div class="p-2">${escapeHtml(d.target_id || '—')}</div>
+      <div class="bg-slate-50 font-semibold p-2">Correlation ID</div>  <div class="p-2">${escapeHtml(d.correlation_id || '—')}</div>
+      <div class="bg-slate-50 font-semibold p-2">Đường dẫn</div>       <div class="p-2">${escapeHtml(d.path || '')}</div>
+      <div class="bg-slate-50 font-semibold p-2">IP</div>              <div class="p-2">${escapeHtml(d.ip_address || '')}</div>
+    </div>
+
+    <h4 class="mt-6 mb-2 font-bold text-blue-800">Trường thay đổi</h4>
+    ${changesTable}
+  `;
 }
 
-  // === Helper: kiểm tra đã bị xóa vĩnh viễn chưa (dựa vào Journal)
+  /* ====== OPEN DETAIL ====== */
+  async function openDetail(id) {
+    try {
+      const r = await apiFetch('/journal/detail/' + id);
+      if (!r || !r.ok) throw new Error('Không tải được chi tiết');
+      const d = await r.json();
+      state.currentLog = d;
+      resetHardDeleteUI();
+
+      // Label tiêu đề
+      const label = d?.target_id ? `MSSV: ${String(d.target_id)}` : `STT: ${String(id)}`;
+      $('#d_id').textContent = label;
+
+      const btnOpenApplicant = document.getElementById('btnOpenApplicant');
+      if (btnOpenApplicant) btnOpenApplicant.style.display = 'none';
+
+      const action = String(d?.action || '').toUpperCase();
+      const canTarget   = !!(d?.target_id);
+      const isApplicant = (d?.target_type === 'Applicant');
+      const isBatchLog  =
+        (d?.target_type === 'ApplicantBatch') ||
+        action === 'PRINT' || action === 'EXPORT' ||
+        action === 'BATCH_UPDATE' || action === 'BATCH_UPDATE_PREVIEW';
+
+      // Nút restore / hard-delete: ẩn cho batch logs
+      const btnRestore    = document.getElementById('btnRestore');
+      const btnHardDelete = document.getElementById('btnHardDelete');
+      if (isBatchLog) {
+        btnRestore.style.display = 'none';
+        btnHardDelete.style.display = 'none';
+        $('#d_id').textContent = `Log #${String(d.id)}`;
+
+        if (action === 'BATCH_UPDATE' || action === 'BATCH_UPDATE_PREVIEW') {
+          $('#d_view').innerHTML = renderBatchUpdateDetail(d);
+        } else {
+          // Giữ nguyên cho PRINT/EXPORT
+          $('#d_view').innerHTML = renderBatchActionDetail(d);
+        }
+
+        $('#detail').style.display = 'flex';
+        return;
+      }
+      // Tiếp tục cho Applicant logs
+      const isHardDeleted      = (action === 'DELETE_HARD') || (d?.new_values?.hard_deleted === true);
+      const isSoftDeleteAction = ['DELETE_SOFT', 'DELETE'].includes(action);
+
+      const isObj  = (x) => x && typeof x === 'object' && !Array.isArray(x);
+      const asObj  = (x) => (isObj(x) ? x : {});
+      const prev   = asObj(d.prev_values);
+      const next   = asObj(d.new_values);
+
+      // Quyết định hiện nút Khôi phục
+      btnRestore.style.display = 'none';
+      btnRestore.disabled = false;
+      btnRestore.title = '';
+
+      const hasPrev = Object.keys(prev).length > 0;
+      const restorableActions = new Set(['UPDATE', 'DELETE_SOFT', 'DELETE']);
+
+      let purgedNow = isHardDeleted;
+      if (!purgedNow && isSoftDeleteAction && d?.target_id) {
+        purgedNow = await alreadyPurgedByLog(d.target_id);
+      }
+
+      const isRestorable = isApplicant && canTarget && !purgedNow && restorableActions.has(action) && hasPrev;
+      if (isRestorable) {
+        btnRestore.style.display = '';
+      } else {
+        btnRestore.style.display = '';
+        btnRestore.disabled = true;
+        btnRestore.title = purgedNow ? 'Dữ liệu đã bị xóa vĩnh viễn, không thể khôi phục.' : 'Không có dữ liệu cũ để khôi phục.';
+      }
+
+      // Nút "Xóa vĩnh viễn"
+      const showHardDel = IS_ADMIN && isApplicant && canTarget && isSoftDeleteAction && !isHardDeleted && !purgedNow;
+      btnHardDelete.style.display = showHardDel ? '' : 'none';
+
+      // Render chi tiết
+      const nameMap = await getChecklistNameMap();
+      const isDeleteAction = ['DELETE_SOFT', 'DELETE', 'DELETE_HARD'].includes(action);
+
+      const baseSnap = isDeleteAction ? prev : (Object.keys(next).length ? next : prev);
+
+      const verId =
+        next?.checklist_version_id ??
+        prev?.checklist_version_id ??
+        d?.checklist_version_id ?? null;
+
+      const verName = await getChecklistVersionName(verId);
+
+      const deletionMeta = {
+        deleted_at:     next?.deleted_at     ?? d?.deleted_at     ?? baseSnap?.deleted_at     ?? null,
+        deleted_by:     next?.deleted_by     ?? d?.deleted_by     ?? baseSnap?.deleted_by     ?? null,
+        deleted_reason: next?.deleted_reason ?? d?.deleted_reason ?? baseSnap?.deleted_reason ?? null,
+      };
+
+      const snapshotForView = {
+        ...baseSnap,
+        checklist_version_name: verName || baseSnap?.checklist_version_name || null,
+        ...deletionMeta
+      };
+
+      const asDict = (x) => (isObj(x) ? x : {});
+      const docsBefore = asDict(prev.docs_before) || asDict(prev.docs);
+      const docsAfter  = asDict(next.docs_after)  || asDict(next.docs);
+
+      let docsDiff = Array.isArray(next.docs_diff)
+        ? next.docs_diff
+        : (Array.isArray(d.docs_diff) ? d.docs_diff : []);
+
+      if (!Array.isArray(docsDiff) || docsDiff.length === 0) {
+        const beforeKeys = Object.keys(docsBefore || {});
+        const afterKeys  = Object.keys(docsAfter  || {});
+        const all = new Set([...beforeKeys, ...afterKeys]);
+        docsDiff = Array.from(all)
+          .map(code => ({
+            code,
+            from: Number((docsBefore || {})[code] || 0),
+            to:   Number((docsAfter  || {})[code]  || 0)
+          }))
+          .filter(x => x.from !== x.to);
+      }
+
+      const docsForView = isDeleteAction
+        ? (Object.keys(docsBefore).length ? docsBefore : docsAfter)
+        : (Object.keys(docsAfter).length  ? docsAfter  : docsBefore);
+
+      const diffs = diffKeysFiltered(prev, next);
+
+      const diffsResolved = await Promise.all(
+        diffs.map(async (x) => {
+          if (String(x.field) === 'checklist_version_id') {
+            return {
+              field: 'checklist_version_name',
+              from: await getChecklistVersionName(x.from),
+              to:   await getChecklistVersionName(x.to)
+            };
+          }
+          return x;
+        })
+      );
+
+      const infoHtml = `
+        <h4 class="mt-1 mb-2 font-bold text-blue-800">Thông tin chung</h4>
+        <div class="grid grid-cols-[220px_1fr] border border-gray-200 rounded-xl overflow-hidden">
+          <div class="bg-slate-50 font-semibold p-2">Thời gian</div>     <div class="p-2">${cellValFor('occurred_at', d.occurred_at)}</div>
+          <div class="bg-slate-50 font-semibold p-2">Người thao tác</div><div class="p-2">${escapeHtml(d.actor_name || d.actor_id || '—')}</div>
+          <div class="bg-slate-50 font-semibold p-2">Hành động</div>     <div class="p-2">${escapeHtml(actionVi(d.action))}</div>
+          <div class="bg-slate-50 font-semibold p-2">Trạng thái</div>    <div class="p-2">${escapeHtml(d.status || '')}</div>
+          <div class="bg-slate-50 font-semibold p-2">Đối tượng (MSSV)</div><div class="p-2">${escapeHtml(d.target_id || '—')}</div>
+          <div class="bg-slate-50 font-semibold p-2">Đường dẫn</div>     <div class="p-2">${escapeHtml(d.path || '')}</div>
+          <div class="bg-slate-50 font-semibold p-2">IP</div>             <div class="p-2">${escapeHtml(d.ip_address || '')}</div>
+          <div class="bg-slate-50 font-semibold p-2">Correlation ID</div><div class="p-2">${escapeHtml(d.correlation_id || '')}</div>
+        </div>`;
+
+      const currentPicks = [
+        ["Mã hồ sơ","ma_ho_so"],
+        ["Ngày nhận hồ sơ","ngay_nhan_hs"],
+        ["Mã số học viên","ma_so_hv"],
+        ["Họ tên","ho_ten"],
+        ["Ngày sinh","ngay_sinh"],
+        ["Giới tính","gioi_tinh"],
+        ["Dân tộc","dan_toc"],
+        ["Số điện thoại","so_dt"],
+        ["Email học viên","email_hoc_vien"],
+        ["Ngành nhập học","nganh_nhap_hoc"],
+        ["Version danh mục","checklist_version_name"],
+        ["Đợt","dot"],
+        ["Khóa","khoa"],
+        ["Đã TN trước đó","da_tn_truoc_do"],
+        ["Ghi chú","ghi_chu"],
+        ["Người nhận","nguoi_nhan_ky_ten"],
+        ["Trạng thái","status"],
+        ["Thời điểm xóa (UTC)","deleted_at"],
+        ["Người xóa","deleted_by"],
+        ["Lý do xóa","deleted_reason"]
+      ];
+
+      const snapshotTitle = isDeleteAction ? 'Dữ liệu trước khi xóa' : 'Dữ liệu hiện tại';
+      window.currentRenderSection = 'snapshot';
+      window.currentRenderField   = null;
+
+      const currentHtml = `
+        <h4 class="mt-6 mb-2 font-bold text-blue-800">${snapshotTitle}</h4>
+        ${snapshotGrid(snapshotForView, currentPicks)}
+
+        <h4 class="mt-6 mb-2 font-bold text-blue-800">Danh mục hồ sơ (${isDeleteAction ? 'trước khi xóa' : 'hiện tại'})</h4>
+        ${renderDocsCurrentTable(docsForView, nameMap)}
+      `;
+
+      const diffsFiltered = diffsResolved.filter(x => !['ho_dem','ten','checklist_version_id'].includes(String(x.field)));
+      const diffHtml = diffsFiltered.length
+        ? `<h4 class="mt-6 mb-2 font-bold text-blue-800">Trường thay đổi</h4>
+            <table class="w-full text-sm border border-gray-200 rounded-xl overflow-hidden">
+              <thead class="bg-slate-50">
+                <tr>
+                  <th class="p-2 text-left">Trường</th>
+                  <th class="p-2 text-left">Giá trị cũ</th>
+                  <th class="p-2 text-left">Giá trị mới</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${diffsFiltered.map(x => `
+                  <tr class="border-t">
+                    <td class="p-2 font-semibold">${escapeHtml(getFieldLabel(x.field))}</td>
+                    <td class="p-2">${cellValFor(x.field, x.from)}</td>
+                    <td class="p-2">${cellValFor(x.field, x.to)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>`
+        : `<div class="text-gray-500 mt-4">Không có trường thay đổi.</div>`;
+
+      const docsHtml = `
+        <h4 class="mt-6 mb-2 font-bold text-blue-800">Danh mục hồ sơ thay đổi</h4>
+        ${renderDocsDiffTable(docsDiff, nameMap)}
+      `;
+
+      $('#d_view').innerHTML = infoHtml + currentHtml + diffHtml + docsHtml;
+
+      const isDel = ['DELETE','DELETE_SOFT'].includes(action);
+      if (!(isDel && IS_ADMIN)) {
+        $('#btnHardDelete').style.display = 'none';
+      }
+
+      $('#detail').style.display = 'flex';
+    } catch (e) {
+      showNoti('Không tải được chi tiết: ' + (e.message || 'unknown'), 'error');
+    } finally {
+      window.currentRenderSection = null;
+      window.currentRenderField   = null;
+    }
+  }
+
+  async function journalTrack({ action, target_type='ApplicantBatch', target_id=null, detail={} }) {
+  try {
+    const r = await apiFetch('/journal/track', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        action,              // 'PRINT_IN'
+        target_type,         // tuỳ: 'Applicant', 'ApplicantBatch', ...
+        target_id,           // nếu in 1 hồ sơ cụ thể thì truyền MSSV; in hàng loạt => null
+        new_values: detail,  // metadata: scope, filters, name_mode, count...
+      }),
+    });
+    return r?.ok;
+  } catch { return false; }
+}
+
+  // Helper: kiểm tra đã bị xóa vĩnh viễn chưa (dựa vào Journal)
   async function alreadyPurgedByLog(targetId){
     if (!targetId) return false;
     try {
@@ -1064,7 +1129,6 @@ async function openDetail(id) {
     const mssv  = log?.target_id || '—';
     if (!logId) return;
 
-    // Mở popup xác nhận
     const box = document.getElementById('confirmRestore');
     const yes = document.getElementById('btnConfirmRestoreYes');
     const no  = document.getElementById('btnConfirmRestoreNo');
@@ -1101,38 +1165,30 @@ async function openDetail(id) {
           throw new Error(msg);
         }
 
-        // Đọc payload để lấy item (nếu BE trả về)
         let data = null;
         try {
           const ctOk = r.headers?.get?.('content-type') || '';
-          if (ctOk.includes('application/json')) {
-            data = await r.json().catch(()=>null);
-          }
+          if (ctOk.includes('application/json')) data = await r.json().catch(()=>null);
         } catch(_) {}
 
         showNoti(`Đã khôi phục cho MSSV ${mssv} từ thùng rác!`, 'success');
         document.getElementById('detail').style.display='none';
 
-        // 👉 Bỏ lọc thao tác nếu đang chọn Xóa… để thấy log RESTORE
         const actionSel = document.getElementById('qActionSel');
         if (actionSel) actionSel.value = '';
 
-        // 👉 Về trang 1 rồi đọc lại filter hiện tại trước khi load (Journal list)
         state.page = 1;
         grabFilters();
         load();
 
-        // 🔔 Phát tín hiệu cho trang Danh sách hồ sơ (nếu trang kia có lắng nghe)
         try {
           const focusMssv = String(data?.item?.ma_so_hv || mssv || '');
           if (focusMssv) {
-            // Broadcast realtime
             try {
               const bc = new BroadcastChannel('app-events');
               bc.postMessage({ type:'APPLICANT_RESTORED', mssv: focusMssv, item: data?.item || null });
               bc.close?.();
             } catch(_) {}
-            // Dự phòng: localStorage
             localStorage.setItem('restored.mssv', focusMssv);
           }
         } catch(_) {}
@@ -1140,7 +1196,6 @@ async function openDetail(id) {
       }catch(e){
         showNoti('Lỗi khôi phục: ' + (e.message || 'unknown'), 'error');
       }finally{
-        // cleanup listeners
         yes.removeEventListener('click', onYes);
         no.removeEventListener('click', onNo);
       }
@@ -1233,195 +1288,167 @@ async function openDetail(id) {
   });
 
   $('#apiBase').addEventListener('change', ()=>{ localStorage.setItem(STORAGE_KEY, $('#apiBase').value.trim()); });
-/* ====== Hard delete (Admin only) ====== */
-const btnHardDelete       = document.getElementById('btnHardDelete');
-const btnHardDeleteGo     = document.getElementById('btnHardDeleteGo');
-const btnHardDeleteCancel = document.getElementById('btnHardDeleteCancel');
-const hardDelBox          = document.getElementById('hardDelConfirm');
 
-const hardDelConfirmChk   = document.getElementById('hardDelConfirmChk');  // ✅ checkbox xác nhận
-const hardDelReasonSel    = document.getElementById('hardDelReasonSel');   // ✅ select lý do
-const hardDelReasonWrap   = document.getElementById('hardDelReasonWrap');  // ✅ khối nhập “khác”
-const hardDelReasonText   = document.getElementById('hardDelReasonText');  // ✅ ô nhập “khác”
+  /* ====== Hard delete (Admin only) ====== */
+  const btnHardDelete       = document.getElementById('btnHardDelete');
+  const btnHardDeleteGo     = document.getElementById('btnHardDeleteGo');
+  const btnHardDeleteCancel = document.getElementById('btnHardDeleteCancel');
+  const hardDelBox          = document.getElementById('hardDelConfirm');
 
-function getHardDelReason() {
-  const code = (hardDelReasonSel?.value || '').trim();
-  if (!code) return { code: '', text: '' };
+  const hardDelConfirmChk   = document.getElementById('hardDelConfirmChk');
+  const hardDelReasonSel    = document.getElementById('hardDelReasonSel');
+  const hardDelReasonWrap   = document.getElementById('hardDelReasonWrap');
+  const hardDelReasonText   = document.getElementById('hardDelReasonText');
 
-  if (code === 'OTHER') {
-    return { code, text: (hardDelReasonText?.value || '').trim() };
+  function getHardDelReason() {
+    const code = (hardDelReasonSel?.value || '').trim();
+    if (!code) return { code: '', text: '' };
+    if (code === 'OTHER') return { code, text: (hardDelReasonText?.value || '').trim() };
+    const map = {
+      TRUNG_LAP: 'Hồ sơ trùng lặp',
+      NHAM_MSSV: 'Nhầm MSSV/mục tiêu',
+      YEU_CAU_NGUOI_DUNG: 'Yêu cầu người dùng xóa dữ liệu',
+      TEST_DATA: 'Dữ liệu thử nghiệm',
+    };
+    return { code, text: map[code] || code };
   }
-  const map = {
-    TRUNG_LAP: 'Hồ sơ trùng lặp',
-    NHAM_MSSV: 'Nhầm MSSV/mục tiêu',
-    YEU_CAU_NGUOI_DUNG: 'Yêu cầu người dùng xóa dữ liệu',
-    TEST_DATA: 'Dữ liệu thử nghiệm',
+
+  function updateHardDelOkState() {
+    const confirmed = !!(hardDelConfirmChk?.checked);
+    const code      = (hardDelReasonSel?.value || '');
+    const needText  = (code === 'OTHER');
+    const hasText   = (hardDelReasonText?.value || '').trim().length > 0;
+
+    if (hardDelReasonWrap) hardDelReasonWrap.classList.toggle('hidden', !needText);
+
+    const hasReason = code && (!needText || hasText);
+    btnHardDeleteGo.disabled = !(confirmed && hasReason);
+  }
+
+  btnHardDelete.onclick = () => {
+    if (!IS_ADMIN) { showNoti('Chỉ Admin mới được xóa vĩnh viễn.', 'error'); return; }
+    if (hardDelConfirmChk)  hardDelConfirmChk.checked = false;
+    if (hardDelReasonSel)   hardDelReasonSel.value = '';
+    if (hardDelReasonText)  hardDelReasonText.value = '';
+    if (hardDelReasonWrap)  hardDelReasonWrap.classList.add('hidden');
+
+    hardDelBox.classList.remove('hidden');
+    btnHardDeleteGo.classList.remove('hidden');
+    btnHardDeleteCancel.classList.remove('hidden');
+    updateHardDelOkState();
   };
-  return { code, text: map[code] || code };
-}
 
-function updateHardDelOkState() {
-  const confirmed = !!(hardDelConfirmChk?.checked);
-  const code      = (hardDelReasonSel?.value || '');
-  const needText  = (code === 'OTHER');
-  const hasText   = (hardDelReasonText?.value || '').trim().length > 0;
+  hardDelConfirmChk?.addEventListener('change', updateHardDelOkState);
+  hardDelReasonSel?.addEventListener('change', updateHardDelOkState);
+  hardDelReasonText?.addEventListener('input', updateHardDelOkState);
 
-  if (hardDelReasonWrap) hardDelReasonWrap.classList.toggle('hidden', !needText);
+  btnHardDeleteCancel.onclick = () => {
+    hardDelBox.classList.add('hidden');
+    btnHardDeleteGo.classList.add('hidden');
+    btnHardDeleteCancel.classList.add('hidden');
+    if (hardDelConfirmChk) hardDelConfirmChk.checked = false;
+    if (hardDelReasonSel)  hardDelReasonSel.value = '';
+    if (hardDelReasonText) hardDelReasonText.value = '';
+    if (hardDelReasonWrap) hardDelReasonWrap.classList.add('hidden');
+    updateHardDelOkState();
+  };
 
-  const hasReason = code && (!needText || hasText);
-  btnHardDeleteGo.disabled = !(confirmed && hasReason);
-}
+  async function doHardDelete() {
+    const log = state.currentLog;
+    if (!log) return;
+    const { code, text } = getHardDelReason();
+    try {
+      const r = await apiFetch('/journal/hard-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          log_id: log.id,
+          target_type: log.target_type,
+          target_id: log.target_id,
+          confirm: 'CONFIRM_DELETE',
+          reason_code: code,
+          reason: text,
+        }),
+      });
+      if (!r) throw new Error('Không kết nối được máy chủ.');
+      if (!r.ok) {
+        let msg = `Hard-delete thất bại (HTTP ${r.status})`;
+        try {
+          const ct = r.headers?.get?.('content-type') || '';
+          if (ct.includes('application/json')) {
+            const j = await r.json().catch(() => null);
+            if (j?.detail) msg = j.detail;
+          } else {
+            const t = await r.text().catch(() => '');
+            if (t) msg = t;
+          }
+        } catch (_) {}
+        showNoti(msg, 'error');
+        return;
+      }
+      showNoti('Đã xóa vĩnh viễn!', 'success');
+      btnHardDeleteCancel.click();
+      document.getElementById('detail').style.display = 'none';
+      load();
+    } catch (e) {
+      showNoti('Hard-delete lỗi: ' + (e.message || 'unknown'), 'error');
+    }
+  }
 
-// mở panel
-btnHardDelete.onclick = () => {
-  if (!IS_ADMIN) { showNoti('Chỉ Admin mới được xóa vĩnh viễn.', 'error'); return; }
+  btnHardDeleteGo.onclick = async () => {
+    if (!IS_ADMIN) { showNoti('Chỉ Admin mới được xóa vĩnh viễn.', 'error'); return; }
+    const log = state.currentLog; if (!log) return;
+    if (!hardDelConfirmChk?.checked) { showNoti('Bạn chưa xác nhận xóa vĩnh viễn.', 'warning'); return; }
+    const { code, text } = getHardDelReason();
+    if (!code) { showNoti('Vui lòng chọn lý do xóa.', 'warning'); return; }
+    if (code === 'OTHER' && !text) { showNoti('Vui lòng nhập lý do khác.', 'warning'); return; }
 
-  // reset UI
-  if (hardDelConfirmChk)  hardDelConfirmChk.checked = false;
-  if (hardDelReasonSel)   hardDelReasonSel.value = '';
-  if (hardDelReasonText)  hardDelReasonText.value = '';
-  if (hardDelReasonWrap)  hardDelReasonWrap.classList.add('hidden');
+    const confirmBox = document.getElementById('confirmHardDel');
+    const yesBtn = document.getElementById('btnConfirmHardDelYes');
+    const noBtn  = document.getElementById('btnConfirmHardDelNo');
 
-  hardDelBox.classList.remove('hidden');
-  btnHardDeleteGo.classList.remove('hidden');
-  btnHardDeleteCancel.classList.remove('hidden');
-  updateHardDelOkState();
-};
-
-// bind change
-hardDelConfirmChk?.addEventListener('change', updateHardDelOkState);
-hardDelReasonSel?.addEventListener('change', updateHardDelOkState);
-hardDelReasonText?.addEventListener('input', updateHardDelOkState);
-
-// hủy panel
-btnHardDeleteCancel.onclick = () => {
-  hardDelBox.classList.add('hidden');
-  btnHardDeleteGo.classList.add('hidden');
-  btnHardDeleteCancel.classList.add('hidden');
-  if (hardDelConfirmChk) hardDelConfirmChk.checked = false;
-  if (hardDelReasonSel)  hardDelReasonSel.value = '';
-  if (hardDelReasonText) hardDelReasonText.value = '';
-  if (hardDelReasonWrap) hardDelReasonWrap.classList.add('hidden');
-  updateHardDelOkState();
-};
-// ==== Hàm thực thi gọi API xóa vĩnh viễn ====
-async function doHardDelete() {
-  const log = state.currentLog;
-  if (!log) return;
-
-  const { code, text } = getHardDelReason();
-
-  try {
-    const r = await apiFetch('/journal/hard-delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        log_id: log.id,
-        target_type: log.target_type,
-        target_id: log.target_id,
-        confirm: 'CONFIRM_DELETE',
-        reason_code: code,
-        reason: text,
-      }),
-    });
-
-    if (!r) throw new Error('Không kết nối được máy chủ.');
-    if (!r.ok) {
-      let msg = `Hard-delete thất bại (HTTP ${r.status})`;
-      try {
-        const ct = r.headers?.get?.('content-type') || '';
-        if (ct.includes('application/json')) {
-          const j = await r.json().catch(() => null);
-          if (j?.detail) msg = j.detail;
-        } else {
-          const t = await r.text().catch(() => '');
-          if (t) msg = t;
-        }
-      } catch (_) {}
-      showNoti(msg, 'error');
+    if (!confirmBox || !yesBtn || !noBtn) {
+      if (!window.confirm('Xác nhận xóa vĩnh viễn hồ sơ này?')) return;
+      await doHardDelete();
       return;
     }
 
-    showNoti('Đã xóa vĩnh viễn!', 'success');
-    btnHardDeleteCancel.click();
-    document.getElementById('detail').style.display = 'none';
-    load();
-  } catch (e) {
-    showNoti('Hard-delete lỗi: ' + (e.message || 'unknown'), 'error');
-  }
-}
-
-// thực thi xóa
-btnHardDeleteGo.onclick = async () => {
-  if (!IS_ADMIN) { showNoti('Chỉ Admin mới được xóa vĩnh viễn.', 'error'); return; }
-  const log = state.currentLog; if (!log) return;
-
-  // điều kiện đủ
-  if (!hardDelConfirmChk?.checked) { showNoti('Bạn chưa xác nhận xóa vĩnh viễn.', 'warning'); return; }
-  const { code, text } = getHardDelReason();
-  if (!code) { showNoti('Vui lòng chọn lý do xóa.', 'warning'); return; }
-  if (code === 'OTHER' && !text) { showNoti('Vui lòng nhập lý do khác.', 'warning'); return; }
-
-  // popup xác nhận lần cuối (nếu không có modal thì dùng confirm đơn giản)
-  const confirmBox = document.getElementById('confirmHardDel');
-  const yesBtn = document.getElementById('btnConfirmHardDelYes');
-  const noBtn  = document.getElementById('btnConfirmHardDelNo');
-
-  if (!confirmBox || !yesBtn || !noBtn) {
-    if (!window.confirm('Xác nhận xóa vĩnh viễn hồ sơ này?')) return;
-    await doHardDelete();
-    return;
-  }
-
-  confirmBox.classList.remove('hidden');
-
-  const onNo = () => { confirmBox.classList.add('hidden'); };
-  const onYes = async () => {
-    confirmBox.classList.add('hidden');
-    btnHardDeleteGo.disabled = true;
-    await doHardDelete();
-    btnHardDeleteGo.disabled = false;
-    yesBtn.removeEventListener('click', onYes);
-    noBtn.removeEventListener('click', onNo);
+    confirmBox.classList.remove('hidden');
+    const onNo = () => { confirmBox.classList.add('hidden'); };
+    const onYes = async () => {
+      confirmBox.classList.add('hidden');
+      btnHardDeleteGo.disabled = true;
+      await doHardDelete();
+      btnHardDeleteGo.disabled = false;
+      yesBtn.removeEventListener('click', onYes);
+      noBtn.removeEventListener('click', onNo);
+    };
+    noBtn.addEventListener('click', onNo,  { once: true });
+    yesBtn.addEventListener('click', onYes, { once: true });
   };
 
-  noBtn.addEventListener('click', onNo,  { once: true });
-  yesBtn.addEventListener('click', onYes, { once: true });
-};
+  function resetHardDeleteUI() {
+    hardDelBox.classList.add('hidden');
+    btnHardDeleteGo.classList.add('hidden');
+    btnHardDeleteCancel.classList.add('hidden');
+    const chk = document.getElementById('hardDelConfirmChk');
+    if (chk) chk.checked = false;
+    if (hardDelReasonSel) hardDelReasonSel.value = '';
+    if (hardDelReasonText) hardDelReasonText.value = '';
+    if (hardDelReasonWrap) hardDelReasonWrap.classList.add('hidden');
+    btnHardDeleteGo.disabled = true;
+  }
 
-function resetHardDeleteUI() {
-  // Ẩn toàn bộ khu vực xác nhận
-  hardDelBox.classList.add('hidden');
-  btnHardDeleteGo.classList.add('hidden');
-  btnHardDeleteCancel.classList.add('hidden');
-
-  // Reset trạng thái
-  const chk = document.getElementById('hardDelConfirmChk');
-  if (chk) chk.checked = false;
-  if (hardDelReasonSel) hardDelReasonSel.value = '';
-  if (hardDelReasonText) hardDelReasonText.value = '';
-  if (hardDelReasonWrap) hardDelReasonWrap.classList.add('hidden');
-
-  btnHardDeleteGo.disabled = true;
-}
-
-(function () {
-    // Ưu tiên query expired=1 (khi bị redirect)
+  (function () {
     const params = new URLSearchParams(location.search);
     const byQuery = params.get('expired') === '1';
-
-    // Hoặc cookie cờ do BE set
     const byCookie = document.cookie.split(';').some(c => c.trim().startsWith('__session_expired=1'));
-
     if (byQuery || byCookie) {
-      // Hiện thông báo rộng rãi
       if (typeof showToast === 'function') {
         showToast('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.', 'warn', 4500);
       } else {
-        // Fallback nếu trang không có showToast
         alert('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
       }
-      // Xóa cookie cờ để khỏi lặp lại
       document.cookie = '__session_expired=; Max-Age=0; Path=/; SameSite=Lax';
     }
   })();

@@ -14,6 +14,7 @@ from app.routers.auth import require_roles
 
 from app.models.audit import AuditLog, DeletionRequest
 from app.services.audit import write_audit
+from pydantic import BaseModel, Field
 
 # (liên quan hard-delete Applicant)
 from app.models.applicant import Applicant, ApplicantDoc
@@ -400,3 +401,85 @@ def hard_delete(
 
     return {"ok": True, "target_type": ttype, "target_id": tid, "reason_code": raw_code}
 
+# ====== Pydantic payload cho POST /journal/track ======
+class JournalTrackDetail(BaseModel):
+    scope: str | None = Field(None, description="'ALL' | 'FILTERED' | 'SELECTED' | 'SINGLE' ...")
+    name_mode: str | None = Field(None, description="A4 | A5 | default | ...")
+    count: int | None = Field(None, description="số lượng mục liên quan")
+    # filters gốc để truy vết, VD chứa mshv, dot, khoa...
+    filters: dict | None = None
+    # có thể truyền thẳng định danh mục tiêu (nếu có)
+    target_type: str | None = None
+    target_id: str | None = None
+
+class JournalTrackIn(BaseModel):
+    action: str = Field(..., description="Ví dụ: 'PRINT_IN' hoặc 'EXPORT'")
+    detail: JournalTrackDetail | None = None
+
+# ====== Ghi log thao tác in/xuất ======
+@router.post("/track")
+def track_action(
+    payload: JournalTrackIn,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Dùng cho FE ghi nhận các thao tác In/Xuất.
+    - action: 'PRINT_IN' | 'EXPORT' | ...
+    - detail: metadata (scope, name_mode, count, filters, target_type, target_id)
+    """
+    action = (payload.action or "").strip().upper()
+    if action not in {"PRINT_IN", "EXPORT", "PRINT_EXPORT"}:
+        # vẫn cho ghi, nhưng khuyến nghị hai giá trị chính
+        pass
+
+    d = payload.detail.dict() if payload.detail else {}
+    target_type = d.get("target_type") or "Batch"
+    target_id = d.get("target_id") or (d.get("filters") or {}).get("mshv") or None
+
+    # new_values lưu toàn bộ chi tiết để xem ở trang "Chi tiết"
+    new_values = {
+        "scope": d.get("scope"),
+        "name_mode": d.get("name_mode"),
+        "count": d.get("count"),
+        "filters": d.get("filters") or {},
+    }
+
+    write_audit(
+        db,
+        action=action,                   # <-- 'PRINT_IN' hoặc 'EXPORT'
+        target_type=target_type,         # 'Batch' hoặc 'Applicant'
+        target_id=str(target_id) if target_id else None,
+        prev_values=None,
+        new_values=new_values,
+        status="SUCCESS",
+        request=request,
+    )
+    db.commit()
+    # Không cần body, 204 cho gọn
+    return {"ok": True}
+
+# ====== Fallback GET /journal/track?action=...&mshv=... ======
+@router.get("/track")
+def track_action_get(
+    request: Request,
+    db: Session = Depends(get_db),
+    action: str = Query(..., description="PRINT_IN | EXPORT"),
+    scope: str | None = None,
+    name_mode: str | None = None,
+    count: int | None = None,
+    mshv: str | None = None,
+):
+    new_values = {"scope": scope, "name_mode": name_mode, "count": count, "filters": {"mshv": mshv} if mshv else {}}
+    write_audit(
+        db,
+        action=(action or "").upper(),
+        target_type="Applicant" if mshv else "Batch",
+        target_id=mshv,
+        prev_values=None,
+        new_values=new_values,
+        status="SUCCESS",
+        request=request,
+    )
+    db.commit()
+    return {"ok": True}

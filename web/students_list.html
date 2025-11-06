@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Danh sách hồ sơ | Admission_Management_System</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <link rel="icon" type="image/png" href="hutech.png" sizes="32x32">
   <link rel="apple-touch-icon" href="hutech.png">
   <meta name="theme-color" content="#2563eb">
@@ -37,18 +38,13 @@
           <a id="loginLink" href="/login" class="btn btn-outline">Đăng nhập</a>
           <button id="btnLogout" class="btn btn-outline hidden">LogOut</button>
         </div>
-
-        <!-- <a class="btn btn-outline" href="/" title="Biên soạn Hồ Sơ">Soạn Hồ Sơ</a>
-        <a id="journalLink" class="btn btn-outline" href="/journal.html" title="Nhật ký" hidden>🧾Nhật ký</a> -->
         <a class="btn btn-outline" href="/ams_home.html" title="Trang chủ">← Trang chủ</a>
       </div>
     </header>
-
     <!-- Toolbar -->
     <section class="card space-y-4">
       <!-- Hàng 1: Tìm kiếm + Lọc đợt/khóa -->
       <div class="grid grid-cols-1 xl:grid-cols-3 gap-3 items-end">
-        <!-- Ô tìm chung -->
         <div class="xl:col-span-2">
           <div class="flex items-center gap-2">
             <div class="relative flex-1 min-w-[240px]">
@@ -63,28 +59,79 @@
           </div>
         </div>
       </div>
-      <h2 class="font-bold">IN / XUẤT DỮ LIỆU</h2>
-      <!-- Hàng 2: Theo ngày + Theo đợt -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <!-- Theo ngày -->
-        <div class="flex flex-wrap items-center gap-2 min-w-0">
-          <input id="day" type="date" class="input w-36 sm:w-40 md:w-44 lg:w-48 flex-none" />
-          <button id="btnExportDay" class="btn btn-outline shrink-0" title="Xuất Excel theo ngày">⬇️ Excel</button>
-          <button id="btnPrintDay"  class="btn btn-primary shrink-0" title="In PDF gộp theo ngày">🖨️ PDF</button>
-          <p class="w-full text-xs text-gray-500">Gửi in theo ngày nhận hồ sơ.</p>
+
+      <!-- Tiêu đề + nút Excel -->
+      <div class="flex items-center justify-between">
+        <h2 class="font-bold">IN / XUẤT DỮ LIỆU</h2>
+        <button id="btnExcelToggle" class="btn btn-outline btn-xs" aria-expanded="false">
+          ⚙️ Cập nhật từ Excel
+        </button>
+      </div>
+
+      <!-- Dải tác vụ đẹp hơn -->
+      <div class="grid gap-3 md:grid-cols-2">
+        <!-- Theo NGÀY -->
+        <div class="rounded-2xl border bg-white/70 p-3 shadow-sm">
+          <div class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Theo ngày</div>
+          <div class="flex flex-wrap items-end gap-2">
+            <input id="day" type="date" class="input w-44" />
+            <div class="ml-auto flex items-center gap-2">
+              <button id="btnPrintDay"  class="btn btn-outline">🖨️ In</button>
+              <button id="btnExportDay" class="btn btn-outline">⬇️ Xuất Excel</button>
+            </div>
+          </div>
         </div>
 
-        <!-- Theo đợt (+Khóa) server-side -->
-        <div class="flex flex-wrap items-center gap-2 min-w-0">
-          <input id="dot" class="input w-24 sm:w-28 md:w-32 flex-none" placeholder="Nhập tên đợt" title="VD: 1" />
-          <input id="dotKhoa" class="input w-24 sm:w-28 md:w-32 flex-none" placeholder="Nhập Khóa" title="VD: 25" />
-          <button id="btnExportDot" class="btn btn-outline shrink-0" title="Xuất Excel theo đợt + khóa">⬇️ Excel</button>
-          <button id="btnPrintDot"  class="btn btn-primary shrink-0" title="In PDF gộp theo đợt + khóa">🖨️ PDF</button>
-          <p class="w-full text-xs text-gray-500">Gửi in/xuất theo <b>đợt</b>; hoặc nhập thêm <b>Khóa</b> nếu cần.</p>
+        <!-- Theo ĐỢT / KHÓA -->
+        <div class="rounded-2xl border bg-white/70 p-3 shadow-sm">
+          <div class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Theo đợt / khóa</div>
+          <div class="flex flex-wrap items-end gap-2">
+            <input id="dot"     class="input w-40" placeholder="Đợt: " />
+            <input id="dotKhoa" class="input w-28" placeholder="Khóa: " />
+            <div class="ml-auto flex items-center gap-2">
+              <button id="btnPrintDot"  class="btn btn-outline">🖨️ In</button>
+              <button id="btnExportDot" class="btn btn-outline">⬇️ Xuất Excel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Link nhật ký -->
+      <div class="flex">
+        <a id="journalLink" href="/journal.html" hidden
+          class="btn btn-soft btn-xs mt-1">📒 Nhật ký</a>
+      </div>
+
+      <!-- Khối Excel -->
+      <div id="excelBox" class="hidden mt-5 border-t pt-4">
+        <h3 class="font-semibold mb-2">CẬP NHẬT HÀNG LOẠT (MSHV) • Excel</h3>
+        <div class="flex flex-wrap items-center gap-2 mt-2">
+          <input id="batchFile" type="file" accept=".xlsx" class="input w-72" />
+          <button id="btnDownloadTemplate" class="btn btn-outline">⬇️ Tải mẫu .xlsx</button>
+          <button id="btnBatchPreview" class="btn btn-outline">👀 Xem thử (dry-run)</button>
+          <button id="btnBatchApply" class="btn btn-primary">💾 Áp dụng</button>
+          <label class="ml-3 inline-flex items-center gap-2 text-sm">
+            <input id="stopOnError" type="checkbox" class="accent-blue-600" />
+            Dừng khi gặp lỗi
+          </label>
+        </div>
+
+        <div id="batchMsg" class="mt-2 text-sm text-gray-600"></div>
+
+        <div id="batchPreviewWrap" class="hidden mt-2 overflow-auto border rounded-xl">
+          <table class="table min-w-full">
+            <thead>
+              <tr>
+                <th class="text-left">MSHV</th>
+                <th class="text-left">Trạng thái</th>
+                <th class="text-left">Trường thay đổi</th>
+              </tr>
+            </thead>
+            <tbody id="batchPreviewBody"></tbody>
+          </table>
         </div>
       </div>
     </section>
-
     <!-- Results -->
     <section class="card space-y-3">
       <div class="flex items-center justify-between flex-wrap gap-2">
@@ -196,22 +243,16 @@
     let API_PREFIX = "";
 
     // ===== Compose / Editor detection =====
-    const COMPOSE_CANDIDATES = ["/compilation.html", "/compose.html", "/editor.html", "/"];
-    let COMPOSE_BASE = "/compilation.html"; // mặc định an toàn
+    const COMPOSE_CANDIDATES = ["/compilation.html", "/compose.html", "/editor.html"];
+    let COMPOSE_BASE = "/compilation.html";
 
     async function detectComposePage(){
       for (const p of COMPOSE_CANDIDATES) {
         try {
           const r = await fetch(p, { method: "GET", credentials: "include" });
-          if (r.ok) {
-            if (p !== "/ams_home.html") { // tránh nhầm trang chủ
-              COMPOSE_BASE = p;
-              break;
-            }
-          }
+          if (r.ok) { COMPOSE_BASE = p; break; }
         } catch(_) {}
       }
-      // Cập nhật link "Soạn Hồ Sơ" trên header
       const soan = document.querySelector('a[title="Biên soạn Hồ Sơ"]');
       if (soan) soan.href = COMPOSE_BASE;
     }
@@ -244,7 +285,17 @@
       }
       return r;
     }
-
+    // --- Ghi log vào Journal (PRINT_IN / EXPORT)
+    async function journalTrack(payload){
+      try{
+        await apiFetch('/journal/track', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(payload || {})
+        });
+      }catch(_){ /* im lặng, không chặn luồng in/xuất */ }
+    }
+    // --- Định dạng ngày DMY ---
     function fmtDMY(s) {
       if (!s) return "";
       const t = String(s).trim();
@@ -476,19 +527,29 @@
           location.href = `${COMPOSE_BASE}?mshv=${encodeURIComponent(mshv)}&action=edit`;
           return;
         }
-
         // In A5/A4
         const a5 = e.target.closest('.btn-print-a5');
         const a4 = e.target.closest('.btn-print-a4');
         if (a5 || a4) {
           const mshv = decodeURIComponent((a5 || a4).dataset.mshv || '');
           if (!mshv) return;
+
+          // 🧠 Ghi log
+          await journalTrack({
+            action: 'PRINT_IN',
+            detail: {
+              scope: 'SINGLE',
+              filters: { mshv },
+              name_mode: a5 ? 'A5' : 'A4',
+              count: 1
+            }
+          });
+
           const url = a5 ? `/print/a5/${encodeURIComponent(mshv)}`
-                         : `/print/a4/${encodeURIComponent(mshv)}`;
+                        : `/print/a4/${encodeURIComponent(mshv)}`;
           await openPdfOrAlert(url);
           return;
         }
-
         // Xoá mềm
         const btn = e.target.closest('.btn-del');
         if (!btn) return;
@@ -569,14 +630,42 @@
       if (!key) return list;
 
       const getVal = (it) => {
-        if (key === 'ho_dem') return (it.ho_dem || "").toString(); // Sắp xếp theo Họ đệm
-        if (key === 'ten') return (it.ten || "").toString(); // Sắp xếp theo Tên
-        if (key === 'ma_so_hv') return (it.ma_so_hv || "").toString(); // Sắp xếp theo MSHV
-        return "";
+        switch (key) {
+          case 'ho_dem': return (it.ho_dem || "").toString();
+          case 'ten': return (it.ten || "").toString();
+          case 'ma_so_hv': return (it.ma_so_hv || "").toString();
+          case 'ngay_nhan_hs': {
+            const v = it.ngay_nhan_hs;
+            // chuẩn ISO -> số để sort ổn định; fallback về 0
+            const t = v ? Date.parse(v) : 0;
+            return isNaN(t) ? 0 : t;
+          }
+          case 'nganh': {
+            const ng = it.nganh_nhap_hoc ?? it.nganh ?? "";
+            return ng.toString();
+          }
+          case 'dot': {
+            const d = it.dot ?? it.dot_tuyen ?? "";
+            return d.toString();
+          }
+          case 'khoa': {
+            const k = it.khoa ?? it.khoa_hoc ?? it.khoahoc ?? "";
+            return k.toString();
+          }
+          case 'nguoi_nhan': {
+            const n = it.nguoi_nhan_ky_ten ?? it.nguoi_nhan ?? it.nguoi_ky ?? "";
+            return n.toString();
+          }
+          default: return "";
+        }
       };
 
       const collator = new Intl.Collator('vi', { numeric: true, sensitivity: 'base' });
-      const arr = list.slice().sort((a, b) => collator.compare(getVal(a), getVal(b)));
+      const arr = list.slice().sort((a, b) => {
+        const A = getVal(a), B = getVal(b);
+        if (typeof A === 'number' && typeof B === 'number') return A - B;
+        return collator.compare(String(A), String(B));
+      });
       return dir === 'asc' ? arr : arr.reverse();
     }
 
@@ -807,35 +896,51 @@
     }
 
     // ===== Export/In ấn theo ngày/đợt =====
-    $("day").value = new Date().toISOString().slice(0,10);
+    // ---- Theo ngày
+    const dayEl = $("day");
+    if (dayEl) {
+      dayEl.value = new Date().toISOString().slice(0,10);
 
-    $("btnExportDay").onclick = async ()=>{
-      const d = $("day").value;
-      if (!d){ alert("Chọn ngày trước đã"); return; }
-      await fetchFileOrAlert(`/export/excel?day=${encodeURIComponent(d)}`, `tong_ngay_${d}.xlsx`, "excel");
-    };
-    $("btnPrintDay").onclick = async ()=>{
-      const d = $("day").value;
-      if (!d){ alert("Chọn ngày trước đã"); return; }
-      await openPdfOrAlert(`/batch/print?day=${encodeURIComponent(d)}`);
-    };
-    $("btnExportDot").onclick = async ()=>{
-      const dot  = $("dot").value.trim();
-      const khoa = $("dotKhoa").value.trim();
-      if (!dot){ alert("Nhập tên đợt trước đã"); return; }
-      let url = `/export/excel-dot?dot=${encodeURIComponent(dot)}`;
-      if (khoa) url += `&khoa=${encodeURIComponent(khoa)}`;
-      const fname = `tong_dot_${dot}${khoa ? `_khoa_${khoa}` : ""}.xlsx`;
-      await fetchFileOrAlert(url, fname, "excel");
-    };
-    $("btnPrintDot").onclick = async ()=>{
-      const dot  = $("dot").value.trim();
-      const khoa = $("dotKhoa").value.trim();
-      if (!dot){ alert("Nhập tên đợt trước đã"); return; }
-      let url = `/batch/print-dot?dot=${encodeURIComponent(dot)}`;
-      if (khoa) url += `&khoa=${encodeURIComponent(khoa)}`;
-      await openPdfOrAlert(url);
-    };
+      $("btnExportDay")?.addEventListener("click", async () => {
+        const d = $("day").value;
+        if (!d){ alert("Chọn ngày trước đã"); return; }
+        await journalTrack({ action:'EXPORT', detail:{ scope:'DAY', filters:{ day:d }, name_mode:'split', count:null }});
+        await fetchFileOrAlert(`/export/excel?day=${encodeURIComponent(d)}&name=split`, `tong_ngay_${d}.xlsx`, "excel");
+      });
+
+      $("btnPrintDay")?.addEventListener("click", async () => {
+        const d = $("day").value;
+        if (!d){ alert("Chọn ngày trước đã"); return; }
+        await journalTrack({ action:'PRINT_IN', detail:{ scope:'DAY', filters:{ day:d }, name_mode:'default', count:null }});
+        await openPdfOrAlert(`/batch/print?day=${encodeURIComponent(d)}`);
+      });
+    }
+
+    // ---- Theo đợt/khóa
+    const dotEl = $("dot");
+    if (dotEl) {
+      $("btnExportDot")?.addEventListener("click", async () => {
+        const dot  = $("dot").value.trim();
+        const khoa = $("dotKhoa")?.value.trim() || "";
+        if (!dot){ alert("Nhập tên đợt trước đã"); return; }
+
+        await journalTrack({ action:'EXPORT', detail:{ scope:'DOT', filters:{ dot, ...(khoa?{khoa}:{}) }, name_mode:'split', count:null }});
+        let url = `/export/excel-dot?dot=${encodeURIComponent(dot)}&name=split`;
+        if (khoa) url += `&khoa=${encodeURIComponent(khoa)}`;
+        await fetchFileOrAlert(url, `tong_dot_${dot}${khoa?`_khoa_${khoa}`:""}.xlsx`, "excel");
+      });
+
+      $("btnPrintDot")?.addEventListener("click", async () => {
+        const dot  = $("dot").value.trim();
+        const khoa = $("dotKhoa")?.value.trim() || "";
+        if (!dot){ alert("Nhập tên đợt trước đã"); return; }
+
+        await journalTrack({ action:'PRINT_IN', detail:{ scope:'DOT', filters:{ dot, ...(khoa?{khoa}:{}) }, name_mode:'default', count:null }});
+        let url = `/batch/print-dot?dot=${encodeURIComponent(dot)}`;
+        if (khoa) url += `&khoa=${encodeURIComponent(khoa)}`;
+        await openPdfOrAlert(url);
+      });
+    }
 
     // ===== Sort header bindings =====
     function bindSortHandlers(){
@@ -920,11 +1025,15 @@
 
     // ENTER to search for Đợt / Khóa
     (function bindEnterForFilters(){
-      const dotInput  = document.querySelector('#filterDot, #qDot, input[placeholder="Lọc theo Đợt"]');
-      const khoaInput = document.querySelector('#filterKhoa, #qKhoa, input[placeholder="Lọc theo Khóa"]');
-      function triggerSearch(){ runSearch(); }
-      function bindEnter(el){ if (!el) return; el.addEventListener('keydown', (e)=>{ if (e.key === 'Enter'){ e.preventDefault(); triggerSearch(); } }); }
-      bindEnter(dotInput); bindEnter(khoaInput);
+      const dotInput  = document.getElementById('filterDot');
+      const khoaInput = document.getElementById('filterKhoa');
+      const triggerSearch = () => runSearch();
+      [dotInput, khoaInput].forEach(el => {
+        if (!el) return;
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter'){ e.preventDefault(); triggerSearch(); }
+        });
+      });
     })();
 
     // Nút vào Journal theo quyền
@@ -1001,44 +1110,250 @@
       document.cookie = '__session_expired=; Max-Age=0; Path=/; SameSite=Lax';
     }
   })();
-  </script>
 
-  <!-- Toast -->
-  <div id="toast" class="fixed top-8 left-1/2 -translate-x-1/2 z-[9999] pointer-events-none hidden">
-    <div id="toastInner"
-      class="px-5 py-3 rounded-xl shadow-xl text-white font-semibold
-            bg-rose-600/95 backdrop-blur
-            transition-all duration-300 scale-95 opacity-0
-            max-w-[90vw] sm:max-w-md text-center">
-    </div>
-  </div>
+  // Toggle khối Excel ngay tại nút tiêu đề
+  (function(){
+    const btn = document.getElementById('btnExcelToggle');
+    const box = document.getElementById('excelBox');
+    if (!btn || !box) return;
+    btn.addEventListener('click', ()=>{
+      const isHidden = box.classList.toggle('hidden');
+      btn.setAttribute('aria-expanded', String(!isHidden));
+      btn.textContent = isHidden ? '⚙️ Cập nhật từ Excel' : '⬇️ Ẩn cập nhật từ Excel';
+    });
+  })();
 
-  <!-- Modal chọn lý do cập nhật -->
-  <div id="reasonModal" class="overlay" aria-modal="true" role="dialog">
-    <div class="modal max-w-lg">
-      <div class="hd">Thông tin cập nhật</div>
-      <div class="bd space-y-2">
-        <label class="text-sm font-medium text-gray-700 block">Vui lòng chọn lý do:</label>
-        <select id="reasonSelect" class="input w-full">
-          <option value="">-- Chọn lệnh bổ sung --</option>
-          <option value="capnhat_thongtin">Cập nhật thông tin học viên</option>
-          <option value="capnhat_hoso_moi">Cập nhật hồ sơ mới</option>
-          <option value="bosung_hoso">Bổ sung hồ sơ</option>
-          <option value="capnhat_chungchi">Cập nhật chứng chỉ</option>
-          <option value="chinhsua_hoso">Chỉnh sửa hồ sơ</option>
-          <option value="khac">Lý do khác (nhập thêm)</option>
-        </select>
-        <div id="reasonOtherWrap" class="hidden">
-          <label class="text-sm font-medium text-gray-700 block mt-2">Nhập lý do khác:</label>
-          <input id="reasonOther" class="input w-full" placeholder="Nhập lý do cụ thể..." />
-        </div>
-      </div>
-      <div class="ft">
-        <button id="reasonCancel" class="btn btn-outline">Hủy</button>
-        <button id="reasonOK" class="btn btn-primary">Xác nhận</button>
-      </div>
-    </div>
-  </div>
-  
+  // --- Tải mẫu XLSX ---
+  function downloadXlsxTemplate() {
+    const rows = [
+      [
+        "ma_so_hv","ho_dem","ten","ho_ten","gioi_tinh","dan_toc",
+        "ngay_sinh","so_dt","email_hoc_vien","nganh_nhap_hoc","dot","khoa","ghi_chu"
+      ],
+      // ví dụ 1
+      ["2510000123","Nguyen Van","An","","Nam","Kinh","01/01/2005","0912345678","an@example.com","CNTT","1","27",""],
+      // ví dụ 2
+      ["2510000456","","","Nguyen Thi B","Nu","Kinh","2004-12-31","","b@example.com","Marketing","2","27","Cập nhật email"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "batch_update_template");
+    ws['!cols'] = [
+      {wch:12}, {wch:14}, {wch:10}, {wch:22}, {wch:8}, {wch:8},
+      {wch:12}, {wch:14}, {wch:28}, {wch:20}, {wch:8}, {wch:8}, {wch:22}
+    ];
+    XLSX.writeFile(wb, "batch_update_template.xlsx");
+  }
+  document.getElementById("btnDownloadTemplate")?.addEventListener("click", downloadXlsxTemplate);
+
+  // Đọc file XLSX
+  async function readFileToRows(file){
+    if (!file) throw new Error('Chưa chọn file.');
+    const name = (file.name||'').toLowerCase();
+    if (!name.endsWith('.xlsx')) throw new Error('Chỉ nhận .xlsx');
+    if (typeof XLSX === 'undefined') throw new Error('Thiếu thư viện XLSX.');
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array', cellDates:false, raw:false});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws, {defval:''});
+  }
+
+  // Chuẩn hoá MSHV về 10 số
+  function normMssv(v){
+    if (v == null) return '';
+    if (typeof v === 'number') v = String(Math.trunc(v));
+    let s = String(v).trim();
+    if (/e\+/i.test(s)) { // dạng 2.51E+09
+      const n = Number(s);
+      if (!Number.isNaN(n)) s = String(Math.trunc(n));
+    }
+    s = s.replace(/\D/g, '');       // bỏ ký tự không phải số
+    if (s.length === 9) s = '0' + s; // hay gặp mất '0' đầu
+    return s;
+  }
+
+  // Map giới tính hay gặp
+  function normGender(v){
+    if (!v) return v;
+    const s = String(v).trim().toLowerCase();
+    if (s === 'nu' || s === 'nữ') return 'Nữ';
+    if (s === 'nam') return 'Nam';
+    if (s === 'khac' || s === 'khác') return 'Khác';
+    return v; // để BE validate tiếp
+  }
+
+  // Render preview
+  function renderBatchPreview(resp){
+    const wrap = $('batchPreviewWrap'), body = $('batchPreviewBody');
+    if (!wrap || !body) return;
+    wrap.classList.remove('hidden'); body.innerHTML = '';
+    (resp.results||[]).forEach(r=>{
+      const tr = document.createElement('tr');
+      const fields = r.changed_fields ? Object.keys(r.changed_fields).join(', ') : '—';
+      const statusClass =
+        r.status === 'UPDATED' ? 'text-green-700' :
+        r.status === 'SKIPPED' ? 'text-gray-600' :
+        r.status === 'NOT_FOUND' ? 'text-orange-700' :
+        r.status === 'SOFT_DELETED' ? 'text-purple-700' :
+        r.status === 'INVALID' ? 'text-red-700' : 'text-gray-700';
+      tr.innerHTML = `
+        <td class="p-2 border-b font-medium">${r.ma_so_hv || ''}</td>
+        <td class="p-2 border-b ${statusClass}">${r.status}${r.errors ? ' • ' + (r.errors||[]).join('; ') : ''}</td>
+        <td class="p-2 border-b">${fields}</td>`;
+      body.appendChild(tr);
+    });
+    $('batchMsg').textContent =
+      `Tổng: ${resp.total} • UPDATED: ${resp.updated} • SKIPPED: ${resp.skipped} • NOT_FOUND: ${resp.not_found} • SOFT_DELETED: ${resp.soft_deleted} • INVALID: ${resp.invalid}`;
+  }
+
+  // Chuẩn hoá và gửi batch
+  async function callBatch(dry){
+    const file = document.getElementById('batchFile')?.files?.[0];
+    if (!file){ alert('Chọn file XLSX trước đã.'); return; }
+
+    const stop = document.getElementById('stopOnError')?.checked ? true : false;
+
+    // khoá nút trong lúc chạy
+    const btnPrev = document.getElementById('btnBatchPreview');
+    const btnApply = document.getElementById('btnBatchApply');
+    btnPrev?.setAttribute('disabled','');
+    btnApply?.setAttribute('disabled','');
+
+    try{
+      document.getElementById('batchMsg').textContent = dry ? 'Đang chạy dry-run…' : 'Đang cập nhật…';
+
+      const rows  = await readFileToRows(file);
+      const items = (function normalizeItems(rawList){
+        const fields = ["ma_so_hv","ho_dem","ten","ho_ten","gioi_tinh","dan_toc",
+                        "ngay_sinh","so_dt","email_hoc_vien","nganh_nhap_hoc","dot","khoa","ghi_chu"];
+        return rawList.map(r=>{
+          const o = {};
+          fields.forEach(f=>{ if (r[f] !== undefined && String(r[f]).trim() !== '') o[f] = String(r[f]).trim(); });
+          return o;
+        });
+      })(rows);
+
+      const miss  = items.findIndex(x=>!x.ma_so_hv);
+      if (miss >= 0) throw new Error(`Dòng ${miss+1}: thiếu ma_so_hv`);
+
+      const payload = JSON.stringify({ items, stop_on_error: stop });
+
+      // ---- thử nhiều endpoint/method như trước
+      const qs    = dry ? '?dry_run=true' : '?dry_run=false';
+      const paths = [
+        `/applicants/batch-update${qs}`,
+        `/applicants/batch-update/${qs}`,
+        `/applicants/batch_update${qs}`,
+        `/applicants/batch_update/${qs}`,
+        `/batch/update${qs}`,
+        `/applicants/batch${qs}`
+      ];
+      const methods = ['POST','PUT','PATCH'];
+
+      let lastText = '', lastStatus = 0, respJson = null, ok = false;
+
+      for (const p of paths) {
+        for (const m of methods) {
+          let r = null;
+          try {
+            r = await apiFetch(p, {
+              method: m,
+              headers: { 'Content-Type':'application/json' },
+              body: payload
+            });
+          } catch(_) {}
+          if (r && r.ok) {
+            respJson = await r.json();
+            ok = true;
+            break;
+          }
+          if (r) {
+            lastStatus = r.status;
+            try { lastText = await r.text(); } catch { lastText = ''; }
+            if (r.status !== 404 && r.status !== 405) break;
+          }
+        }
+        if (ok) break;
+      }
+
+      if (!ok) {
+        const msg = lastText || `Batch update thất bại (HTTP ${lastStatus||'???'})`;
+        document.getElementById('batchMsg').textContent = msg;
+        showToast(msg, 'error');
+        return;
+      }
+
+      // Hiển thị preview kết quả (cả dry-run & apply)
+      renderBatchPreview(respJson);
+      const totalChanged = (respJson?.results||[]).filter(r=>r.status==='UPDATED').length;
+
+      if (dry) {
+        showToast('Dry-run OK', 'info');
+        document.getElementById('batchMsg').textContent = `Dry-run OK • ${totalChanged} bản ghi sẽ thay đổi`;
+      } else {
+        showToast('Cập nhật xong!', 'success');
+        document.getElementById('batchMsg').textContent = `Đã cập nhật ${respJson?.updated ?? totalChanged} bản ghi`;
+
+        // ⟳ làm mới danh sách kết quả phía dưới sau khi áp dụng
+        await runSearch();
+
+        // Thu gọn khu preview + reset file để tránh lẫn
+        document.getElementById('batchPreviewWrap')?.classList.add('hidden');
+        document.getElementById('batchFile').value = '';
+      }
+    } catch(e){
+      document.getElementById('batchMsg').textContent = e.message || 'Lỗi batch update';
+      showToast(e.message || 'Lỗi batch update', 'error');
+    } finally {
+      btnPrev?.removeAttribute('disabled');
+      btnApply?.removeAttribute('disabled');
+    }
+  }
+  $('btnBatchPreview')?.addEventListener('click', ()=> callBatch(true));
+  $('btnBatchApply')?.addEventListener('click',  ()=> callBatch(false));
+
+  function prettifyError(msg){
+  if (!msg) return '';
+  if (/write_audit\(\).*unexpected keyword argument 'correlation_id'/.test(msg)) {
+    return 'Mô-đun nhật ký (audit) đang dùng phiên bản cũ – đã bỏ qua ghi nhật ký. Dữ liệu vẫn được xem thử/cập nhật bình thường.';
+  }
+  return msg;
+}
+
+function renderBatchPreview(resp){
+  const wrap = $('batchPreviewWrap'), body = $('batchPreviewBody');
+  if (!wrap || !body) return;
+  wrap.classList.remove('hidden'); body.innerHTML = '';
+
+  (resp.results||[]).forEach(r=>{
+    const tr = document.createElement('tr');
+    const fields = r.changed_fields ? Object.keys(r.changed_fields).join(', ') : '—';
+    const statusClass =
+      r.status === 'UPDATED' ? 'text-green-700' :
+      r.status === 'SKIPPED' ? 'text-gray-600' :
+      r.status === 'NOT_FOUND' ? 'text-orange-700' :
+      r.status === 'SOFT_DELETED' ? 'text-purple-700' :
+      r.status === 'INVALID' ? 'text-red-700' : 'text-gray-700';
+
+    const errText = (r.errors||[]).map(prettifyError).join('; ');
+
+    tr.innerHTML = `
+      <td class="p-2 border-b font-medium">${r.ma_so_hv || ''}</td>
+      <td class="p-2 border-b ${statusClass}">
+        ${r.status}${errText ? ' • ' + errText : ''}
+      </td>
+      <td class="p-2 border-b">${fields}</td>`;
+    body.appendChild(tr);
+  });
+
+  // Tóm tắt phần đầu cũng “dịch” lỗi audit nếu có
+  const hasAuditWarn = (resp.results||[]).some(x => (x.errors||[]).some(e => /write_audit\(\).*unexpected keyword argument/.test(e)));
+  const extra = hasAuditWarn ? ' • ⚠️ Đã bỏ qua ghi nhật ký do phiên bản cũ (không ảnh hưởng tới dữ liệu).' : '';
+
+  $('batchMsg').textContent =
+    `Tổng: ${resp.total} • UPDATED: ${resp.updated} • SKIPPED: ${resp.skipped} • NOT_FOUND: ${resp.not_found} • SOFT_DELETED: ${resp.soft_deleted} • INVALID: ${resp.invalid}${extra}`;
+}
+
+</script>
 </body>
 </html>

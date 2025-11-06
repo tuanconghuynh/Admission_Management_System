@@ -11,6 +11,9 @@ from starlette.responses import JSONResponse, RedirectResponse
 from app.db.base import Base
 from app.db.session import engine, get_db
 
+from fastapi.middleware.cors import CORSMiddleware
+from app.routers import applicants_batch  
+
 # Routers
 from app.routers import health, applicants, checklist, export, batch
 from app.routers import auth, admin, journal
@@ -28,6 +31,13 @@ except Exception:
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          # hoặc liệt kê origin FE của anh
+    allow_credentials=True,
+    allow_methods=["*"],          # quan trọng: cho OPTIONS
+    allow_headers=["*"],
+)
 # ---------------- Session cookie ----------------
 app.add_middleware(
     SessionMiddleware,
@@ -196,13 +206,14 @@ app.include_router(account.router, tags=["Account"])
 app.include_router(health.router,     prefix="/api", tags=["Health"])
 app.include_router(checklist.router,  prefix="/api", tags=["Checklist"])
 app.include_router(applicants.router, prefix="/api", tags=["Applicants"])
+app.include_router(applicants_batch.router, prefix="/api", tags=["Applicants (batch)"]) 
 app.include_router(batch.router,      prefix="/api", tags=["Batch"])
 app.include_router(export.router,     prefix="/api", tags=["Export"])
 app.include_router(journal.router,    prefix="/api", tags=["Journal"])
 
 # Alias không /api (ẩn khỏi docs)
-for r in (health.router, checklist.router, applicants.router, batch.router, export.router, journal.router):
-    app.include_router(r, prefix="", include_in_schema=False)
+for r in (health.router, checklist.router, applicants.router, applicants_batch.router, batch.router, export.router, journal.router):
+    app.include_router(r, prefix="", include_in_schema=False) 
 
 # ---------------- Startup ----------------
 @app.on_event("startup")

@@ -14,7 +14,6 @@ from ..models import Applicant, ApplicantDoc, ChecklistItem
 
 DOC_PREFIX = "doc_"
 
-
 # ---------- Helpers ----------
 def _parse_to_date(v: Optional[object]) -> Optional[date]:
     if v in (None, ""):
@@ -106,7 +105,6 @@ def _set_date_format_by_header(ws, headers: List[str], header_names: Iterable[st
                 if isinstance(c.value, (date, datetime)):
                     c.number_format = "dd/mm/yyyy"
                     c.alignment = Alignment(horizontal="center")
-
 
 # ---------- Export 1: có cột checklist ----------
 def build_excel_bytes_by_items(
