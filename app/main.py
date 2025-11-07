@@ -20,6 +20,10 @@ from app.routers import auth, admin, journal
 from app.routers import account  #trang thông tin tài khoản
 from urllib.parse import quote
 
+#Email
+from app.routers import applicants_email
+from app.core.config import settings  
+
 # Dùng chung hằng số timeout với auth.py để không lệch
 from app.routers.auth import IDLE_TIMEOUT_SEC as AUTH_IDLE_TIMEOUT_SEC
 
@@ -30,6 +34,8 @@ except Exception:
     write_audit = None  # fallback an toàn
 
 app = FastAPI()
+
+app.include_router(applicants_email.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -232,6 +238,14 @@ def _log_routes():
 @app.get("/", include_in_schema=False)
 async def root():
     return RedirectResponse(url="/ams_home.html", status_code=307)
+
+os.makedirs(settings.receipts_path, exist_ok=True)
+app.mount(
+    "/static/receipts",
+    StaticFiles(directory=str(settings.receipts_path)),
+    name="receipts",
+)
+app.mount("/web", StaticFiles(directory="web"), name="web")
 
 # ---------------- Static web/ ----------------
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

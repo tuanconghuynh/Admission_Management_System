@@ -67,6 +67,17 @@
           ⚙️ Cập nhật từ Excel
         </button>
       </div>
+      <!-- Bulk actions -->
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-sm text-gray-600">
+          Đã chọn: <span id="bulkCount" class="font-semibold">0</span> học viên
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btnSendBulk" class="btn btn-primary disabled:opacity-50 disabled:pointer-events-none" disabled>
+            ✉️ Gửi email hàng loạt
+          </button>
+        </div>
+      </div>
 
       <!-- Dải tác vụ đẹp hơn -->
       <div class="grid gap-3 md:grid-cols-2">
@@ -81,7 +92,6 @@
             </div>
           </div>
         </div>
-
         <!-- Theo ĐỢT / KHÓA -->
         <div class="rounded-2xl border bg-white/70 p-3 shadow-sm">
           <div class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Theo đợt / khóa</div>
@@ -95,20 +105,13 @@
           </div>
         </div>
       </div>
-
-      <!-- Link nhật ký -->
-      <div class="flex">
-        <a id="journalLink" href="/journal.html" hidden
-          class="btn btn-soft btn-xs mt-1">📒 Nhật ký</a>
-      </div>
-
       <!-- Khối Excel -->
       <div id="excelBox" class="hidden mt-5 border-t pt-4">
-        <h3 class="font-semibold mb-2">CẬP NHẬT HÀNG LOẠT (MSHV) • Excel</h3>
+        <h3 class="font-semibold mb-2">TOOL EDIT INFO • Excel</h3>
         <div class="flex flex-wrap items-center gap-2 mt-2">
           <input id="batchFile" type="file" accept=".xlsx" class="input w-72" />
           <button id="btnDownloadTemplate" class="btn btn-outline">⬇️ Tải mẫu .xlsx</button>
-          <button id="btnBatchPreview" class="btn btn-outline">👀 Xem thử (dry-run)</button>
+          <button id="btnBatchPreview" class="btn btn-outline">👀Preview</button>
           <button id="btnBatchApply" class="btn btn-primary">💾 Áp dụng</button>
           <label class="ml-3 inline-flex items-center gap-2 text-sm">
             <input id="stopOnError" type="checkbox" class="accent-blue-600" />
@@ -168,15 +171,19 @@
           <table class="table min-w-full">
             <thead>
               <tr>
+              <th class="text-center">
+                <input id="chkAll" type="checkbox" class="accent-blue-600" title="Chọn tất cả trên trang" />
+              </th>
                 <th class="text-left">Mã HS</th>
                 <th class="text-left th-sortable" data-sort="ho_dem" role="button" tabindex="0" aria-label="Sắp xếp theo Họ đệm">Họ đệm <span class="arrow"></span></th>
                 <th class="text-left th-sortable" data-sort="ten" role="button" tabindex="0" aria-label="Sắp xếp theo Tên">Tên <span class="arrow"></span></th>
-                <th class="text-left th-sortable" data-sort="ma_so_hv" role="button" tabindex="0" aria-label="Sắp xếp theo MSHV">MSHV <span class="arrow">▲▼</span></th>
-                <th class="th-sortable" data-sort="ngay_nhan_hs" role="button" tabindex="0" aria-label="Sắp xếp theo Ngày nhận">Ngày nhận <span class="arrow">▲▼</span></th>
-                <th class="th-sortable" data-sort="nganh" role="button" tabindex="0" aria-label="Sắp xếp theo Ngành">Ngành <span class="arrow">▲▼</span></th>
-                <th class="th-sortable" data-sort="dot" role="button" tabindex="0" aria-label="Sắp xếp theo Đợt">Đợt <span class="arrow">▲▼</span></th>
-                <th class="th-sortable" data-sort="khoa" role="button" tabindex="0" aria-label="Sắp xếp theo Khóa">Khóa <span class="arrow">▲▼</span></th>
-                <th class="th-sortable" data-sort="nguoi_nhan" role="button" tabindex="0" aria-label="Sắp xếp theo Người nhận">Người nhận <span class="arrow">▲▼</span></th>
+                <th class="text-left th-sortable" data-sort="ma_so_hv" role="button" tabindex="0" aria-label="Sắp xếp theo MSHV">MSHV <span class="arrow"></span></th>
+                <th class="th-sortable" data-sort="ngay_nhan_hs" role="button" tabindex="0" aria-label="Sắp xếp theo Ngày nhận">Ngày nhận <span class="arrow"></span></th>
+                <th class="th-sortable" data-sort="nganh" role="button" tabindex="0" aria-label="Sắp xếp theo Ngành">Ngành <span class="arrow"></span></th>
+                <th class="th-sortable" data-sort="dot" role="button" tabindex="0" aria-label="Sắp xếp theo Đợt">Đợt <span class="arrow"></span></th>
+                <th class="th-sortable" data-sort="khoa" role="button" tabindex="0" aria-label="Sắp xếp theo Khóa">Khóa <span class="arrow"></span></th>
+                <th class="th-sortable" data-sort="nguoi_nhan" role="button" tabindex="0" aria-label="Sắp xếp theo Người nhận">Người nhận <span class="arrow"></span></th>
+                <th class="text-center">Email</th>
                 <th class="text-center">In</th>
                 <th class="text-center">Sửa/Xóa</th>
               </tr>
@@ -201,10 +208,6 @@
       </div>
     </section>
   </div>
-
-  <!-- Modal Edit (đÃ bỏ - phần HTML giữ comment để tham khảo)
-  <div id="editModal" class="modal-backdrop" aria-hidden="true">...</div> -->
-
   <!-- Modal nhập lý do xoá -->
   <div id="delModal" class="overlay" aria-modal="true" role="dialog">
     <div class="modal">
@@ -221,6 +224,110 @@
       </div>
     </div>
   </div>
+
+ <!-- Modal gửi email (Preview + Template) -->
+  <div id="emailModal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/40">
+    <div class="w-[920px] max-w-[95vw] rounded-2xl bg-white shadow-xl">
+      <!-- Header -->
+      <div class="flex items-center justify-between p-4 border-b">
+        <h3 class="text-lg font-semibold">Gửi email xác nhận</h3>
+        <button class="p-2 rounded-md hover:bg-gray-100" onclick="closeEmailModal()">✕</button>
+      </div>
+
+      <!-- Body -->
+      <div class="p-4 space-y-4">
+        <div class="grid grid-cols-12 gap-3">
+          <div class="col-span-8">
+            <label class="text-sm text-gray-600">Đến</label>
+            <input id="email_to" class="input" disabled />
+          </div>
+          <div class="col-span-4">
+            <label class="text-sm text-gray-600">MSHV</label>
+            <input id="email_mshv" class="input" disabled />
+          </div>
+          <div class="col-span-8">
+            <label class="text-sm text-gray-600">Tiêu đề</label>
+            <input id="email_subject" class="input" />
+          </div>
+          <div class="col-span-4">
+            <label class="text-sm text-gray-600">Template</label>
+            <select id="email_tpl" class="input">
+              <option value="confirmation" selected>Biên nhận hồ sơ (HS)</option>
+              <option value="student_card">Thư thẻ SV</option>
+              <!-- sau này anh thêm template khác thì add option ở đây -->
+            </select>
+          </div>
+        </div>
+
+        <!-- Preview only -->
+        <div class="mt-1 h-[45vh]">
+          <textarea id="email_body" hidden></textarea>
+          <iframe id="email_preview" class="w-full h-full rounded-lg border bg-white"></iframe>
+        </div>
+
+        <!-- Attach options -->
+        <div class="flex items-center gap-4 text-sm">
+          <label class="inline-flex items-center gap-2">
+            <input id="chk_attach" type="checkbox" class="accent-blue-600" checked>
+            <!-- Giữ A5 cố định -->
+            <input id="chk_a5" type="checkbox" checked hidden>
+            Đính kèm biên nhận PDF
+          </label>
+          <a id="view_attach" href="#" target="_blank" class="text-blue-600 hover:underline hidden">
+            Xem file đính kèm
+          </a>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="flex justify-end gap-3 p-4 border-t">
+        <button class="btn btn-outline" onclick="closeEmailModal()">Đóng</button>
+        <button class="btn btn-primary" onclick="sendEmail()">Gửi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal preview gửi hàng loạt -->
+<div id="bulkEmailModal" class="fixed inset-0 z-[10000] hidden items-center justify-center bg-black/40">
+  <div class="w-[960px] max-w-[95vw] rounded-2xl bg-white shadow-xl">
+    <div class="flex items-center justify-between p-4 border-b">
+      <h3 class="text-lg font-semibold">Gửi email hàng loạt</h3>
+      <button class="p-2 rounded-md hover:bg-gray-100" onclick="closeBulkModal()">✕</button>
+    </div>
+
+    <div class="p-4 space-y-4">
+      <div class="text-sm text-gray-700">
+        Số lượng học viên sẽ gửi: <b id="bulkCountLabel">0</b>
+      </div>
+      <div class="max-h-24 overflow-auto rounded border p-2 bg-gray-50 text-sm">
+        <div id="bulkListLabel" class="font-mono whitespace-pre-wrap"></div>
+      </div>
+      <!-- Chọn học viên để xem mẫu -->
+      <div>
+        <label class="text-sm text-gray-600 block mb-1">Xem mẫu của học viên</label>
+        <select id="bulkPreviewSelect" class="input w-full"></select>
+      </div>
+
+      <div>
+        <label class="text-sm text-gray-600 block mb-1">Tiêu đề</label>
+        <input id="bulk_subject" class="input" />
+      </div>
+
+      <div class="h-[45vh]">
+        <iframe id="bulk_preview" class="w-full h-full rounded-lg border bg-white"></iframe>
+      </div>
+      <p class="text-xs text-gray-500">
+        (Preview dùng mẫu A5 của học viên đầu tiên trong danh sách để kiểm tra nội dung/logo. Khi gửi sẽ dùng nội dung tương ứng cho từng học viên.)
+      </p>
+    </div>
+
+    <div class="flex justify-end gap-3 p-4 border-t">
+      <button class="btn btn-outline" onclick="closeBulkModal()">Đóng</button>
+      <button class="btn btn-primary" id="bulkSendBtn">Gửi</button>
+    </div>
+  </div>
+</div>
+  <!-- Footer -->
 
   <footer class="max-w-6xl mx-auto px-6 pb-4 text-right text-xs text-gray-500">
     © <span class="font-semibold">
@@ -392,6 +499,9 @@
         const tr = document.createElement("tr");
         tr.className = "row-alt";
         tr.innerHTML = `
+          <td class="border-b text-center">
+            <input type="checkbox" class="rowChk accent-blue-600" data-mshv="${encodeURIComponent(mshv)}" />
+          </td>
           <td class="border-b whitespace-nowrap font-medium">${dash(it.ma_ho_so)}</td>
           <td class="border-b">${dash(it.ho_dem || '')}</td> 
           <td class="border-b">${dash(it.ten || '')}</td>
@@ -401,6 +511,9 @@
           <td class="border-b text-center">${dash(dot)}</td>
           <td class="border-b text-center">${dash(khoa)}</td>
           <td class="border-b">${dash(nguoi)}</td>
+          <td class="border-b text-center whitespace-nowrap">
+            <button class="btn btn-outline btn-xs btn-pill btn-email" data-mshv="${encodeURIComponent(mshv)}">✉️ Email</button>
+          </td>
           <td class="border-b text-center whitespace-nowrap">
             <div class="inline-flex gap-2">
               <button class="btn btn-soft btn-xs btn-pill btn-print-a5" data-mshv="${encodeURIComponent(mshv)}">A5</button>
@@ -415,6 +528,7 @@
           </td>`;
         tbody.appendChild(tr);
       });
+        updateBulkUI();
     }
 
     // ===== Toast helper =====
@@ -437,7 +551,7 @@
       if (!toast) {
         toast = document.createElement('div');
         toast.id = 'toast';
-        toast.className = 'fixed top-8 left-1/2 -translate-x-1/2 z-[9999] pointer-events-none hidden';
+        toast.className = 'fixed top-8 left-1/2 -translate-x-1/2 z-[11000] pointer-events-none hidden';
         document.body.appendChild(toast);
       }
       if (!inner) {
@@ -1304,6 +1418,7 @@
     } catch(e){
       document.getElementById('batchMsg').textContent = e.message || 'Lỗi batch update';
       showToast(e.message || 'Lỗi batch update', 'error');
+    
     } finally {
       btnPrev?.removeAttribute('disabled');
       btnApply?.removeAttribute('disabled');
@@ -1353,7 +1468,363 @@ function renderBatchPreview(resp){
   $('batchMsg').textContent =
     `Tổng: ${resp.total} • UPDATED: ${resp.updated} • SKIPPED: ${resp.skipped} • NOT_FOUND: ${resp.not_found} • SOFT_DELETED: ${resp.soft_deleted} • INVALID: ${resp.invalid}${extra}`;
 }
+// ======= EMAIL FEATURES (Preview-only + Template select + Inline-logo preview) =======
 
+// Helper map template FE -> BE
+function mapTplKey(t) {
+  // FE option values: 'confirmation' | 'student_card'
+  // BE expects: 'confirmation' | 'student_card_email'
+  return t === 'student_card' ? 'student_card_email' : (t || 'confirmation');
+}
+
+// Tập chọn MSHV ở bảng
+const selectedMSHV = new Set();
+
+function updateBulkUI() {
+  const count = selectedMSHV.size;
+  const countEl = document.getElementById('bulkCount');
+  const btnBulk = document.getElementById('btnSendBulk');
+  if (countEl) countEl.textContent = String(count);
+  if (btnBulk) {
+    btnBulk.disabled = count === 0;
+    btnBulk.classList.toggle('disabled:opacity-50', count === 0);
+    btnBulk.classList.toggle('disabled:pointer-events-none', count === 0);
+  }
+}
+
+function toggleSelectAll(on) {
+  document.querySelectorAll('.rowChk').forEach(ch => {
+    ch.checked = !!on;
+    const id = decodeURIComponent(ch.dataset.mshv || '');
+    if (id) { if (on) selectedMSHV.add(id); else selectedMSHV.delete(id); }
+  });
+  updateBulkUI();
+}
+
+document.addEventListener('change', (e) => {
+  const chkAll = e.target.closest('#chkAll');
+  if (chkAll) { toggleSelectAll(chkAll.checked); return; }
+
+  const rowChk = e.target.closest('.rowChk');
+  if (rowChk) {
+    const id = decodeURIComponent(rowChk.dataset.mshv || '');
+    if (!id) return;
+    if (rowChk.checked) selectedMSHV.add(id); else selectedMSHV.delete(id);
+    updateBulkUI();
+  }
+});
+
+// ===== Modal helpers =====
+function showEmailModal() {
+  const overlay = document.getElementById('emailModal');
+  if (!overlay) return console.warn('Missing #emailModal');
+  overlay.classList.remove('hidden');
+  overlay.classList.add('flex'); // center
+}
+function closeEmailModal() {
+  const overlay = document.getElementById('emailModal');
+  if (!overlay) return;
+  overlay.classList.add('hidden');
+  overlay.classList.remove('flex');
+}
+window.closeEmailModal = closeEmailModal;
+
+// ===== Preview helpers (thay CID -> URL tĩnh cho khung xem trước) =====
+function resolvePreviewCIDs(html) {
+  const logoUrl = '/web/logohutech_chu.png';
+  return String(html || '')
+    .replace(/src\s*=\s*["']cid:logohutech_chu\.png["']/gi, `src="${logoUrl}"`);
+}
+
+function renderPreview(html) {
+  const iframe = document.getElementById('email_preview');
+  if (!iframe) return;
+  const body = resolvePreviewCIDs(html);
+  iframe.srcdoc = `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;padding:16px;background:#fff;color:#111}
+  img{max-width:100%;height:auto}
+</style>
+</head><body>${body||''}</body></html>`;
+}
+
+// ===== Mở modal gửi email (preview-only) =====
+async function openEmailModal(mshv) {
+  const em_to   = document.getElementById('email_to');
+  const em_mshv = document.getElementById('email_mshv');
+  const em_sub  = document.getElementById('email_subject');
+  const em_html = document.getElementById('email_body');
+  const chkAttach = document.getElementById('chk_attach');
+  const chkA5     = document.getElementById('chk_a5');
+  const linkView  = document.getElementById('view_attach');
+  const selTpl    = document.getElementById('email_tpl');
+
+  try {
+    const rawTpl = (selTpl?.value || 'confirmation').trim(); // FE value
+    const tplKey = mapTplKey(rawTpl);                        // BE key
+    const a5on   = rawTpl === 'confirmation';                // Chỉ HS mới A5
+
+    // nhật ký: mở nháp (log theo FE chọn cho dễ đọc)
+    journalTrack({
+      action: 'EMAIL_DRAFT_OPEN',
+      detail: { scope: 'SINGLE', mshv, tpl: rawTpl, a5: a5on }
+    });
+
+    const r = await apiFetch(
+      `/applicants/${encodeURIComponent(mshv)}/email-draft?a5=${a5on?'true':'false'}&tpl=${encodeURIComponent(tplKey)}`
+    );
+    if (!r || !r.ok) throw new Error(`Không tạo được bản nháp (HTTP ${r?.status||'???'})`);
+    const draft = await r.json();
+
+    em_to && (em_to.value   = draft.to_email || '');
+    em_mshv && (em_mshv.value = mshv);
+    em_sub && (em_sub.value  = draft.subject || '');
+    em_html && (em_html.value = draft.html_body || '');
+    if (chkA5) chkA5.checked = !!draft.a5;
+
+    // ✅ “Đính kèm” chỉ bật nếu là Biên nhận HS
+    if (chkAttach) chkAttach.checked = a5on;
+
+    if (linkView) {
+      if (a5on && draft.attachment_url) {
+        linkView.classList.remove('hidden');
+        linkView.href = draft.attachment_url;
+        linkView.target = '_blank';
+      } else {
+        linkView.classList.add('hidden');
+        linkView.removeAttribute('href');
+        linkView.removeAttribute('target');
+      }
+    }
+
+    renderPreview(draft.html_body);
+    showEmailModal();
+
+    if (selTpl && !selTpl._boundChange) {
+      selTpl.addEventListener('change', async () => {
+        const raw2  = (selTpl.value || 'confirmation').trim();
+        const tpl2  = mapTplKey(raw2);
+        const a5_2  = raw2 === 'confirmation';
+
+        if (chkAttach) chkAttach.checked = a5_2;
+        if (chkA5)     chkA5.checked     = a5_2;
+
+        try {
+          const r2 = await apiFetch(
+            `/applicants/${encodeURIComponent(mshv)}/email-draft?a5=${a5_2?'true':'false'}&tpl=${encodeURIComponent(tpl2)}`
+          );
+          if (!r2 || !r2.ok) throw new Error(`Không tạo được bản nháp (HTTP ${r2?.status||'???'})`);
+          const d2 = await r2.json();
+          em_sub && (em_sub.value  = d2.subject || '');
+          em_html && (em_html.value = d2.html_body || '');
+          renderPreview(d2.html_body);
+
+          if (linkView) {
+            if (a5_2 && d2.attachment_url) {
+              linkView.classList.remove('hidden');
+              linkView.href = d2.attachment_url;
+              linkView.target = '_blank';
+            } else {
+              linkView.classList.add('hidden');
+              linkView.removeAttribute('href');
+              linkView.removeAttribute('target');
+            }
+          }
+        } catch (e) {
+          showToast(e.message || 'Lỗi tải template', 'error');
+        }
+      });
+      selTpl._boundChange = true;
+    }
+  } catch (e) {
+    showToast(e.message || 'Lỗi tạo/ tải bản nháp email', 'error');
+  }
+} // <-- đóng hàm openEmailModal
+
+// gắn nút ✉️ ở mỗi hàng
+document.addEventListener('click', (e) => {
+  const btnEmail = e.target.closest('.btn-email');
+  if (!btnEmail) return;
+  const mshv = decodeURIComponent(btnEmail.dataset.mshv || '');
+  if (mshv) openEmailModal(mshv);
+});
+
+// ===== Nút Gửi trong modal =====
+async function sendEmail(){
+  const mshv   = document.getElementById('email_mshv')?.value.trim();
+  const subj   = document.getElementById('email_subject')?.value;
+  const html   = document.getElementById('email_body')?.value;
+  const tplSel = document.getElementById('email_tpl')?.value || 'confirmation';
+
+  const isHS   = tplSel === 'confirmation';
+  const attach = isHS ? !!document.getElementById('chk_attach')?.checked : false;
+
+  const btn = document.querySelector('#emailModal .btn.btn-primary');
+  const oldText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Đang gửi…'; }
+
+  try{
+    // Chọn endpoint linh hoạt theo FE selection
+    const path = isHS
+      ? `/applicants/${encodeURIComponent(mshv)}/send-confirmation?a5=true`
+      : `/applicants/${encodeURIComponent(mshv)}/send-student-card`;
+
+    const r = await apiFetch(path, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        subject: subj,
+        html_body: html,
+        // HS mới có đính kèm PDF
+        attach_receipt: attach
+      })
+    });
+    if (!r || !r.ok){
+      let msg = `Gửi thất bại (HTTP ${r?.status||'???'})`;
+      try { const t = await r.text(); const j = JSON.parse(t); if (j?.detail) msg = j.detail; } catch {}
+      throw new Error(msg);
+    }
+
+    await journalTrack({
+      action: 'EMAIL_SENT',
+      detail: { scope:'SINGLE', mshv, subject:subj||'', tpl:tplSel, attach, a5:isHS, status:'OK' }
+    });
+
+    showToast('✅ Đã gửi email thành công.', 'success', 2600);
+    const msgEl = document.getElementById('msg');
+    if (msgEl) {
+      const to = document.getElementById('email_to')?.value || '';
+      msgEl.textContent = `✅ Đã gửi email tới ${to} (MSHV ${mshv}).`;
+    }
+    closeEmailModal();
+  }catch(e){
+    showToast(e.message || 'Lỗi gửi email', 'error', 2800);
+  }finally{
+    if (btn) { btn.disabled = false; btn.textContent = oldText || 'Gửi'; }
+  }
+}
+window.sendEmail = sendEmail;
+
+// ===== Email hàng loạt (bulk) =====
+// Modal bulk helpers
+function showBulkModal(){ const o=$('bulkEmailModal'); if(!o) return; o.classList.remove('hidden'); o.classList.add('flex'); }
+function closeBulkModal(){ const o=$('bulkEmailModal'); if(!o) return; o.classList.add('hidden'); o.classList.remove('flex'); }
+window.closeBulkModal = closeBulkModal;
+
+// Render preview hàng loạt
+function renderBulkPreviewHTML(html) {
+  const iframe = $('bulk_preview');
+  if (!iframe) return;
+  const body = resolvePreviewCIDs(html);
+  iframe.srcdoc = `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{font-family:Arial,Helvetica,sans-serif;padding:16px;background:#fff;color:#111}img{max-width:100%;height:auto}</style>
+</head><body>${body||''}</body></html>`;
+}
+
+// Nút “Gửi email hàng loạt” -> mở preview
+$('btnSendBulk')?.addEventListener('click', async ()=>{
+  const list = [...selectedMSHV];
+  if (!list.length) { alert('Chưa chọn học viên nào.'); return; }
+
+  // Đọc template đang chọn ở modal đơn (reuse)
+  const rawTpl = (document.getElementById('email_tpl')?.value || 'confirmation').trim(); // FE
+  const tplKey = mapTplKey(rawTpl);                                                      // BE
+  const a5     = rawTpl === 'confirmation'; // Chỉ biên nhận HS mới cần A5/đính kèm
+  const first  = list[0];
+
+  try {
+    // Lấy nháp có kèm tpl + a5 (map key khi gọi BE)
+    const r = await apiFetch(
+      `/applicants/${encodeURIComponent(first)}/email-draft?a5=${a5?'true':'false'}&tpl=${encodeURIComponent(tplKey)}`
+    );
+    if (!r || !r.ok) {
+      let msg = `Không lấy được bản nháp (HTTP ${r?.status||'???'})`;
+      try { const t = await r.text(); const j = JSON.parse(t); if (j?.detail) msg = j.detail; } catch {}
+      throw new Error(msg);
+    }
+    const draft = await r.json();
+
+    // fill UI
+    $('bulkCountLabel').textContent = String(list.length);
+    $('bulkListLabel').textContent  = list.join(', ');
+    $('bulk_subject').value         = draft.subject || '';
+    renderBulkPreviewHTML(draft.html_body);
+
+    // Đổ dropdown chọn người xem mẫu + bind change (kèm tpl)
+    const sel = $('bulkPreviewSelect');
+    if (sel) {
+      sel.innerHTML = list.map(id => `<option value="${id}">${id}</option>`).join('');
+      sel.value = first;
+
+      if (!sel._boundChange) {
+        sel.addEventListener('change', async () => {
+          const id = sel.value;
+          try {
+            const r3 = await apiFetch(
+              `/applicants/${encodeURIComponent(id)}/email-draft?a5=${a5?'true':'false'}&tpl=${encodeURIComponent(tplKey)}`
+            );
+            if (!r3 || !r3.ok) {
+              let msg = `Không lấy được bản nháp (HTTP ${r3?.status||'???'})`;
+              try { const t = await r3.text(); const j = JSON.parse(t); if (j?.detail) msg = j.detail; } catch {}
+              throw new Error(msg);
+            }
+            const d3 = await r3.json();
+            renderBulkPreviewHTML(d3.html_body);
+          } catch (e) {
+            showToast(e.message || 'Lỗi tải mẫu xem trước', 'error');
+          }
+        });
+        sel._boundChange = true;
+      }
+    }
+
+    // Bind nút “Gửi” (chọn endpoint theo FE selection)
+    const btn = $('bulkSendBtn');
+    btn.onclick = async ()=>{
+      btn.disabled = true;
+      try{
+        const subject = $('bulk_subject').value;
+        const ids = [...selectedMSHV];
+
+        const endpoint = (rawTpl === 'confirmation')
+          ? '/applicants/send-confirmation-batch'
+          : '/applicants/send-student-card-batch';
+
+        const r2 = await apiFetch(endpoint, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ ma_so_hv_list: ids, subject, a5 })
+        });
+
+        if (!r2 || !r2.ok){
+          let msg = `Batch gửi thất bại (HTTP ${r2?.status||'???'})`;
+          try { const t = await r2.text(); const j = JSON.parse(t); if (j?.detail) msg = j.detail; } catch {}
+          throw new Error(msg);
+        }
+
+        await journalTrack({
+          action: 'EMAIL_SENT',
+          detail: { scope: 'BATCH', count: ids.length, sample: ids.slice(0, 10), subject, tpl: rawTpl, a5, status: 'OK' }
+        });
+
+        showToast('✅ Đã gửi email hàng loạt thành công.', 'success', 2800);
+        const msgEl = document.getElementById('msg');
+        if (msgEl) msgEl.textContent = `✅ Đã gửi email cho ${ids.length} học viên.`;
+        closeBulkModal();
+      }catch(e){
+        showToast(e.message || 'Lỗi batch gửi', 'error');
+      }finally{
+        btn.disabled = false;
+      }
+    };
+
+    showBulkModal();
+  } catch(e){
+    showToast(e.message || 'Lỗi mở preview hàng loạt', 'error');
+  }
+});
 </script>
 </body>
 </html>

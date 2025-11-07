@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Email - Biên nhận hồ sơ nhập học</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      font-size: 14px;
+      color: #222;
+      background-color: #f9fafb;
+      line-height: 1.6;
+      margin: 0;
+      padding: 0;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 24px 32px;
+      max-width: 640px;
+      margin: 20px auto;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    h2 {
+      color: #0033A0;
+      text-transform: uppercase;
+      font-size: 20px;
+      margin: 10px auto 20px auto;
+      text-align: center;
+    }
+    p { margin: 8px 0; }
+    b { font-weight: 600; color: #000; }
+    a {
+      color: #d60000;
+      font-weight: bold;
+      text-decoration: none;
+    }
+    a:hover { text-decoration: underline; }
+    .info-block {
+      margin: 16px 0 22px 0;
+      line-height: 1.8;
+    }
+    .signature {
+      margin-top: 28px;
+      font-size: 13px;
+      line-height: 1.6;
+      border-top: 1px solid #ddd;
+      padding-top: 16px;
+      display: flex;
+      align-items: center;
+    }
+    .sig-logo {
+      flex-shrink: 0;
+      margin-right: 12px;
+    }
+    .sig-logo img {
+      max-height: 50px;
+      width: auto;
+      display: block;
+    }
+    .sig-info {
+      border-left: 2px solid #0033A0;
+      padding-left: 12px;
+    }
+    .sig-info b {
+      color: #0033A0;
+    }
+    .sig-info .org-name {
+      color: #d60000; /* đỏ */
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+
+    <!-- ✅ HEADER: logo căn phải, chuẩn email -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0; border-collapse:collapse;">
+      <tr>
+        <td align="right" style="padding:0 0 10px 0;">
+          <img
+            src="https://img5.thuthuatphanmem.vn/uploads/2021/07/14/logo-dai-hoc-hutech_012634748.png"
+            alt="HUTECH Logo"
+            width="160"
+            style="display:block; height:auto; border:0; outline:none; text-decoration:none;"
+          />
+        </td>
+      </tr>
+    </table>
+    <!-- hết header -->
+
+    <h2>BIÊN NHẬN HỒ SƠ NHẬP HỌC</h2>
+
+    <p>Kính gửi Anh/Chị: <b>{{ applicant.full_name }}</b>,</p>
+
+    <p>Viện Hợp tác và Phát triển Đào tạo xin thông báo đã tiếp nhận <b>hồ sơ bản cứng</b> của Anh/Chị đã được tiếp nhận.</p>
+
+    <div class="info-block">
+      <p style="text-align: center; font-weight: bold; font-size: 16px; color: #0033A0; margin-bottom: 8px;">
+        Thông tin học viên
+      </p>
+      <p>Mã số học viên: <b>{{ applicant.ma_so_hv }}</b></p>
+      <p>Họ và tên: <b>{{ applicant.full_name }}</b></p>
+      <p>Ngày sinh: <b>{{ applicant.ngay_sinh }}</b></p>
+      <p>Ngành học: <b>{{ applicant.nganh_nhap_hoc or applicant.nganh }}</b></p>
+    </div>
+
+    <p>📎Hồ sơ chi tiết của Anh/Chị được đính kèm trong email này.</p>
+    <p>
+      Anh/Chị vui lòng <b>kiểm tra kỹ thông tin</b> và <b>xác nhận lại</b> qua biểu mẫu bên dưới để hoàn tất hồ sơ nhập học.</p>
+    <p style="margin-top: 12px;">
+      👉 <b>Xác nhận thông tin hồ sơ:</b>
+      <a href="https://forms.gle/phtfXpbLfAG9tvfn7" target="_blank">Tại đây</a>
+    </p>
+    <p>Trân trọng!</p>
+
+    <div class="signature">
+      <div class="sig-logo">
+        <img src="https://img5.thuthuatphanmem.vn/uploads/2021/07/14/logo-dai-hoc-hutech_012634748.png" alt="HUTECH Logo">
+      </div>
+      <div class="sig-info">
+        <div class="org-name">VIỆN HỢP TÁC VÀ PHÁT TRIỂN ĐÀO TẠO – HUTECH</div>
+        <b>E.</b> <a href="mailto:daotaotructuyen@hutech.edu.vn" style="color:#0033A0;">daotaotructuyen@hutech.edu.vn</a><br>
+        <b>W.</b> <a href="https://www.hutech.edu.vn/e-hutech" style="color:#0033A0;">www.hutech.edu.vn</a><br>
+        <b>T.</b> (028) 6686 6465<br>
+        <b>A.</b> 475A Điện Biên Phủ, P. Thạnh Mỹ Tây, TP. Hồ Chí Minh.
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -2,6 +2,8 @@
 from datetime import datetime, date
 import io, os
 from typing import List, Dict
+from pathlib import Path
+import re
 
 from reportlab.lib.pagesizes import A4, A5, landscape
 from reportlab.lib import colors
@@ -578,7 +580,7 @@ def render_single_pdf_a5(a: Applicant, items: List[ChecklistItem], docs: List[Ap
     c.drawRightString(
         W - rm,
         bm_footer + sign_h + 2*mm,
-        _vn_date_line(None, "__________")
+        _vn_date_line(None, "TP.HCM")
     )
     # Bảng chữ ký: Người nộp (HV) — Người nhận (NV)
     content_w = W - lm - rm
@@ -609,3 +611,81 @@ def render_single_pdf_a5(a: Applicant, items: List[ChecklistItem], docs: List[Ap
     c.showPage(); c.save()
     return buf.getvalue()
 # ================== HẾT BẢN IN A5 ==================
+
+# ===== LƯU FILE PDF BIÊN NHẬN (A4/A5) =====
+def save_receipt_pdf_file(
+    a: Applicant,
+    items: List[ChecklistItem],
+    docs: List[ApplicantDoc],
+    *,
+    a5: bool = False,
+    out_dir: str | Path | None = None,
+    filename: str | None = None,
+) -> str:
+    """
+    Render biên nhận (A4 hoặc A5) -> GHI RA FILE -> trả về absolute path.
+    - a5=True: dùng layout A5 tối giản
+    - out_dir: thư mục xuất (mặc định settings.RECEIPTS_DIR)
+    - filename: tên file (mặc định auto theo mã HS + timestamp)
+    """
+    # render bytes theo layout
+    pdf_bytes = (
+        render_single_pdf_a5(a, items, docs)
+        if a5 else
+        render_single_pdf(a, items, docs)
+    )
+
+    # Xác định thư mục & tên
+    out_dir = Path(out_dir or getattr(settings, "RECEIPTS_DIR", "assets/receipts"))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if not filename:
+        ts = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        base = (a.ma_ho_so or a.ma_so_hv or "unknown").replace("/", "_").replace("\\", "_")
+        filename = f"receipt_{base}_{ts}.pdf"
+
+    out_path = (out_dir / filename).resolve()
+    with open(out_path, "wb") as f:
+        f.write(pdf_bytes)
+
+    return str(out_path)
+
+# ==== SAVE TO DISK HELPERS ==========
+def _safe_filename(s: str) -> str:
+    s = (s or "").strip()
+    s = re.sub(r"[^\w\s.-]", "_", s, flags=re.UNICODE)
+    s = re.sub(r"\s+", "_", s)
+    return s or "file"
+
+def _display_name(a: Applicant) -> str:
+    ln = (getattr(a, "ho_dem", "") or "").strip()
+    fn = (getattr(a, "ten", "") or "").strip()
+    if ln or fn:
+        return f"{ln} {fn}".strip()
+    return (getattr(a, "ho_ten", "") or "").strip()
+
+def save_receipt_pdf_file(
+    a: Applicant,
+    items: List[ChecklistItem],
+    docs: List[ApplicantDoc],
+    *,
+    a5: bool = False,
+    out_dir: str | Path | None = None,
+) -> str:
+    """Render biên nhận (A4/A5) -> ghi file -> trả về absolute path."""
+    data = render_single_pdf_a5(a, items, docs) if a5 else render_single_pdf(a, items, docs)
+
+    base_dir: Path = Path(out_dir).resolve() if out_dir else settings.receipts_path
+    base_dir.mkdir(parents=True, exist_ok=True)
+
+    name_safe = _safe_filename(_display_name(a))
+    mcode = (a.ma_ho_so or a.ma_so_hv or "").strip()
+    mcode_safe = _safe_filename(mcode) if mcode else "NA"
+
+    ts = _now_vn().strftime("%Y%m%d_%H%M%S")
+    size_tag = "A5" if a5 else "A4"
+    fname = f"bien_nhan_{size_tag}_{mcode_safe}_{name_safe}_{ts}.pdf"
+
+    fpath = base_dir / fname
+    with open(fpath, "wb") as f:
+        f.write(data)
+    return str(fpath.resolve())
