@@ -1472,11 +1472,8 @@ function renderBatchPreview(resp){
 
 // Helper map template FE -> BE
 function mapTplKey(t) {
-  // FE option values: 'confirmation' | 'student_card'
-  // BE expects: 'confirmation' | 'student_card_email'
-  return t === 'student_card' ? 'student_card_email' : (t || 'confirmation');
+  return (t || 'confirmation'); // 'confirmation' | 'student_card' | ...
 }
-
 // Tập chọn MSHV ở bảng
 const selectedMSHV = new Set();
 
@@ -1561,9 +1558,9 @@ async function openEmailModal(mshv) {
   const selTpl    = document.getElementById('email_tpl');
 
   try {
-    const rawTpl = (selTpl?.value || 'confirmation').trim(); // FE value
-    const tplKey = mapTplKey(rawTpl);                        // BE key
-    const a5on   = rawTpl === 'confirmation';                // Chỉ HS mới A5
+    const rawTpl = (selTpl?.value || 'confirmation').trim();
+    const tplKey = mapTplKey(rawTpl);            // giờ sẽ là 'confirmation' hoặc 'student_card'
+    const a5on   = rawTpl === 'confirmation'; // chỉ khi là template Biên nhận HS mới có A5
 
     // nhật ký: mở nháp (log theo FE chọn cho dễ đọc)
     journalTrack({
@@ -1652,56 +1649,43 @@ document.addEventListener('click', (e) => {
 
 // ===== Nút Gửi trong modal =====
 async function sendEmail(){
-  const mshv   = document.getElementById('email_mshv')?.value.trim();
-  const subj   = document.getElementById('email_subject')?.value;
-  const html   = document.getElementById('email_body')?.value;
-  const tplSel = document.getElementById('email_tpl')?.value || 'confirmation';
+  const mshv   = $('email_mshv')?.value.trim();
+  const subj   = $('email_subject')?.value || '';
+  const html   = $('email_body')?.value || '';
+  const rawTpl = ($('email_tpl')?.value || 'confirmation').trim(); // 'confirmation' | 'student_card' | ...
+  const tplKey = mapTplKey(rawTpl);
+  const isHS   = (rawTpl === 'confirmation');                      // chỉ Biên nhận HS mới có A5/đính kèm
+  const attach = isHS ? !!$('chk_attach')?.checked : false;
 
-  const isHS   = tplSel === 'confirmation';
-  const attach = isHS ? !!document.getElementById('chk_attach')?.checked : false;
-
-  const btn = document.querySelector('#emailModal .btn.btn-primary');
-  const oldText = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = 'Đang gửi…'; }
-
-  try{
-    // Chọn endpoint linh hoạt theo FE selection
-    const path = isHS
-      ? `/applicants/${encodeURIComponent(mshv)}/send-confirmation?a5=true`
-      : `/applicants/${encodeURIComponent(mshv)}/send-student-card`;
-
+  try {
+    const path = `/applicants/${encodeURIComponent(mshv)}/send-email?tpl=${encodeURIComponent(tplKey)}&a5=${isHS?'true':'false'}`;
     const r = await apiFetch(path, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        subject: subj,
-        html_body: html,
-        // HS mới có đính kèm PDF
-        attach_receipt: attach
-      })
+      body: JSON.stringify({ subject: subj, html_body: html, attach_receipt: attach })
     });
+
     if (!r || !r.ok){
       let msg = `Gửi thất bại (HTTP ${r?.status||'???'})`;
       try { const t = await r.text(); const j = JSON.parse(t); if (j?.detail) msg = j.detail; } catch {}
       throw new Error(msg);
     }
 
+    // Ghi journal đúng biến
     await journalTrack({
       action: 'EMAIL_SENT',
-      detail: { scope:'SINGLE', mshv, subject:subj||'', tpl:tplSel, attach, a5:isHS, status:'OK' }
+      detail: { scope:'SINGLE', mshv, subject:subj, tpl: rawTpl, attach, a5: isHS, status:'OK' }
     });
 
     showToast('✅ Đã gửi email thành công.', 'success', 2600);
-    const msgEl = document.getElementById('msg');
+    const msgEl = $('msg');
     if (msgEl) {
-      const to = document.getElementById('email_to')?.value || '';
+      const to = $('email_to')?.value || '';
       msgEl.textContent = `✅ Đã gửi email tới ${to} (MSHV ${mshv}).`;
     }
     closeEmailModal();
-  }catch(e){
+  } catch(e){
     showToast(e.message || 'Lỗi gửi email', 'error', 2800);
-  }finally{
-    if (btn) { btn.disabled = false; btn.textContent = oldText || 'Gửi'; }
   }
 }
 window.sendEmail = sendEmail;
@@ -1787,17 +1771,15 @@ $('btnSendBulk')?.addEventListener('click', async ()=>{
       try{
         const subject = $('bulk_subject').value;
         const ids = [...selectedMSHV];
+        const rawTpl = ($('email_tpl')?.value || 'confirmation').trim();
+        const tplKey = mapTplKey(rawTpl);
+        const a5 = rawTpl === 'confirmation';
 
-        const endpoint = (rawTpl === 'confirmation')
-          ? '/applicants/send-confirmation-batch'
-          : '/applicants/send-student-card-batch';
-
-        const r2 = await apiFetch(endpoint, {
+        const r2 = await apiFetch(`/applicants/send-email-batch?tpl=${encodeURIComponent(tplKey)}`, {
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ ma_so_hv_list: ids, subject, a5 })
         });
-
         if (!r2 || !r2.ok){
           let msg = `Batch gửi thất bại (HTTP ${r2?.status||'???'})`;
           try { const t = await r2.text(); const j = JSON.parse(t); if (j?.detail) msg = j.detail; } catch {}
@@ -1815,9 +1797,7 @@ $('btnSendBulk')?.addEventListener('click', async ()=>{
         closeBulkModal();
       }catch(e){
         showToast(e.message || 'Lỗi batch gửi', 'error');
-      }finally{
-        btn.disabled = false;
-      }
+    } finally { btn.disabled = false; }
     };
 
     showBulkModal();

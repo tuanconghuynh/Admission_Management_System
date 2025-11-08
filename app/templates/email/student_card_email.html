@@ -1,144 +1,136 @@
 <!doctype html>
-<html lang="vi">
+<html lang="vi" translate="no" class="notranslate">
 <head>
-  <meta charset="utf-8">
-  <meta name="x-apple-disable-message-reformatting">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Thông báo thẻ sinh viên</title>
-  <style>
-    /* Mobile-friendly resets */
-    body { margin:0; padding:0; background:#f4f6f8; color:#111; }
-    img { border:0; outline:none; text-decoration:none; display:block; }
-    a { text-decoration:none; }
-    /* Buttons (fallback colors if client strips classes) */
-    .btn { display:inline-block; padding:12px 18px; border-radius:10px; font-weight:700; font-size:14px; }
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="Content-Language" content="vi" />
+  <meta name="google" content="notranslate" />
+  <meta name="x-apple-disable-message-reformatting" />
+  <title>Email - Thông báo thẻ sinh viên</title>
 </head>
-<body style="margin:0;padding:0;background:#f4f6f8;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
-          <!-- Header -->
-          <tr>
-            <td style="padding:18px 22px; background:#0ea5e9;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td width="56" valign="middle">
-                    <img src="cid:logohutech_chu.png" alt="HUTECH" width="48" height="48" style="width:48px;height:auto;">
-                  </td>
-                  <td valign="middle" align="left">
-                    <div style="font:700 18px/1.2 Arial,Helvetica,sans-serif;color:#fff;">Viện Hợp tác &amp; Phát triển Đào tạo – HUTECH</div>
-                    <div style="font:400 12px/1.2 Arial,Helvetica,sans-serif;color:#eaf6ff;margin-top:4px;">Thông báo thẻ sinh viên</div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
+<body translate="no" class="notranslate"
+      style="margin:0;padding:0;background:#f9fafb;color:#222;font:14px/1.6 Arial,Helvetica,sans-serif;">
 
-          <!-- Greeting -->
-          <tr>
-            <td style="padding:22px;">
-              <div style="font:400 14px/1.7 Arial,Helvetica,sans-serif;color:#111;">
-                <p style="margin:0 0 12px 0;">Chào bạn <strong>{{student_name}}</strong> (MSHV: <strong>{{mshv}}</strong>),</p>
-                <p style="margin:0 0 12px 0;">
-                  Thẻ sinh viên của bạn đã <strong>được phát hành</strong> cho chương trình <strong>{{program}}</strong>
-                  {{#if dot}} – Đợt <strong>{{dot}}</strong>{{/if}}{{#if khoa}}, Khóa <strong>{{khoa}}</strong>{{/if}}.
-                </p>
-                <p style="margin:0 0 12px 0;">
-                  Vui lòng chọn <strong>hình thức nhận thẻ</strong> bên dưới. Bạn có thể thay đổi lựa chọn trước khi thẻ được bàn giao.
-                </p>
-              </div>
-            </td>
-          </tr>
+  <!-- Preheader ẩn giúp Gmail hiểu nội dung tiếng Việt, không hiện với người nhận -->
+  <div style="display:none!important;visibility:hidden;opacity:0;height:0;overflow:hidden;font-size:1px;line-height:1px;max-height:0;max-width:0;">
+    Thông báo phát hành thẻ sinh viên – vui lòng chọn hình thức nhận thẻ.
+  </div>
 
-          <!-- Options -->
-          <tr>
-            <td style="padding:0 22px 6px 22px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:0 12px;">
-                <tr>
-                  <td style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px;">
-                    <div style="font:700 15px/1.4 Arial,Helvetica,sans-serif;color:#111;margin-bottom:6px;">Nhận trực tiếp tại trạm thi</div>
-                    <div style="font:400 13px/1.7 Arial,Helvetica,sans-serif;color:#374151;">
-                      Địa điểm: <strong>{{pickup_address}}</strong><br>
-                      Thời gian: <strong>{{pickup_time_range}}</strong>
-                    </div>
-                    <div style="margin-top:12px;">
-                      <a class="btn" href="{{confirm_pickup_link}}" target="_blank"
-                         style="background:#16a34a;color:#fff;">✅ Chọn nhận tại trạm thi</a>
-                    </div>
-                  </td>
-                </tr>
+  <div style="background:#fff;border:1px solid #ccc;border-radius:8px;padding:24px 32px;max-width:640px;margin:20px auto;box-shadow:0 2px 5px rgba(0,0,0,0.05);">
 
-                <tr>
-                  <td style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px;">
-                    <div style="font:700 15px/1.4 Arial,Helvetica,sans-serif;color:#111;margin-bottom:6px;">Gửi qua bưu điện</div>
-                    <div style="font:400 13px/1.7 Arial,Helvetica,sans-serif;color:#374151;">
-                      Vui lòng xác nhận địa chỉ nhận (họ tên người nhận, số điện thoại, địa chỉ đầy đủ).
-                      Phí vận chuyển (nếu có) sẽ được hiển thị ở bước xác nhận.
-                    </div>
-                    <div style="margin-top:12px;">
-                      <a class="btn" href="{{confirm_post_link}}" target="_blank"
-                         style="background:#2563eb;color:#fff;">📬 Chọn gửi bưu điện</a>
-                    </div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
+    <!-- Header -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;border-collapse:collapse;">
+      <tr>
+        <td align="right" style="padding:0 0 10px 0;">
+          <img
+            src="https://img5.thuthuatphanmem.vn/uploads/2021/07/14/logo-dai-hoc-hutech_012634748.png"
+            alt="Logo HUTECH" width="140"
+            style="display:block;height:auto;border:0;outline:none;text-decoration:none;">
+        </td>
+      </tr>
+    </table>
 
-          <!-- Tracking / Notes -->
-          <tr>
-            <td style="padding:8px 22px 0 22px;">
-              <div style="font:400 13px/1.7 Arial,Helvetica,sans-serif;color:#374151;">
-                {{#if tracking_link}}
-                Bạn có thể xem trạng thái xử lý thẻ tại đây:
-                <a href="{{tracking_link}}" target="_blank" style="color:#2563eb;font-weight:600;">Theo dõi tiến độ</a>.
-                {{/if}}
-                <br>
-                Lưu ý: Khi đến nhận trực tiếp, vui lòng mang theo <strong>CMND/CCCD</strong> để đối chiếu.
-              </div>
-            </td>
-          </tr>
+    <h2 style="color:#0033A0;text-transform:uppercase;font-size:20px;margin:10px auto 20px auto;text-align:center;">
+      THÔNG BÁO THẺ SINH VIÊN
+    </h2>
 
-          <!-- Divider -->
-          <tr>
-            <td style="padding:18px 22px 0 22px;">
-              <hr style="border:none;height:1px;background:#e5e7eb;">
-            </td>
-          </tr>
+    <p style="margin:8px 0;">Kính gửi Anh/Chị:
+      <b style="font-weight:600;color:#000;">
+        {{ student_name
+           or applicant.full_name
+           or ((applicant.ho_dem ~ ' ' ~ applicant.ten) if applicant and applicant.ho_dem and applicant.ten else '') }}
+      </b>,
+    </p>
 
-          <!-- Contact -->
-          <tr>
-            <td style="padding:14px 22px 22px 22px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td valign="top" style="font:400 12px/1.7 Arial,Helvetica,sans-serif;color:#6b7280;">
-                    Mọi thắc mắc, vui lòng liên hệ:
-                    <br>📞 Hotline: <strong style="color:#111;">{{support_phone}}</strong>
-                    <br>✉️ Email: <a href="mailto:{{support_email}}" style="color:#2563eb;">{{support_email}}</a>
-                  </td>
-                  <td valign="top" align="right">
-                    <img src="cid:logohutech_chu.png" alt="HUTECH" width="40" height="40" style="opacity:.9;">
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
+    <p style="margin:8px 0;">
+      Thẻ sinh viên của Anh/Chị đã được <b style="font-weight:600;color:#000;">phát hành</b> cho chương trình
+      <b style="font-weight:600;color:#000;">{{ program or 'Đại học Từ xa' }}</b>
+      {% if (dot or (applicant and applicant.dot)) %} – Đợt <b style="font-weight:600;color:#000;">{{ dot or applicant.dot }}</b>{% endif %}
+      {% if (khoa or (applicant and applicant.khoa)) %}, Khóa <b style="font-weight:600;color:#000;">{{ khoa or applicant.khoa }}</b>{% endif %}.
+    </p>
 
-          <!-- Footer -->
-          <tr>
-            <td style="background:#f9fafb;padding:14px 22px;text-align:center;">
-              <div style="font:400 11px/1.7 Arial,Helvetica,sans-serif;color:#6b7280;">
-                © Viện Hợp tác &amp; Phát triển Đào tạo – HUTECH<br>
-                Email này được gửi tới {{student_name}} – MSHV {{mshv}}.
-              </div>
-            </td>
-          </tr>
+    <div style="margin:16px 0 22px 0;line-height:1.8;">
+      <p style="text-align:center;font-weight:bold;font-size:16px;color:#0033A0;margin:0 0 8px 0;">Thông tin sinh viên</p>
+      <p style="margin:8px 0;">MSHV: <b style="font-weight:600;color:#000;">{{ mshv or applicant.ma_so_hv }}</b></p>
+      <p style="margin:8px 0;">Họ và tên:
+        <b style="font-weight:600;color:#000;">
+          {{ student_name
+             or applicant.full_name
+             or ((applicant.ho_dem ~ ' ' ~ applicant.ten) if applicant and applicant.ho_dem and applicant.ten else '') }}
+        </b>
+      </p>
+      {% if applicant and applicant.ngay_sinh %}
+        <p style="margin:8px 0;">Ngày sinh: <b style="font-weight:600;color:#000;">{{ applicant.ngay_sinh }}</b></p>
+      {% endif %}
+      {% if (program or applicant.nganh_nhap_hoc or applicant.nganh) %}
+        <p style="margin:8px 0;">Ngành học: <b style="font-weight:600;color:#000;">{{ program or applicant.nganh_nhap_hoc or applicant.nganh }}</b></p>
+      {% endif %}
+    </div>
 
-        </table>
-      </td>
-    </tr>
-  </table>
+    <p style="margin:8px 0;">
+      Anh/Chị vui lòng <b>chọn một</b> hình thức nhận thẻ sinh viên dưới đây:
+    </p>
+
+    <!-- Nhận trực tiếp -->
+    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:10px 0;background:#fafafa;">
+      <div style="font-weight:700;margin-bottom:6px;">Nhận trực tiếp tại trạm thi</div>
+      <div style="color:#444;">
+        Thẻ sẽ được phát tại trạm thi vào <b>đợt thi đầu tiên</b> nơi Anh/Chị đăng ký dự thi.
+        {% if pickup_address %}<br>Địa điểm: <b style="color:#000;">{{ pickup_address }}</b>{% endif %}
+        {% if pickup_time_range %}<br>Thời gian: <b style="color:#000;">{{ pickup_time_range }}</b>{% endif %}
+      </div>
+      <div style="margin-top:10px;">
+        <a href="{{ (confirm_pickup_link or 'https://forms.gle/GhDdRa5vyAS3DuSz8') ~ ('?mshv=' ~ (mshv or applicant.ma_so_hv|string) ~ '&choice=pickup') }}"
+           target="_blank" role="button"
+           style="display:inline-block;padding:10px 14px;border-radius:8px;border:1px solid #16a34a;text-decoration:none;font-weight:700;font-size:14px;background:#16a34a;color:#fff;">
+          ✅ Xác nhận nhận tại trạm
+        </a>
+      </div>
+    </div>
+
+    <!-- Gửi qua bưu điện -->
+    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:10px 0;background:#fafafa;">
+      <div style="font-weight:700;margin-bottom:6px;">Gửi qua bưu điện</div>
+      <div style="color:#444;">
+        Vui lòng điền đầy đủ thông tin người nhận và địa chỉ trong biểu mẫu xác nhận.
+        Phí vận chuyển (nếu có) sẽ được thông báo ở bước xác nhận.
+      </div>
+      <div style="margin-top:10px;">
+        <a href="{{ (confirm_post_link or 'https://forms.gle/GhDdRa5vyAS3DuSz8') ~ ('?mshv=' ~ (mshv or applicant.ma_so_hv|string) ~ '&choice=post') }}"
+           target="_blank" role="button"
+           style="display:inline-block;padding:10px 14px;border-radius:8px;border:1px solid #2563eb;text-decoration:none;font-weight:700;font-size:14px;background:#2563eb;color:#fff;">
+          📬 Xác nhận gửi bưu điện
+        </a>
+      </div>
+    </div>
+
+    <p style="margin:12px 0;">Lưu ý: Khi đến nhận trực tiếp, vui lòng mang theo <b style="font-weight:600;color:#000;">CMND/CCCD</b> để đối chiếu.</p>
+
+    <!-- ✅ Chữ ký căn giữa logo và nội dung -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:28px;border-top:1px solid #ddd;padding-top:16px;">
+      <tr>
+        <td width="100" valign="middle" align="center" style="padding-right:12px;">
+          <img src="https://img5.thuthuatphanmem.vn/uploads/2021/07/14/logo-dai-hoc-hutech_012634748.png"
+              alt="HUTECH Logo"
+              style="display:block;max-height:55px;width:auto;border:0;outline:none;text-decoration:none;">
+        </td>
+        <td valign="middle" style="border-left:2px solid #0033A0;padding-left:12px;font-size:13px;line-height:1.6;">
+          <div style="color:#d60000;font-weight:bold;">
+            VIỆN HỢP TÁC VÀ PHÁT TRIỂN ĐÀO TẠO – HUTECH
+          </div>
+          <b style="color:#0033A0;">E.</b>
+          <a href="mailto:daotaotructuyen@hutech.edu.vn" style="color:#0033A0;text-decoration:none;">
+            daotaotructuyen@hutech.edu.vn
+          </a><br>
+          <b style="color:#0033A0;">W.</b>
+          <a href="https://www.hutech.edu.vn/e-hutech" style="color:#0033A0;text-decoration:none;">
+            www.hutech.edu.vn
+          </a><br>
+          <b style="color:#0033A0;">T.</b> (028) 6686 6465<br>
+          <b style="color:#0033A0;">A.</b> 475A Điện Biên Phủ, P. Thạnh Mỹ Tây, TP. Hồ Chí Minh.
+        </td>
+      </tr>
+    </table>
+  </div>
 </body>
 </html>

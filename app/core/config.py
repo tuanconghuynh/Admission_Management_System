@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     EMAIL_LOG_DETAIL: bool = True  # <-- thêm: để service có thể in log chi tiết
 
     SMTP_HOST: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
+    SMTP_PORT: int = 465
     SMTP_USER: Optional[EmailStr] = None
     SMTP_PASS: Optional[str] = None
     SMTP_FROM: Optional[EmailStr] = None          # sẽ fallback = SMTP_USER nếu None
@@ -36,7 +36,7 @@ class Settings(BaseSettings):
 
     # Cờ TLS/SSL & timeout (giúp bắt lỗi kết nối rõ ràng)
     SMTP_STARTTLS: bool = True                     # Gmail: True với port 587
-    SMTP_SSL_TLS: bool = False                     # Gmail: False (SSL thuần là 465)
+    SMTP_SSL_TLS: bool = True                     # Gmail: False (SSL thuần là 465)
     SMTP_TIMEOUT: int = 20                         # giây
 
     # ======== Security ========

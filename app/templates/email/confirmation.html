@@ -2,6 +2,9 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Content-Language" content="vi">
+  <meta name="google" content="notranslate">
+  <meta name="x-apple-disable-message-reformatting">
   <title>Email - Biên nhận hồ sơ nhập học</title>
   <style>
     body {
@@ -41,92 +44,124 @@
       margin: 16px 0 22px 0;
       line-height: 1.8;
     }
-    .signature {
-      margin-top: 28px;
-      font-size: 13px;
-      line-height: 1.6;
-      border-top: 1px solid #ddd;
-      padding-top: 16px;
-      display: flex;
-      align-items: center;
-    }
-    .sig-logo {
-      flex-shrink: 0;
-      margin-right: 12px;
-    }
-    .sig-logo img {
-      max-height: 50px;
-      width: auto;
-      display: block;
-    }
-    .sig-info {
-      border-left: 2px solid #0033A0;
-      padding-left: 12px;
-    }
-    .sig-info b {
-      color: #0033A0;
-    }
-    .sig-info .org-name {
-      color: #d60000; /* đỏ */
+    /* ✅ Nút xác nhận */
+    .confirm-btn {
+      display: inline-block;
+      background: #d60000;
+      color: #fff !important;
+      padding: 10px 18px;
+      border-radius: 8px;
       font-weight: bold;
+      font-size: 14px;
+      text-decoration: none;
+      border: 1px solid #b00000;
+      margin-top: 6px;
+    }
+    .confirm-btn:hover {
+      background: #b00000;
+      text-decoration: none;
+    }
+    /* ✅ Bảng hồ sơ chi tiết */
+    .table-info {
+      border-collapse: collapse;
+      width: 100%;
+      border: 1px solid #ddd;
+      margin-top: 10px;
+    }
+    .table-info td {
+      border: 1px solid #ddd;
+      padding: 6px 8px;
+      vertical-align: top;
+    }
+    .table-info td:first-child {
+      font-weight: 600;
+      width: 35%;
+      background: #f7f8fa;
     }
   </style>
 </head>
-<body>
+<body translate="no" class="notranslate">
   <div class="card">
 
-    <!-- ✅ HEADER: logo căn phải, chuẩn email -->
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0; border-collapse:collapse;">
+    <!-- HEADER -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;border-collapse:collapse;">
       <tr>
         <td align="right" style="padding:0 0 10px 0;">
-          <img
-            src="https://img5.thuthuatphanmem.vn/uploads/2021/07/14/logo-dai-hoc-hutech_012634748.png"
-            alt="HUTECH Logo"
-            width="160"
-            style="display:block; height:auto; border:0; outline:none; text-decoration:none;"
-          />
+          <img src="https://img5.thuthuatphanmem.vn/uploads/2021/07/14/logo-dai-hoc-hutech_012634748.png"
+               alt="HUTECH Logo"
+               width="160"
+               style="display:block;height:auto;border:0;outline:none;text-decoration:none;">
         </td>
       </tr>
     </table>
-    <!-- hết header -->
 
     <h2>BIÊN NHẬN HỒ SƠ NHẬP HỌC</h2>
 
     <p>Kính gửi Anh/Chị: <b>{{ applicant.full_name }}</b>,</p>
-
     <p>Viện Hợp tác và Phát triển Đào tạo xin thông báo đã tiếp nhận <b>hồ sơ bản cứng</b> của Anh/Chị đã được tiếp nhận.</p>
 
     <div class="info-block">
-      <p style="text-align: center; font-weight: bold; font-size: 16px; color: #0033A0; margin-bottom: 8px;">
-        Thông tin học viên
-      </p>
+      <p style="text-align:center;font-weight:bold;font-size:16px;color:#0033A0;margin-bottom:8px;">Thông tin học viên</p>
       <p>Mã số học viên: <b>{{ applicant.ma_so_hv }}</b></p>
       <p>Họ và tên: <b>{{ applicant.full_name }}</b></p>
       <p>Ngày sinh: <b>{{ applicant.ngay_sinh }}</b></p>
       <p>Ngành học: <b>{{ applicant.nganh_nhap_hoc or applicant.nganh }}</b></p>
     </div>
 
-    <p>📎Hồ sơ chi tiết của Anh/Chị được đính kèm trong email này.</p>
-    <p>
-      Anh/Chị vui lòng <b>kiểm tra kỹ thông tin</b> và <b>xác nhận lại</b> qua biểu mẫu bên dưới để hoàn tất hồ sơ nhập học.</p>
-    <p style="margin-top: 12px;">
-      👉 <b>Xác nhận thông tin hồ sơ:</b>
-      <a href="https://forms.gle/phtfXpbLfAG9tvfn7" target="_blank">Tại đây</a>
-    </p>
-    <p>Trân trọng!</p>
-
-    <div class="signature">
-      <div class="sig-logo">
-        <img src="https://img5.thuthuatphanmem.vn/uploads/2021/07/14/logo-dai-hoc-hutech_012634748.png" alt="HUTECH Logo">
-      </div>
-      <div class="sig-info">
-        <div class="org-name">VIỆN HỢP TÁC VÀ PHÁT TRIỂN ĐÀO TẠO – HUTECH</div>
-        <b>E.</b> <a href="mailto:daotaotructuyen@hutech.edu.vn" style="color:#0033A0;">daotaotructuyen@hutech.edu.vn</a><br>
-        <b>W.</b> <a href="https://www.hutech.edu.vn/e-hutech" style="color:#0033A0;">www.hutech.edu.vn</a><br>
-        <b>T.</b> (028) 6686 6465<br>
-        <b>A.</b> 475A Điện Biên Phủ, P. Thạnh Mỹ Tây, TP. Hồ Chí Minh.
-      </div>
+    <!-- ✅ Hồ sơ chi tiết -->
+    {% if ho_so %}
+    <div>
+      <p style="font-weight:bold;font-size:16px;color:#0033A0;margin-bottom:6px;">Hồ sơ chi tiết đã nhận</p>
+      <table class="table-info">
+        {% for key, value in ho_so.items() %}
+        <tr>
+          <td>{{ key }}</td>
+          <td>{{ value }}</td>
+        </tr>
+        {% endfor %}
+      </table>
     </div>
+    {% endif %}
+
+    <p>📎 Hồ sơ chi tiết của Anh/Chị được đính kèm trong email này!</p>
+    <p>Anh/Chị vui lòng <b>kiểm tra kỹ thông tin</b> và <b>xác nhận lại</b> qua biểu mẫu bên dưới để hoàn tất hồ sơ nhập học.</p>
+
+    <!-- Nút xác nhận -->
+    <div style="margin-top:12px;text-align:center;">
+      <a href="https://forms.gle/XW4yhBuk9P3HdT3Q8" target="_blank" class="confirm-btn">✅ Xác nhận thông tin hồ sơ</a>
+    </div>
+
+    <p style="margin-top:16px;">Trân trọng!</p>
+
+    <!-- ✅ CHỮ KÝ ĐẸP GỌN, CĂN GIỮA LOGO -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:28px;border-top:1px solid #ddd;padding-top:16px;">
+      <tr>
+        <td width="100" align="center" valign="middle" style="padding-right:16px;">
+          <img src="https://img5.thuthuatphanmem.vn/uploads/2021/07/14/logo-dai-hoc-hutech_012634748.png"
+              alt="HUTECH Logo"
+              style="display:block;max-height:64px;width:auto;margin:auto;border:0;outline:none;text-decoration:none;">
+        </td>
+        <td valign="middle" style="border-left:2px solid #0033A0;padding-left:16px;font-size:13px;line-height:1.6;">
+          <div style="color:#d60000;font-weight:bold;font-size:14px;margin-bottom:4px;">
+            VIỆN HỢP TÁC VÀ PHÁT TRIỂN ĐÀO TẠO – HUTECH
+          </div>
+          <div style="margin-bottom:2px;">
+            <b style="color:#0033A0;">E.</b>
+            <a href="mailto:daotaotructuyen@hutech.edu.vn" style="color:#0033A0;text-decoration:none;">
+              daotaotructuyen@hutech.edu.vn
+            </a>
+          </div>
+          <div style="margin-bottom:2px;">
+            <b style="color:#0033A0;">W.</b>
+            <a href="https://www.hutech.edu.vn/e-hutech" style="color:#0033A0;text-decoration:none;">
+              www.hutech.edu.vn
+            </a>
+          </div>
+          <div style="margin-bottom:2px;"><b style="color:#0033A0;">T.</b> (028) 6686 6465</div>
+          <div><b style="color:#0033A0;">A.</b> 475A Điện Biên Phủ, P. Thạnh Mỹ Tây, TP. Hồ Chí Minh.</div>
+        </td>
+      </tr>
+    </table>
   </div>
 </body>
 </html>
