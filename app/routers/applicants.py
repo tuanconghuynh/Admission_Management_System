@@ -300,7 +300,6 @@ def get_by_code(
         "ngay_nhan_hs": _to_dmy(a.ngay_nhan_hs),
         "ngay_nhan_hs_iso": _to_iso(a.ngay_nhan_hs),
         "ho_ten": a.ho_ten,
-        # tên tách đôi + full_name hiển thị
         "ho_dem": getattr(a, "ho_dem", None),
         "ten": getattr(a, "ten", None),
         "full_name": _display_name(getattr(a, "ho_dem", None), getattr(a, "ten", None), getattr(a, "ho_ten", None)),

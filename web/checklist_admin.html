@@ -1,119 +1,192 @@
-<!doctype html>
+<!doctype html> 
 <html lang="vi">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Quản lý Danh mục hồ sơ | Admission_Management_System</title>
+  <title>Quản lý Danh mục hồ sơ | AMS</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" type="image/png" href="hutech.png">
   <meta name="theme-color" content="#2563eb">
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-gray-50 min-h-screen flex flex-col">
-  <div class="max-w-7xl mx-auto p-6 space-y-6 w-full">
+ <style>
+    /* Hover nhẹ logo */
+    a:hover img { transform: scale(1.05); transition: transform 0.2s ease; }
+  </style>
+<body class="min-h-screen flex flex-col">
 
-    <!-- Header -->
-    <header class="flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center gap-3 min-w-0">
-        <a href="/ams_home.html" title="Về trang chủ" class="flex items-center gap-2 hover:opacity-80 transition">
-          <img src="hutech.png" alt="HUTECH" class="h-8 w-8 object-contain select-none" />
-        </a>
-        <div class="min-w-0">
-          <h1 class="text-2xl font-bold leading-tight">QUẢN LÝ DANH MỤC HỒ SƠ</h1>
-          <p class="text-sm text-gray-500">Chỉ <b>Admin</b> có quyền chỉnh sửa.</p>
+  <!-- HEADER CHUNG GIỐNG TRANG CHỦ -->
+  <header class="w-full bg-white/85 backdrop-blur-sm border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center gap-3">
+      <a href="/ams_home.html"
+         class="flex items-center gap-3 hover:opacity-90 transition"
+         title="Về trang chủ">
+        <img src="hutech.png" class="h-10 w-10" alt="HUTECH" />
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-blue-700 leading-tight">
+            ADMISSION MANAGEMENT SYSTEM - AMS
+          </h1>
+          <p class="text-sm sm:text-base text-gray-600 font-medium tracking-wide">
+            V-HT.PTĐT - Hệ Thống Quản Lý Hồ Sơ Nhập Học (AMS)
+          </p>
         </div>
-      </div>
-      <div class="flex items-center gap-2">
-        <label class="text-sm text-gray-500">API Base</label>
-        <input id="apiBase" class="input w-60 md:w-80" placeholder="">
-        <span class="hidden md:inline-block w-px h-6 bg-gray-200"></span>
-        <a href="/" class="btn btn-outline">Trang chính</a>
-      </div>
-    </header>
-
-    <!-- Quyền -->
-    <div id="roleBanner" class="rounded-xl border bg-white p-4 hidden">
-      <div id="roleText" class="text-sm text-gray-700"></div>
+      </a>
     </div>
+  </header>
 
-    <!-- Versions -->
-    <section class="card space-y-4">
-      <div class="flex items-center justify-between flex-wrap gap-2">
-        <h2 class="font-semibold">Phiên bản danh mục</h2>
-        <div class="text-sm text-gray-500">Tạo version mới (clone), xem và xóa phiên bản cũ.</div>
+  <!-- MAIN LAYOUT -->
+  <main class="flex-1 flex">
+    <!-- SIDEBAR ĐỒNG NHẤT -->
+    <aside class="hidden md:flex md:flex-col w-64 bg-white/85 border-r border-slate-200 backdrop-blur-sm">
+      <!-- Khối user + dropdown -->
+      <div class="px-4 pt-4 pb-3 border-b border-slate-200 relative">
+        <button id="userMenuBtn"
+                class="w-full justify-between text-sm text-gray-700 bg-white hover:bg-slate-50 px-3 py-2 rounded-lg shadow border flex items-center gap-2"
+                aria-haspopup="true" aria-expanded="false" aria-controls="userMenu">
+          <span>Hi, <b id="helloName">—</b>
+            <span class="text-gray-500">(<span id="helloRole">—</span>)</span>
+          </span>
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" class="text-gray-500" aria-hidden="true">
+            <path fill-rule="evenodd"
+                  d="M5.23 7.21a.75.75 0 011.06.02L10 11.187l3.71-3.956a.75.75 0 011.08 1.04l-4.24 4.52a.75.75 0 01-1.08 0l-4.24-4.52a.75.75 0 01.02-1.06z"
+                  clip-rule="evenodd"/>
+          </svg>
+        </button>
+
+        <div id="userMenu"
+             class="menu absolute left-4 top-[calc(100%+4px)] w-[calc(100%-2rem)] bg-white border rounded-xl shadow-lg overflow-hidden z-20"
+             role="menu">
+          <a href="/account" class="block px-4 py-2 hover:bg-gray-50 text-sm" role="menuitem">🔎 Thông tin tài khoản</a>
+          <a href="/account" class="block px-4 py-2 hover:bg-gray-50 text-sm" role="menuitem">🔐 Đổi mật khẩu</a>
+          <button id="btnMenuLogout"
+                  class="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm text-red-600"
+                  role="menuitem">
+            ↩️ Đăng xuất
+          </button>
+        </div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <!-- Danh sách version -->
-        <div class="border rounded-xl overflow-hidden bg-white">
-          <div class="px-4 py-3 border-b font-semibold">Các phiên bản</div>
-          <div id="verWrap" class="divide-y"></div>
+      <!-- Menu chính -->
+      <nav class="py-4 text-sm flex-1">
+        <div class="px-4 pb-3 text-xs font-semibold text-gray-500 uppercase">
+          Menu chính
         </div>
+        <a href="/ams_home.html"         class="nav-item">🏠 Trang chủ</a>
+        <a href="/compilation.html"      class="nav-item">📝 Nhập hồ sơ mới</a>
+        <a href="/students_list.html"    class="nav-item">📋 Danh sách hồ sơ</a>
+        <a href="/import_students.html"  class="nav-item">⬇️ Import học viên</a>
+        <a href="/journal.html"          class="nav-item">🕓 Nhật ký hệ thống</a>
+        <a href="/checklist_admin.html"  class="nav-item nav-item-active">📑 Quản lý danh mục hồ sơ</a>
+        <a href="/admin"                 class="nav-item">👤 Quản lý tài khoản</a>
+      </nav>
+    </aside>
 
-        <!-- Tạo version -->
-        <div class="border rounded-xl overflow-hidden bg-white">
-          <div class="px-4 py-3 border-b font-semibold">Tạo phiên bản mới</div>
-          <div class="p-4 space-y-3">
-            <div>
-              <label class="label">Tên phiên bản</label>
-              <input id="verName" class="input w-full" placeholder="vd: v2 (2025)">
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label class="label">Clone từ</label>
-                <select id="verClone" class="input w-full">
-                  <option value="active">Version đang active</option>
-                </select>
-              </div>
-              <div class="flex items-center gap-2 pt-6">
-                <input id="verActivate" type="checkbox" class="h-4 w-4">
-                <label for="verActivate" class="text-sm">Kích hoạt ngay</label>
-              </div>
-            </div>
-            <div class="flex items-center justify-end gap-2">
-              <button id="btnCreateVer" class="btn btn-primary" disabled>Tạo version</button>
+    <!-- CONTENT -->
+    <section class="flex-1 flex items-start justify-center">
+      <div class="max-w-7xl mx-auto px-6 py-6 w-full space-y-6" id="pageContent">
+
+        <!-- Header trang Checklist -->
+        <section class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="min-w-0">
+              <h1 class="text-2xl font-bold leading-tight">QUẢN LÝ DANH MỤC HỒ SƠ</h1>
+              <p class="text-sm text-gray-500">Chỉ <b>Admin</b> có quyền chỉnh sửa.</p>
             </div>
           </div>
+          <div class="flex items-center gap-2">
+            <label class="text-sm text-gray-500">API Base</label>
+            <input id="apiBase" class="input w-60 md:w-80" placeholder="">
+            <span class="hidden md:inline-block w-px h-6 bg-gray-200"></span>
+            <a href="/" class="btn btn-outline">Trang chính</a>
+          </div>
+        </section>
+
+        <!-- Quyền -->
+        <div id="roleBanner" class="rounded-xl border bg-white p-4 hidden">
+          <div id="roleText" class="text-sm text-gray-700"></div>
         </div>
+
+        <!-- Versions -->
+        <section class="card space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <h2 class="font-semibold">Phiên bản danh mục</h2>
+            <div class="text-sm text-gray-500">Tạo version mới (clone), xem và xóa phiên bản cũ.</div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <!-- Danh sách version -->
+            <div class="border rounded-xl overflow-hidden bg-white">
+              <div class="px-4 py-3 border-b font-semibold">Các phiên bản</div>
+              <div id="verWrap" class="divide-y"></div>
+            </div>
+
+            <!-- Tạo version -->
+            <div class="border rounded-xl overflow-hidden bg-white">
+              <div class="px-4 py-3 border-b font-semibold">Tạo phiên bản mới</div>
+              <div class="p-4 space-y-3">
+                <div>
+                  <label class="label">Tên phiên bản</label>
+                  <input id="verName" class="input w-full" placeholder="vd: v2 (2025)">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="label">Clone từ</label>
+                    <select id="verClone" class="input w-full">
+                      <option value="active">Version đang active</option>
+                    </select>
+                  </div>
+                  <div class="flex items-center gap-2 pt-6">
+                    <input id="verActivate" type="checkbox" class="h-4 w-4">
+                    <label for="verActivate" class="text-sm">Kích hoạt ngay</label>
+                  </div>
+                </div>
+                <div class="flex items-center justify-end gap-2">
+                  <button id="btnCreateVer" class="btn btn-primary" disabled>Tạo version</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Items -->
+        <section class="card space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 class="font-semibold">
+                Danh mục hồ sơ (version:
+                <span id="activeVer" class="chip-mini">—</span>)
+              </h2>
+              <p class="text-xs text-gray-500">Kéo ☰ để sắp xếp; nhớ bấm <b>Lưu thứ tự</b>.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="btnAdd" class="btn btn-primary" disabled>+ Thêm mục</button>
+              <button id="btnSaveOrder" class="btn btn-outline" disabled>💾 Lưu thứ tự</button>
+            </div>
+          </div>
+
+          <div class="overflow-hidden border rounded-xl bg-white">
+            <div class="overflow-auto">
+              <table class="table min-w-full text-sm">
+                <thead>
+                  <tr>
+                    <th class="text-center w-14">#</th>
+                    <th class="text-left  w-10"> </th>
+                    <th class="text-left">Mã</th>
+                    <th class="text-left">Tên hiển thị</th>
+                    <th class="text-center w-24">Thứ tự</th>
+                    <th class="text-right  w-56">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody" class="divide-y"></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="empty" class="text-center text-gray-500 py-6 hidden">Chưa có mục nào.</div>
+        </section>
+
       </div>
     </section>
-
-    <!-- Items -->
-    <section class="card space-y-3">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 class="font-semibold">
-            Danh mục hồ sơ (version:
-            <span id="activeVer" class="chip-mini">—</span>)
-          </h2>
-          <p class="text-xs text-gray-500">Kéo ☰ để sắp xếp; nhớ bấm <b>Lưu thứ tự</b>.</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <button id="btnAdd" class="btn btn-primary" disabled>+ Thêm mục</button>
-          <button id="btnSaveOrder" class="btn btn-outline" disabled>💾 Lưu thứ tự</button>
-        </div>
-      </div>
-
-      <div class="overflow-hidden border rounded-xl bg-white">
-        <div class="overflow-auto">
-          <table class="table min-w-full text-sm">
-            <thead>
-              <tr>
-                <th class="text-center w-14">#</th>
-                <th class="text-left  w-10"> </th>
-                <th class="text-left">Mã</th>
-                <th class="text-left">Tên hiển thị</th>
-                <th class="text-center w-24">Thứ tự</th>
-                <th class="text-right  w-56">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody id="tbody" class="divide-y"></tbody>
-          </table>
-        </div>
-      </div>
-      <div id="empty" class="text-center text-gray-500 py-6 hidden">Chưa có mục nào.</div>
-    </section>
-  </div>
+  </main>
 
   <!-- Modal Add/Edit: dùng style.css (.overlay + .modal) -->
   <div id="modal" class="overlay" aria-hidden="true">
@@ -171,13 +244,30 @@
   <!-- Toast -->
   <div id="toast-wrap"></div>
 
+  <!-- Modal xác nhận Đăng xuất (dùng chung với các trang khác) -->
+  <div class="overlay" id="logoutModal" role="dialog" aria-modal="true" aria-labelledby="lgTitle">
+    <div class="modal max-w-md" id="logoutBox" tabindex="-1">
+      <div class="px-6 py-4 border-b flex items-center justify-between">
+        <div id="lgTitle" class="font-semibold text-gray-800">Xác nhận</div>
+        <button class="btn btn-outline btn-xs" id="lgClose" aria-label="Đóng">✕</button>
+      </div>
+      <div class="px-6 py-5" id="lgDesc">
+        <p class="text-gray-700">Bạn có chắc chắn muốn đăng xuất không?</p>
+      </div>
+      <div class="px-6 py-4 border-t flex justify-end gap-2 bg-gray-50 rounded-b-2xl">
+        <button class="btn btn-outline" id="lgCancel">Hủy</button>
+        <button class="btn btn-primary" id="lgOK">Đăng xuất</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Footer -->
-  <footer class="bg-[#1E50B4] text-white mt-8">
+  <footer class="bg-[#1E50B4] text-white mt-auto">
     <div class="max-w-7xl mx-auto px-6 py-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 text-sm">
       <div>
         <p class="font-semibold uppercase">VIỆN HỢP TÁC VÀ PHÁT TRIỂN ĐÀO TẠO</p>
         <p class="uppercase">TRƯỜNG ĐẠI HỌC CÔNG NGHỆ TPHCM (HUTECH)</p>
-        <p><b>Sài Gòn Campus:</b> 475A Điện Biên Phủ, Phường Thạnh Mỹ Tây, TP.HCM</p>
+        <p><b>Sài Gòn Campus:</b> 475A Điện Biên Phủ, Phường Thạnh Mỹ Tây, TP. Hồ Chí Minh</p>
         <p>
           <b>ĐT:</b> (028) 6686 6465 ·
           <b>Email:</b> <a href="mailto:daotaotructuyen@hutech.edu.vn" class="underline hover:text-yellow-300">daotaotructuyen@hutech.edu.vn</a>
@@ -186,6 +276,7 @@
       <p class="text-xs">© V-HT.PTĐT HUTECH — Code by HC-Tuấn</p>
     </div>
   </footer>
+
 <script>
 /* =========================
  *  AMS – Checklist Admin UI (safe DOM, DnD+Keyboard, focus trap, robust fetch)
@@ -195,13 +286,25 @@
 const el = (tag, attrs = {}, children = []) => {
   const n = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
-    if (k === 'class') n.className = v;
-    else if (k === 'dataset') Object.assign(n.dataset, v);
-    else if (k.startsWith('on') && typeof v === 'function') n[k] = v;
-    else if (k === 'text') n.textContent = v ?? '';
-    else if (k === 'html') n.innerHTML = v ?? ''; // dùng cẩn thận, không áp cho dữ liệu từ API!
-    else n.setAttribute(k, v);
+    if (k === 'class') {
+      n.className = v;
+    } else if (k === 'dataset') {
+      Object.assign(n.dataset, v);
+    } else if (k.startsWith('on') && typeof v === 'function') {
+      n[k] = v;
+    } else if (k === 'text') {
+      n.textContent = v ?? '';
+    } else if (k === 'html') {
+      n.innerHTML = v ?? ''; // cẩn thận XSS
+    } else if (k === 'disabled' || k === 'checked' || k === 'readonly' || k === 'required') {
+      // boolean attributes: chỉ set khi true
+      if (v) n.setAttribute(k, '');
+      // nếu false thì bỏ qua, KHÔNG setAttribute
+    } else {
+      n.setAttribute(k, v);
+    }
   }
+
   (Array.isArray(children) ? children : [children]).forEach(c => {
     if (c == null) return;
     n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
@@ -210,13 +313,22 @@ const el = (tag, attrs = {}, children = []) => {
 };
 
 /* ---------- Toast ---------- */
-function toast(msg, type='info', ms=2200){
+function showToast(msg, type='info', ms=2200){
   const wrap = document.getElementById('toast-wrap') || document.body.appendChild(el('div', {id:'toast-wrap'}));
-  const box  = el('div', {class: 'toast ' + (type==='success'?'success':type==='warn'?'warn':type==='error'?'error':'') , text: String(msg||'')});
+  const box  = el('div', {class: 'toast ' + (type==='success'?'success':type==='warn'?'warn':type==='error'?'error':'' ) , text: String(msg||'')});
   wrap.appendChild(box);
   requestAnimationFrame(()=> box.classList.add('show'));
-  setTimeout(()=>{ box.classList.remove('show'); box.addEventListener('transitionend',()=>box.remove(),{once:true}); }, ms);
+  const hide = () => {
+    box.classList.remove('show');
+    box.addEventListener('transitionend',()=>box.remove(),{once:true});
+  };
+  const timer = setTimeout(hide, ms);
+  box.addEventListener('click', ()=>{ clearTimeout(timer); hide(); });
 }
+
+/* Giữ alias cũ để không phải sửa hết code bên dưới */
+const toast = showToast;
+
 
 /* ---------- API base & prefix detect + robust fetch with timeout ---------- */
 const STORAGE_KEY = 'apiBase';
@@ -300,27 +412,139 @@ async function showErrorFromResponse(r, fallback='Thao tác thất bại'){
   toast(`${fallback} (HTTP ${r.status})`,'error');
 }
 
-/* ---------- Auth & role banner ---------- */
+/* ---------- Dropdown menu user (giống các trang khác) ---------- */
+(function menuSetup(){
+  const btn = document.getElementById('userMenuBtn');
+  const menu = document.getElementById('userMenu');
+  if(!btn || !menu) return;
+  function openMenu(on){
+    menu.classList.toggle('show', on);
+    btn.setAttribute('aria-expanded', String(on));
+  }
+  btn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    openMenu(!menu.classList.contains('show'));
+  });
+  document.addEventListener('click', ()=> menu.classList.contains('show') && openMenu(false));
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') openMenu(false); });
+  document.getElementById('btnMenuLogout')?.addEventListener('click', ()=>{
+    openMenu(false);
+    openLogout();
+  });
+})();
+
+/* ---------- Modal logout (dùng apiFetch) ---------- */
+(function(){
+  const wrap = document.getElementById('logoutModal');
+  const box  = document.getElementById('logoutBox');
+  const ok   = document.getElementById('lgOK');
+  const cxl  = document.getElementById('lgCancel');
+  const x    = document.getElementById('lgClose');
+  let last=null;
+
+  function open(){
+    last=document.activeElement;
+    wrap.classList.add('show');
+    requestAnimationFrame(()=>box.focus());
+    document.body.classList.add('overflow-hidden');
+  }
+  function close(){
+    wrap.classList.remove('show');
+    document.body.classList.remove('overflow-hidden');
+    last?.focus?.();
+  }
+  function trap(e){
+    if(e.key!=='Tab') return;
+    const f=box.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
+    if(!f.length) return;
+    const first=f[0], last=f[f.length-1];
+    if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+  }
+
+  window.openLogout=open;
+
+  ok.addEventListener('click', async ()=>{
+    try{ await apiFetch('/logout',{method:'POST'});}catch{}
+    location.href='/auth_login.html';
+  });
+  cxl.addEventListener('click', close);
+  x.addEventListener('click', close);
+  wrap.addEventListener('click', e=>{ if(e.target===wrap) close(); });
+  box.addEventListener('keydown', trap);
+})();
+
+/* ---------- Auth & role banner + fill sidebar name ---------- */
 let IS_ADMIN = false;
 async function ensureAdmin(){
   await detectPrefix();
   const r = await apiFetch('/me');
-  if (!r || !r.ok) { location.href = '/auth_login.html'; return; }
+  if (!r || !r.ok) { 
+    location.href = '/auth_login.html'; 
+    return; 
+  }
   const me = await r.json();
-  const roles = Array.isArray(me.roles) ? me.roles : (me.role ? [me.role] : []);
-  IS_ADMIN = roles.includes('Admin');
+
+  // Gom hết role có thể có
+  const rawRoles = [];
+
+  // roles có thể là mảng hoặc string
+  if (Array.isArray(me.roles)) {
+    rawRoles.push(...me.roles);
+  } else if (me.roles) {
+    rawRoles.push(me.roles);
+  }
+
+  if (me.role) rawRoles.push(me.role);
+
+  // ⚠️ Quan trọng: is_admin có thể là true, 1, "1"
+  if (me.is_admin === true || me.is_admin === 1 || me.is_admin === '1') {
+    rawRoles.push('Admin');
+  }
+
+  // Nếu rỗng thì cho default
+  const roles = rawRoles.length ? rawRoles : ['User'];
+
+  // Chuẩn hóa lower để check admin
+  const rolesLower = roles.map(r => String(r).toLowerCase());
+
+  IS_ADMIN = rolesLower.some(r =>
+    r === 'admin' ||
+    r === 'administrator' ||
+    r.includes('admin')
+  );
+
+  console.log('[/me]', me, 'roles =', roles, 'IS_ADMIN =', IS_ADMIN);
+
+  // Fill sidebar user info
+  const name = me.full_name || me.username || 'Người dùng';
+  const helloNameEl = document.getElementById('helloName');
+  const helloRoleEl = document.getElementById('helloRole');
+  if (helloNameEl) helloNameEl.textContent = name;
+  if (helloRoleEl) helloRoleEl.textContent = roles.join(', ');
 
   const banner = document.getElementById('roleBanner');
   const t = document.getElementById('roleText');
   const controlIds = ['btnAdd','btnSaveOrder','btnCreateVer'];
 
   if (IS_ADMIN) {
-    banner.classList.add('hidden'); t.textContent = '';
-    controlIds.forEach(id => { const b=document.getElementById(id); if (b) b.disabled=false; });
+    // Ẩn banner, bật nút
+    if (banner) banner.classList.add('hidden');
+    if (t) t.textContent = '';
+    controlIds.forEach(id => { 
+      const b = document.getElementById(id); 
+      if (b) b.disabled = false; 
+    });
   } else {
-    banner.classList.remove('hidden');
-    t.innerHTML = `Tài khoản <b>${me.full_name||me.username||''}</b> (<b>${me.role||roles.join(', ')||'User'}</b>) <span class="text-rose-600 font-semibold">không có quyền chỉnh sửa</span>. Bạn chỉ được xem danh mục.`;
-    controlIds.forEach(id => { const b=document.getElementById(id); if (b) b.disabled=true; });
+    if (banner) banner.classList.remove('hidden');
+    if (t) {
+      t.innerHTML = `Tài khoản <b>${name}</b> (<b>${roles.join(', ')}</b>) ` +
+                    `<span class="text-rose-600 font-semibold">không có quyền chỉnh sửa</span>. Bạn chỉ được xem danh mục.`;
+    }
+    controlIds.forEach(id => { 
+      const b = document.getElementById(id); 
+      if (b) b.disabled = true; 
+    });
   }
 }
 
@@ -338,72 +562,114 @@ const activeVerChip = document.getElementById('activeVer');
 function renderVersionsList(list){
   verWrap.innerHTML = '';
   if (!list.length) {
-    verWrap.appendChild(el('div', {class:'p-4 text-gray-500', text:'Chưa có dữ liệu.'}));
+    verWrap.appendChild(el('div', {
+      class: 'p-4 text-gray-500',
+      text: 'Chưa có dữ liệu.'
+    }));
     return;
   }
-  list.forEach(v=>{
+
+  list.forEach(v => {
     const isActive = (v.is_active === true) || (v.active === true) || (v.id === ACTIVE_VERSION_ID);
-    const row = el('div', {class:'px-4 py-3 flex items-center justify-between gap-2'}, [
-      el('div', {class:'min-w-0'}, [
-        el('div', {class:'font-semibold', text: v.version_name || ''}),
-        el('div', {class:'text-xs text-gray-500'}, [
+
+    const row = el('div', {
+      class: 'px-4 py-3 flex items-center justify-between gap-2'
+    }, [
+      // Thông tin version
+      el('div', { class: 'min-w-0' }, [
+        el('div', { class: 'font-semibold', text: v.version_name || '' }),
+        el('div', { class: 'text-xs text-gray-500' }, [
           'ID: ', String(v.id || ''),
           isActive ? ' • ' : '',
-          isActive ? el('span', {class:'text-green-700 font-semibold', text:'Đang hoạt động'}) : ''
+          isActive ? el('span', {
+            class: 'text-green-700 font-semibold',
+            text: 'Đang hoạt động'
+          }) : ''
         ])
       ]),
-      el('div', {class:'shrink-0 flex items-center gap-2'}, [
-        el('button', {class:'btn btn-outline btn-xs act-view', dataset:{id:String(v.id)}, text:'Xem'}),
+
+      // Các nút thao tác
+      el('div', { class: 'shrink-0 flex items-center gap-2' }, [
+        // Xem
         el('button', {
-          class:'btn btn-outline btn-xs act-activate',
-          dataset:{id:String(v.id)},
-          disabled:(!IS_ADMIN || isActive)
+          class: 'btn btn-outline btn-xs',
+          type: 'button',
+          onclick: () => handleViewVersion(v.id)
+        }, 'Xem'),
+
+        // Kích hoạt
+        el('button', {
+          class: 'btn btn-outline btn-xs',
+          type: 'button',
+          disabled: isActive || !IS_ADMIN,
+          onclick: () => handleActivateVersion(v.id)
         }, 'Kích hoạt'),
+
+        // Xóa
         el('button', {
-          class:'btn btn-outline btn-xs border-rose-600 text-rose-600 hover:bg-rose-600 hover:text-white act-delver',
-          dataset:{id:String(v.id)}, disabled:(isActive || !IS_ADMIN)
+          class: 'btn btn-outline btn-xs border-rose-600 text-rose-600 hover:bg-rose-600 hover:text-white',
+          type: 'button',
+          disabled: isActive || !IS_ADMIN,
+          onclick: () => handleDeleteVersion(v.id)
         }, 'Xóa')
       ])
     ]);
+
     verWrap.appendChild(row);
   });
+}
 
-  // bind
-  verWrap.querySelectorAll('.act-activate').forEach(b=>{
-    b.addEventListener('click', async ()=>{
-      const id = Number(b.dataset.id);
-      if (!IS_ADMIN) return;
-      b.disabled = true;
-      const r = await apiFetch(`/checklist/versions/${id}/activate`, {method:'POST'});
-      if (!r || !r.ok){
-        if (r && r.status === 400){
-          toast(`Không thể kích hoạt: thiếu cột 'active'/'is_active'`, 'error');
-        } else await showErrorFromResponse(r,'Kích hoạt thất bại');
-      } else {
-        toast('Đã kích hoạt version','success');
-        await loadVersions();
-        await loadItems();
-      }
-      b.disabled = false;
-    });
-  });
+function handleViewVersion(id) {
+  if (!id) return;
+  // debug cho chắc
+  console.log('view version', id);
+  openViewModal(Number(id));
+}
 
-  verWrap.querySelectorAll('.act-view').forEach(b=>{
-    b.addEventListener('click', ()=> openViewModal(Number(b.dataset.id)));
-  });
+async function handleActivateVersion(id) {
+  if (!IS_ADMIN) {
+    toast('Bạn không có quyền kích hoạt phiên bản.', 'error');
+    return;
+  }
+  id = Number(id);
+  if (!id) return;
 
-  verWrap.querySelectorAll('.act-delver').forEach(b=>{
-    b.addEventListener('click', async ()=>{
-      if (!IS_ADMIN) return;
-      const id = Number(b.dataset.id);
-      if (!confirm(`Xóa phiên bản ID ${id}?`)) return;
-      b.disabled = true;
-      const r = await apiFetch(`/checklist/versions/${id}`, {method:'DELETE'});
-      if (!r || !r.ok){ await showErrorFromResponse(r,'Xóa phiên bản thất bại'); }
-      else { toast('Đã xóa phiên bản','success'); await loadVersions(); await loadItems(); }
-      b.disabled = false;
-    });
-  });
+  console.log('activate version', id);
+  const btnText = 'Kích hoạt version';
+
+  const r = await apiFetch(`/checklist/versions/${id}/activate`, { method: 'POST' });
+  if (!r || !r.ok) {
+    if (r && r.status === 400) {
+      toast(`Không thể kích hoạt: thiếu cột 'active'/'is_active'`, 'error');
+    } else {
+      await showErrorFromResponse(r, 'Kích hoạt thất bại');
+    }
+  } else {
+    toast('Đã kích hoạt version', 'success');
+    await loadVersions();
+    await loadItems();
+  }
+}
+
+async function handleDeleteVersion(id) {
+  if (!IS_ADMIN) {
+    toast('Bạn không có quyền xóa phiên bản.', 'error');
+    return;
+  }
+  id = Number(id);
+  if (!id) return;
+
+  if (!confirm(`Xóa phiên bản ID ${id}?`)) return;
+
+  console.log('delete version', id);
+  const r = await apiFetch(`/checklist/versions/${id}`, { method: 'DELETE' });
+  if (!r || !r.ok) {
+    await showErrorFromResponse(r, 'Xóa phiên bản thất bại');
+  } else {
+    toast('Đã xóa phiên bản', 'success');
+    await loadVersions();
+    await loadItems();
+  }
 }
 
 async function loadVersions(){
@@ -556,7 +822,7 @@ function renderItems(){
     const i = +b.dataset.i;
     if (i<ITEMS.length-1) { swapItems(i, i+1); }
   }));
-  tbody.querySelectorAll('.act-edit').forEach(b=> b.addEventListener('click', ()=> openModal('edit', b.dataset.code)));
+  tbody.querySelectorAll('.act-edit').forEach(b=> b.addEventListener('click', ()=> openModalChecklist('edit', b.dataset.code)));
   tbody.querySelectorAll('.act-del').forEach(b=> b.addEventListener('click', ()=> onDelete(b.dataset.code)));
 }
 
@@ -598,10 +864,10 @@ btnSaveOrder.addEventListener('click', async ()=>{
   await loadItems();
 });
 
-document.getElementById('btnAdd').addEventListener('click', ()=> openModal('add'));
+document.getElementById('btnAdd').addEventListener('click', ()=> openModalChecklist('add'));
 
 /* ---------- Modal Add/Edit (focus trap + backdrop + ESC) ---------- */
-const modal = document.getElementById('modal');
+const modalChecklist = document.getElementById('modal');
 const btnClose = document.getElementById('btnClose');
 const btnCancel = document.getElementById('btnCancel');
 const btnOk = document.getElementById('btnOk');
@@ -623,13 +889,13 @@ function trapFocus(container, e){
   else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
 }
 
-function openModal(mode, code=null){
+function openModalChecklist(mode, code=null){
   if (!IS_ADMIN) return;
   MODAL_MODE = mode; MODAL_CODE = code;
   lastFocusedBeforeModal = document.activeElement;
 
   document.body.style.overflow = 'hidden';
-  modal.classList.add('show'); modal.setAttribute('aria-hidden','false');
+  modalChecklist.classList.add('show'); modalChecklist.setAttribute('aria-hidden','false');
 
   modalTitle.textContent = mode === 'add' ? 'Thêm mục danh mục' : 'Sửa mục danh mục';
   rowCode.style.display = (mode === 'add') ? '' : 'none';
@@ -643,15 +909,15 @@ function openModal(mode, code=null){
   setTimeout(()=> (mode==='add'? inpCode : inpName).focus(), 50);
 }
 
-function closeModal(){
-  modal.classList.remove('show'); modal.setAttribute('aria-hidden','true');
+function closeModalChecklist(){
+  modalChecklist.classList.remove('show'); modalChecklist.setAttribute('aria-hidden','true');
   document.body.style.overflow = '';
   lastFocusedBeforeModal?.focus?.();
 }
-btnClose.addEventListener('click', closeModal);
-btnCancel.addEventListener('click', closeModal);
-modal.addEventListener('click', (e)=>{ if (e.target === modal) closeModal(); });
-modal.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeModal(); trapFocus(modal, e); });
+btnClose.addEventListener('click', closeModalChecklist);
+btnCancel.addEventListener('click', closeModalChecklist);
+modalChecklist.addEventListener('click', (e)=>{ if (e.target === modalChecklist) closeModalChecklist(); });
+modalChecklist.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeModalChecklist(); trapFocus(modalChecklist, e); });
 
 btnOk.addEventListener('click', async ()=>{
   if (MODAL_MODE === 'add'){
@@ -663,7 +929,7 @@ btnOk.addEventListener('click', async ()=>{
     const r = await apiFetch('/checklist/items', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ code:c, display_name:n }) });
     btnOk.disabled = false;
     if (!r || !r.ok){ await showErrorFromResponse(r,'Thêm thất bại'); return; }
-    toast('Đã thêm','success'); closeModal(); await loadItems();
+    toast('Đã thêm','success'); closeModalChecklist(); await loadItems();
   } else {
     const n = inpName.value.trim();
     if (!n) { toast('Nhập tên hiển thị','warn'); return; }
@@ -671,7 +937,7 @@ btnOk.addEventListener('click', async ()=>{
     const r = await apiFetch(`/checklist/items/${encodeURIComponent(MODAL_CODE)}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ display_name:n }) });
     btnOk.disabled = false;
     if (!r || !r.ok){ await showErrorFromResponse(r,'Cập nhật thất bại'); return; }
-    toast('Đã cập nhật','success'); closeModal(); await loadItems();
+    toast('Đã cập nhật','success'); closeModalChecklist(); await loadItems();
   }
 });
 
@@ -754,6 +1020,5 @@ window.addEventListener('load', async ()=>{
   }
 })();
 </script>
-
 </body>
 </html>

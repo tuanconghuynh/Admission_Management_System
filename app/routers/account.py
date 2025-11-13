@@ -60,9 +60,15 @@ def account_change_password(
     old_password: str = Form(...),
     new_password: str = Form(...),
     confirm_password: str = Form(...),
+    # 🆕 nếu FE muốn chỉ định nơi quay về (optional)
+    next: str | None = Form(None),
     me: User = Depends(require_login),
     db: Session = Depends(get_db),
 ):
+    # Ghi lại trạng thái TRƯỚC khi đổi để biết có phải đang bị ép đổi lần đầu không
+    must_change_flag = bool(getattr(me, "must_change_password", False))
+    first_time_change = not bool(getattr(me, "password_changed_at", None))
+
     if len(new_password) < 6:
         _flash(request, "Mật khẩu mới tối thiểu 6 ký tự!", "error")
         return RedirectResponse(url="/account", status_code=302)
@@ -73,6 +79,7 @@ def account_change_password(
         _flash(request, "Mật khẩu hiện tại không đúng!", "error")
         return RedirectResponse(url="/account", status_code=302)
 
+    # Không cho dùng lại mật khẩu cũ (hoặc mật khẩu trước khi reset)
     reset_hash = getattr(me, "reset_password_hash", None)
     if not reset_hash and getattr(me, "must_change_password", False) and not getattr(me, "password_changed_at", None):
         reset_hash = me.password_hash
@@ -95,8 +102,20 @@ def account_change_password(
     except Exception:
         db.rollback()
         _flash(request, "Không thể đổi mật khẩu. Vui lòng thử lại!", "error")
+        return RedirectResponse(url="/account", status_code=302)
 
-    return RedirectResponse(url="/account", status_code=302)
+    # 🧭 Xác định nơi redirect sau khi đổi thành công
+    # Ưu tiên: nếu form gửi lên next -> đi theo next
+    if next:
+        target = next
+    # Nếu đang trong trạng thái "bị ép đổi lần đầu" -> cho về thẳng trang chủ AMS
+    elif must_change_flag or first_time_change:
+        target = "/ams_home.html"
+    # Còn lại: quay về trang account như cũ
+    else:
+        target = "/account"
+
+    return RedirectResponse(url=target, status_code=302)
 
 # ========= Cập nhật hồ sơ: hỗ trợ tên tách đôi & tương thích full_name =========
 @router.post("/account/profile")

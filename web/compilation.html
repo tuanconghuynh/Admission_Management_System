@@ -3,285 +3,385 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Biên nhận hồ sơ nhập học | V-HT.PTĐT HUTECH</title>
+  <title>Biên nhận hồ sơ nhập học | AMS</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" type="image/png" href="hutech.png" sizes="32x32">
   <link rel="apple-touch-icon" href="hutech.png">
   <meta name="theme-color" content="#2563eb">
 </head>
-<body class="bg-gray-50">
+ <style>
+    /* Hover nhẹ logo */
+    a:hover img { transform: scale(1.05); transition: transform 0.2s ease; }
+  </style>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Ẩn HTML tới khi check xong /me để tránh nháy -->
+  <script>document.documentElement.style.visibility = 'hidden';</script>
+
   <!-- Toast -->
   <div id="toast-wrap"></div>
 
-  <div class="max-w-6xl mx-auto p-6 space-y-6">
-    <header class="flex flex-wrap items-center justify-between border-b border-gray-200 pb-3">
-      <div class="flex items-center gap-3 min-w-0">
-        <a href="/ams_home.html" class="flex items-center gap-3 hover:opacity-90 transition">
-          <img src="hutech.png" alt="HUTECH" class="h-9 w-9 object-contain select-none" />
-          <h1 class="text-2xl font-bold leading-none truncate text-blue-700">BIÊN NHẬN HỒ SƠ NHẬP HỌC</h1>
-        </a>
+  <!-- HEADER CHUNG AMS -->
+  <header class="w-full bg-white/85 backdrop-blur-sm border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-3">
+      <a href="/ams_home.html"
+         class="flex items-center gap-3 hover:opacity-90 transition"
+         title="Về trang chủ">
+        <img src="hutech.png" alt="HUTECH" class="h-10 w-10 object-contain select-none" />
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-blue-700 leading-tight">
+            ADMISSION MANAGEMENT SYSTEM - AMS
+          </h1>
+          <p class="text-sm sm:text-base text-gray-600 font-medium tracking-wide">
+            V-HT.PTĐT · Biên nhận hồ sơ nhập học
+          </p>
+        </div>
+      </a>
+
+      <!-- Góc phải: API base + quick info -->
+      <div class="flex flex-col items-end gap-2">
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+          <label for="apiBase" class="text-gray-600 font-medium">API Base</label>
+          <input id="apiBase" class="input w-48 md:w-72" placeholder="http://..." />
+          <button class="btn btn-outline" id="btnTestApi" title="Kiểm tra kết nối API">🔍 Test</button>
+        </div>
+        <span id="navHello" class="text-xs text-gray-500 hidden"></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN LAYOUT -->
+  <main class="flex-1 flex bg-slate-50/60">
+    <!-- SIDEBAR -->
+    <aside class="hidden md:flex md:flex-col w-64 bg-white/90 border-r border-slate-200 backdrop-blur-sm">
+      <!-- User block + dropdown -->
+      <div class="px-4 pt-4 pb-3 border-b border-slate-200 relative">
+        <button id="userMenuBtn"
+                class="w-full justify-between text-sm text-gray-700 bg-white hover:bg-slate-50 px-3 py-2 rounded-lg shadow border flex items-center gap-2"
+                aria-haspopup="true" aria-expanded="false" aria-controls="userMenu">
+          <span>
+            <span>Hi, <b id="helloName">—</b></span>
+            <span class="text-gray-500"> (<span id="helloRole">—</span>)</span>
+          </span>
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" class="text-gray-500" aria-hidden="true">
+            <path fill-rule="evenodd"
+                  d="M5.23 7.21a.75.75 0 011.06.02L10 11.187l3.71-3.956a.75.75 0 011.08 1.04l-4.24 4.52a.75.75 0 01-1.08 0l-4.24-4.52a.75.75 0 01.02-1.06z"
+                  clip-rule="evenodd"/>
+          </svg>
+        </button>
+
+        <div id="userMenu"
+             class="menu absolute left-4 top-[calc(100%+4px)] w-[calc(100%-2rem)] bg-white border rounded-xl shadow-lg overflow-hidden z-20"
+             role="menu">
+          <a href="/account" class="block px-4 py-2 hover:bg-gray-50 text-sm" role="menuitem">🔎 Thông tin tài khoản</a>
+          <a href="/account" class="block px-4 py-2 hover:bg-gray-50 text-sm" role="menuitem">🔐 Đổi mật khẩu</a>
+          <button id="btnMenuLogout"
+                  class="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm text-red-600"
+                  role="menuitem">
+            ↩️ Đăng xuất
+          </button>
+        </div>
+
+        <!-- Nút login/logout cũ (ẩn) để JS cũ không lỗi nếu có dùng -->
+        <a id="navLogin" href="/auth_login.html"
+           class="hidden"></a>
+        <button id="navLogout" class="hidden" type="button"></button>
       </div>
 
-      <div class="flex flex-wrap items-center gap-2 text-sm">
-        <label for="apiBase" class="text-gray-600 font-medium">API Base</label>
-        <input id="apiBase" class="input w-64 md:w-80" placeholder="http://..." />
-        <button class="btn btn-outline" id="btnTestApi" title="Kiểm tra kết nối API">🔍 Test</button>
-        <button class="btn btn-outline" id="btnReloadChecklist" title="Tải lại danh sách checklist">↻ Checklist</button>
-      </div>
-    </header>
+      <!-- Menu chính -->
+      <nav class="py-4 text-sm flex-1">
+        <div class="px-4 pb-3 text-xs font-semibold text-gray-500 uppercase">
+          Menu chính
+        </div>
+        <a href="/ams_home.html"         class="nav-item">🏠 Trang chủ</a>
+        <a href="/compilation.html"      class="nav-item nav-item-active">📝 Nhập hồ sơ mới</a>
+        <a href="/students_list.html"    class="nav-item">📋 Danh sách hồ sơ</a>
+        <a href="/import_students.html"  class="nav-item">⬇️ Import học viên</a>
+        <a href="/journal.html"          class="nav-item">🕓 Nhật ký hệ thống</a>
+        <a href="/checklist_admin.html"  class="nav-item">📑 Quản lý danh mục hồ sơ</a>
+        <a href="/admin"                 class="nav-item">👤 Quản lý tài khoản</a>
+        <!-- <a href="/receipt.html"          class="nav-item nav-item-active">🧾 Biên nhận hồ sơ</a> -->
+      </nav>
+    </aside>
 
-    <style>
-      header { background: rgba(255,255,255,0.85); backdrop-filter: blur(6px); }
-      a:hover img { transform: scale(1.05); transition: transform 0.2s ease; }
-    </style>
+    <!-- CONTENT -->
+    <section class="flex-1 flex items-start justify-center">
+      <div class="max-w-7xl mx-auto p-6 space-y-6 w-full">
 
-    <!-- Quick Nav -->
-    <nav class="flex flex-wrap items-center gap-2 -mt-2">
-      <a id="navStudents" href="/students_list.html" class="btn btn-outline">📋 Danh sách hồ sơ</a>
-      <span class="flex-1"></span>
-      <span id="navHello" class="text-sm text-gray-600 hidden"></span>
-      <a id="navLogin"  href="/login" class="btn btn-outline">Login</a>
-      <button id="navLogout" class="btn btn-secondary hidden">LogOut</button>
-    </nav>
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Form -->
-      <section class="lg:col-span-2 card">
-        <div class="section-title">Nhập Thông Tin Hồ Sơ</div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="label">Mã hồ sơ</label>
-            <input class="input" id="ma_ho_so" placeholder="0000" readonly />
+        <!-- Thanh nhỏ dưới header: link nhanh về DS hồ sơ & reload checklist -->
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <a id="navStudents"
+               href="/students_list.html"
+               class="btn btn-outline">
+              📋 Danh sách hồ sơ
+            </a>
+            <button class="btn btn-outline" id="btnReloadChecklist" title="Tải lại danh sách checklist">
+              ↻ Checklist
+            </button>
           </div>
-          <div>
-            <label class="label">Ngày nhận HS (Mặc định)</label>
-            <input class="input" id="ngay_nhan_hs" type="date" readonly disabled />
-          </div>
-          <div>
-            <label class="label" for="khoa">Niên Khóa</label>
-            <select class="input" id="khoa" name="khoa">
-              <option value="">-- Chọn khóa --</option>
-              <option>23</option><option>24</option><option>25</option><option>26</option>
-              <option>27</option><option>28</option><option>29</option><option>30</option>
-            </select>
-          </div>
-          <div>
-            <label class="label">Đợt</label>
-            <select class="input" id="dot">
-              <option value="">-- Chọn đợt --</option>
-              <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
-              <option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
-              <option>11</option><option>12</option><option>13</option><option>14</option><option>15</option>
-              <option>16</option><option>17</option><option>18</option><option>19</option><option>20</option>
-            </select>
+          <div class="hidden sm:flex text-xs text-gray-500">
+            Nhấn <span class="mx-1 px-1 rounded border bg-slate-50 font-mono">Ctrl</span> + <span class="mx-1 px-1 rounded border bg-slate-50 font-mono">Enter</span> để lưu nhanh.
           </div>
         </div>
 
-        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Họ đệm + Tên (form chính vẫn tách để đẹp dữ liệu) -->
-          <div>
-            <label class="label">Họ đệm</label>
-            <input class="input" id="ho_dem" placeholder="Nguyễn Văn" />
-          </div>
-          <div>
-            <label class="label">Tên</label>
-            <input class="input" id="ten" placeholder="An" />
-          </div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Form -->
+          <section class="lg:col-span-2 card">
+            <div class="section-title">Biên nhận hồ sơ nhập học</div>
 
-          <!-- Hiển thị gộp để người nhập thấy ngay -->
-          <div class="md:col-span-2 text-xs text-gray-500 -mt-2">
-            Họ và tên: <b id="fullNameMirror"></b>
-          </div>
-
-          <input type="hidden" id="ho_ten" />
-
-          <div>
-            <label class="label">Mã số HV</label>
-            <input class="input" id="ma_so_hv" placeholder="2510200xxx" />
-          </div>
-          <div>
-            <label class="label">Giới tính</label>
-            <select class="input" id="gioi_tinh">
-              <option value="">-- Chọn giới tính --</option>
-              <option value="Nam">Nam</option>
-              <option value="Nữ">Nữ</option>
-              <option value="Khác">Khác</option>
-            </select>
-          </div>
-          <div>
-            <label class="label">Dân tộc</label>
-            <input class="input" id="dan_toc" placeholder="Kinh, Hoa, Khmer..." />
-          </div>
-          <div>
-            <label class="label">Ngày sinh</label>
-            <input class="input" id="ngay_sinh" type="date" />
-          </div>
-          <div>
-            <label class="label">Số điện thoại</label>
-            <input class="input" id="so_dt" placeholder="012.345.678"/>
-          </div>
-          <div>
-            <label class="label">Email học viên</label>
-            <input class="input" id="email_hoc_vien" type="email" placeholder="nguyenvana@gmail.com"/>
-          </div>
-          <div>
-            <label class="label">Ngành nhập học</label>
-            <select class="input" id="nganh_nhap_hoc">
-              <option value="">-- Chọn ngành --</option>
-              <option>Tâm lý học</option>
-              <option>Ngôn ngữ Anh</option>
-              <option>Công nghệ thông tin</option>
-              <option>Quản trị kinh doanh</option>
-              <option>Kế toán</option>
-              <option>Luật kinh tế</option>
-              <option>Quản lý xây dựng</option>
-              <option>Tài chính - Ngân hàng</option>
-              <option>Marketing</option>
-            </select>
-          </div>
-          <div>
-            <label class="label">Đã TN trước đó</label>
-            <select class="input" id="da_tn_truoc_do">
-              <option value="">-- Chọn Đối tượng --</option>
-              <option>THPT</option><option>Trung cấp</option><option>Cao đẳng</option><option>Đại học</option>
-            </select>
-          </div>
-          <div>
-            <label class="label">Người nhận (Chữ ký)</label>
-            <div class="relative">
-              <input id="nguoi_nhan_ky_ten" class="input pr-9 bg-gray-100 text-gray-500 cursor-not-allowed" readonly />
-              <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 select-none" title="Đã khóa">🔒</span>
+            <!-- Khối 1: Mã, ngày, khóa, đợt -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="label">Mã hồ sơ (4 số cuối)</label>
+                <input class="input" id="ma_ho_so" placeholder="0000" readonly />
+              </div>
+              <div>
+                <label class="label">Ngày nhận HS (Mặc định)</label>
+                <input class="input" id="ngay_nhan_hs" type="date" readonly disabled />
+              </div>
+              <div>
+                <label class="label" for="khoa">Niên Khóa</label>
+                <select class="input" id="khoa" name="khoa">
+                  <option value="">-- Chọn khóa --</option>
+                  <option>23</option><option>24</option><option>25</option><option>26</option>
+                  <option>27</option><option>28</option><option>29</option><option>30</option>
+                </select>
+              </div>
+              <div>
+                <label class="label">Đợt</label>
+                <select class="input" id="dot">
+                  <option value="">-- Chọn đợt --</option>
+                  <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+                  <option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
+                  <option>11</option><option>12</option><option>13</option><option>14</option><option>15</option>
+                  <option>16</option><option>17</option><option>18</option><option>19</option><option>20</option>
+                </select>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <!-- Checklist -->
-        <div class="mt-6">
-          <div class="section-title">Hồ sơ gồm:</div>
-          <div class="overflow-auto">
-            <table class="min-w-full border bg-white">
-              <thead class="bg-gray-100">
-                <tr>
-                  <th class="p-2 border">STT</th>
-                  <th class="p-2 border text-center">Danh mục</th>
-                  <th class="p-2 border">Có?</th>
-                  <th class="p-2 border">Số lượng</th>
-                </tr>
-              </thead>
-              <tbody id="docsBody"></tbody>
-            </table>
-          </div>
-        </div>
+            <!-- Thông tin HV -->
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="label">Họ đệm</label>
+                <input class="input" id="ho_dem" placeholder="Nguyễn Văn" />
+              </div>
+              <div>
+                <label class="label">Tên</label>
+                <input class="input" id="ten" placeholder="An" />
+              </div>
 
-        <!-- Ghi chú -->
-        <div class="mt-4">
-          <label class="label">Ghi chú (Các chứng chỉ khác sẽ điền ở đây)</label>
-          <input class="input" id="ghi_chu" />
-        </div>
+              <div class="md:col-span-2 text-xs text-gray-500 -mt-2">
+                Họ và tên: <b id="fullNameMirror"></b>
+              </div>
+              <input type="hidden" id="ho_ten" />
 
-        <div class="mt-6 flex gap-3 flex-wrap items-center">
-          <button id="btnSaveOrUpdate" class="btn btn-secondary">Lưu</button>
-        </div>
-        <div id="msg" class="mt-3 text-sm text-green-700"></div>
-      </section>
-
-      <!-- Panel phải -->
-      <aside class="card space-y-6 lg:sticky lg:top-4">
-        <section>
-          <div class="section-title">Tra cứu & Chỉnh sửa hồ sơ</div>
-
-          <label class="label">Nhập Mã Số Học Viên</label>
-          <div class="flex gap-2">
-            <input class="input flex-1" id="q_ma_so_hv" placeholder="VD: 2510xxxxxx" />
-            <button id="btnLoadApplicantMSHV" class="btn btn-outline">Tải</button>
-          </div>
-
-          <label class="label mt-3 block">Hoặc Nhập Họ tên</label>
-          <div class="flex gap-2 relative">
-            <input class="input flex-1" id="q_ho_ten" placeholder="VD: Nguyễn Văn An" />
-            <button id="btnSearchByName" class="btn btn-outline">Tìm</button>
-
-            <!-- dropdown gợi ý theo tên -->
-            <div id="nameResults" class="absolute left-0 top-full mt-1 z-50 w-full max-h-64 overflow-auto rounded-md border bg-white shadow hidden">
-              <div class="text-xs text-gray-500 mb-1 px-2 pt-2">Chọn một kết quả để tải vào form:</div>
-              <ul id="nameResultsList" class="divide-y"></ul>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-2 mt-3">
-            <button id="btnUpdateApplicant" class="btn btn-secondary">Cập nhật</button>
-            <button id="btnDeleteApplicant" class="btn btn-outline">Xóa</button>
-
-            <!-- Modal cập nhật lý do -->
-            <div id="modalUpdateReason" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 backdrop-blur-sm">
-              <div class="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-2xl transform transition-all scale-100">
-                <div class="px-6 py-4 border-b flex items-center justify-between bg-blue-50 rounded-t-2xl">
-                  <div class="text-lg font-bold text-blue-800">📝 YÊU CẦU CẬP NHẬT HỒ SƠ</div>
-                  <button id="urClose" class="text-sm px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-2 focus:ring-blue-300">❌</button>
-                </div>
-
-                <div class="p-6 space-y-4 text-base">
-                  <div>
-                    <label for="updateReasonSelect" class="block font-semibold text-gray-800 mb-2">Yêu cầu cập nhật</label>
-                    <select id="updateReasonSelect" class="input w-full h-12 text-base">
-                      <option value="">-- Chọn lệnh bổ sung --</option>
-                      <option value="capnhat_hoso_moi">Cập nhật hồ sơ mới</option>
-                      <option value="bosung_hoso">Bổ sung hồ sơ</option>
-                      <option value="capnhat_thongtin">Cập nhật thông tin học viên</option>
-                      <option value="capnhat_chungchi">Cập nhật chứng chỉ</option>
-                      <option value="chinhsua_hoso">Chỉnh sửa hồ sơ</option>
-                      <option value="khac">Lý do khác...</option>
-                    </select>
-                  </div>
-
-                  <div id="reasonOtherWrap" class="hidden">
-                    <label for="updateReasonText" class="block font-semibold text-gray-800 mb-2">Nhập lý do khác</label>
-                    <textarea id="updateReasonText" rows="3" class="input w-full text-base" placeholder="Nhập lý do khác..."></textarea>
-                  </div>
-                </div>
-
-                <div class="px-6 py-4 border-t flex justify-end gap-3 bg-gray-50 rounded-b-2xl">
-                  <button id="urCancel" class="px-5 py-2 text-sm border border-gray-400 rounded-lg hover:bg-gray-100">Hủy</button>
-                  <button id="urOK" class="px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Cập nhật</button>
+              <div>
+                <label class="label">Mã số HV</label>
+                <input class="input" id="ma_so_hv" placeholder="2510200xxx" />
+              </div>
+              <div>
+                <label class="label">Giới tính</label>
+                <select class="input" id="gioi_tinh">
+                  <option value="">-- Chọn giới tính --</option>
+                  <option value="Nam">Nam</option>
+                  <option value="Nữ">Nữ</option>
+                  <option value="Khác">Khác</option>
+                </select>
+              </div>
+              <div>
+                <label class="label">Dân tộc</label>
+                <input class="input" id="dan_toc" placeholder="Kinh, Hoa, Khmer..." />
+              </div>
+              <div>
+                <label class="label">Ngày sinh</label>
+                <input class="input" id="ngay_sinh" type="date" />
+              </div>
+              <div>
+                <label class="label">Số điện thoại</label>
+                <input class="input" id="so_dt" placeholder="012.345.678"/>
+              </div>
+              <div>
+                <label class="label">Email học viên</label>
+                <input class="input" id="email_hoc_vien" type="email" placeholder="nguyenvana@gmail.com"/>
+              </div>
+              <div>
+                <label class="label">Ngành nhập học</label>
+                <select class="input" id="nganh_nhap_hoc">
+                  <option value="">-- Chọn ngành --</option>
+                  <option>Tâm lý học</option>
+                  <option>Ngôn ngữ Anh</option>
+                  <option>Công nghệ thông tin</option>
+                  <option>Quản trị kinh doanh</option>
+                  <option>Kế toán</option>
+                  <option>Luật kinh tế</option>
+                  <option>Quản lý xây dựng</option>
+                  <option>Tài chính - Ngân hàng</option>
+                  <option>Marketing</option>
+                </select>
+              </div>
+              <div>
+                <label class="label">Đã TN trước đó</label>
+                <select class="input" id="da_tn_truoc_do">
+                  <option value="">-- Chọn Đối tượng --</option>
+                  <option>THPT</option><option>Trung cấp</option><option>Cao đẳng</option><option>Đại học</option>
+                </select>
+              </div>
+              <div>
+                <label class="label">Người nhận (Chữ ký)</label>
+                <div class="relative">
+                  <input id="nguoi_nhan_ky_ten" class="input pr-9 bg-gray-100 text-gray-500 cursor-not-allowed" readonly />
+                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 select-none" title="Đã khóa">🔒</span>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
 
-        <!-- In -->
-        <section id="sectionPrintLoaded" class="mt-2">
-          <div class="flex gap-2">
-            <button id="btnPrintLoadedA5" class="btn btn-outline" disabled>In A5</button>
-            <button id="btnPrintLoadedA4" class="btn btn-outline" disabled>In A4</button>
-          </div>
-          <p id="lookupMsg" class="text-sm text-gray-600 mt-2"></p>
-        </section>
+            <!-- Checklist -->
+            <div class="mt-6">
+              <div class="section-title">Hồ sơ gồm:</div>
+              <div class="overflow-auto">
+                <table class="min-w-full border bg-white">
+                  <thead class="bg-gray-100">
+                    <tr>
+                      <th class="p-2 border">STT</th>
+                      <th class="p-2 border text-center">Danh mục</th>
+                      <th class="p-2 border">Có?</th>
+                      <th class="p-2 border">Số lượng</th>
+                    </tr>
+                  </thead>
+                  <tbody id="docsBody"></tbody>
+                </table>
+              </div>
+            </div>
 
-        <hr/>
+            <!-- Ghi chú -->
+            <div class="mt-4">
+              <label class="label">Ghi chú (Các chứng chỉ khác sẽ điền ở đây)</label>
+              <input class="input" id="ghi_chu" />
+            </div>
 
-        <section>
-          <div class="section-title"><center>TRỢ GIÚP</center></div>
-          <ul class="list-disc ml-5 text-sm text-gray-600 space-y-1">
-            <li>Chọn API Base rồi nhấn nút Test cho lần đầu hoặc khi đổi server.</li>
-            <li>Nhấn nút ↻ để tải lại danh sách hồ sơ và checklist từ server.</li>
-            <li>Mã hồ sơ và ngày nhận HS sẽ tự động gán</li>
-            <li>PDF mở trong tab mới; nếu bị chặn sẽ mở ngay tại tab.</li>
-            <li>Tìm kiếm theo <b>Mã số HV</b> hoặc <b>Họ và tên</b>.</li>
-            <li>Để trống số lượng trong checklist để đánh dấu có/không.</li>
-            <li>Liên hệ Email: <a href="mailto:hc.tuan@hutech.edu.vn">hc.tuan@hutech.edu.vn</a></li>
-            <li>Liên hệ zalo: <a href="http://zalo.me/tuanconghuynh">Huỳnh Công Tuấn Tại đây!</a></li>
-          </ul>
-        </section>
-      </aside>
+            <div class="mt-6 flex gap-3 flex-wrap items-center">
+              <button id="btnSaveOrUpdate" class="btn btn-secondary">Lưu</button>
+              <span class="text-xs text-gray-500">Hoặc bấm <b>Ctrl + Enter</b> để lưu nhanh.</span>
+            </div>
+            <div id="msg" class="mt-3 text-sm text-green-700"></div>
+          </section>
+
+          <!-- Panel phải -->
+          <aside class="card space-y-6 lg:sticky lg:top-4">
+            <section>
+              <div class="section-title">Tra cứu & Chỉnh sửa hồ sơ</div>
+
+              <label class="label">Nhập Mã Số Học Viên</label>
+              <div class="flex gap-2 relative">
+                <input class="input flex-1" id="q_ma_so_hv" placeholder="VD: 2510xxxxxx" />
+                <button id="btnLoadApplicantMSHV" class="btn btn-outline">Tải</button>
+              </div>
+
+              <label class="label mt-3 block">Hoặc Nhập Họ tên</label>
+              <div class="flex gap-2 relative">
+                <input class="input flex-1" id="q_ho_ten" placeholder="VD: Nguyễn Văn An" />
+                <button id="btnSearchByName" class="btn btn-outline">Tìm</button>
+
+                <!-- dropdown gợi ý theo tên -->
+                <div id="nameResults" class="absolute left-0 top-full mt-1 z-50 w-full max-h-64 overflow-auto rounded-md border bg-white shadow hidden">
+                  <div class="text-xs text-gray-500 mb-1 px-2 pt-2">Chọn một kết quả để tải vào form:</div>
+                  <ul id="nameResultsList" class="divide-y"></ul>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 mt-3">
+                <button id="btnUpdateApplicant" class="btn btn-secondary">Cập nhật</button>
+                <button id="btnDeleteApplicant" class="btn btn-outline">Xóa</button>
+
+                <!-- Modal cập nhật lý do -->
+                <div id="modalUpdateReason" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 backdrop-blur-sm">
+                  <div class="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-2xl transform transition-all scale-100">
+                    <div class="px-6 py-4 border-b flex items-center justify-between bg-blue-50 rounded-t-2xl">
+                      <div class="text-lg font-bold text-blue-800">📝 YÊU CẦU CẬP NHẬT HỒ SƠ</div>
+                      <button id="urClose" class="text-sm px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-2 focus:ring-blue-300">❌</button>
+                    </div>
+
+                    <div class="p-6 space-y-4 text-base">
+                      <div>
+                        <label for="updateReasonSelect" class="block font-semibold text-gray-800 mb-2">Yêu cầu cập nhật</label>
+                        <select id="updateReasonSelect" class="input w-full h-12 text-base">
+                          <option value="">-- Chọn lệnh bổ sung --</option>
+                          <option value="capnhat_hoso_moi">Cập nhật hồ sơ mới</option>
+                          <option value="bosung_hoso">Bổ sung hồ sơ</option>
+                          <option value="capnhat_thongtin">Cập nhật thông tin học viên</option>
+                          <option value="capnhat_chungchi">Cập nhật chứng chỉ</option>
+                          <option value="chinhsua_hoso">Chỉnh sửa hồ sơ</option>
+                          <option value="khac">Lý do khác...</option>
+                        </select>
+                      </div>
+
+                      <div id="reasonOtherWrap" class="hidden">
+                        <label for="updateReasonText" class="block font-semibold text-gray-800 mb-2">Nhập lý do khác</label>
+                        <textarea id="updateReasonText" rows="3" class="input w-full text-base" placeholder="Nhập lý do khác..."></textarea>
+                      </div>
+                    </div>
+
+                    <div class="px-6 py-4 border-t flex justify-end gap-3 bg-gray-50 rounded-b-2xl">
+                      <button id="urCancel" class="px-5 py-2 text-sm border border-gray-400 rounded-lg hover:bg-gray-100">Hủy</button>
+                      <button id="urOK" class="px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Cập nhật</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- In -->
+            <section id="sectionPrintLoaded" class="mt-2">
+              <div class="flex gap-2">
+                <button id="btnPrintLoadedA5" class="btn btn-outline" disabled>In A5</button>
+                <button id="btnPrintLoadedA4" class="btn btn-outline" disabled>In A4</button>
+              </div>
+              <p id="lookupMsg" class="text-sm text-gray-600 mt-2"></p>
+            </section>
+
+            <hr/>
+
+            <section>
+              <div class="section-title"><center>TRỢ GIÚP</center></div>
+              <ul class="list-disc ml-5 text-sm text-gray-600 space-y-1">
+                <li>Chọn API Base rồi nhấn nút Test cho lần đầu hoặc khi đổi server.</li>
+                <li>Nhấn nút ↻ để tải lại danh sách hồ sơ và checklist từ server.</li>
+                <li>Mã hồ sơ và ngày nhận HS sẽ tự động gán.</li>
+                <li>PDF mở trong tab mới; nếu bị chặn sẽ hiện cảnh báo bật pop-up.</li>
+                <li>Tìm kiếm theo <b>Mã số HV</b> hoặc <b>Họ và tên</b>.</li>
+                <li>Để trống số lượng trong checklist để đánh dấu có/không.</li>
+                <li>Liên hệ Email: <a href="mailto:hc.tuan@hutech.edu.vn">hc.tuan@hutech.edu.vn</a></li>
+                <li>Liên hệ zalo: <a href="http://zalo.me/tuanconghuynh">Huỳnh Công Tuấn tại đây!</a></li>
+              </ul>
+            </section>
+          </aside>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- FOOTER CHUNG -->
+  <footer class="bg-[#1E50B4] text-white">
+    <div class="max-w-7xl mx-auto px-6 py-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 text-sm">
+      <div>
+        <p class="font-semibold uppercase">VIỆN HỢP TÁC VÀ PHÁT TRIỂN ĐÀO TẠO</p>
+        <p class="uppercase">TRƯỜNG ĐẠI HỌC CÔNG NGHỆ TPHCM (HUTECH)</p>
+        <p><b>Sài Gòn Campus:</b> 475A Điện Biên Phủ, Phường Thạnh Mỹ Tây, TP. Hồ Chí Minh</p>
+        <p>
+          <b>ĐT:</b> (028) 6686 6465 ·
+          <b>Email:</b> <a href="mailto:daotaotructuyen@hutech.edu.vn" class="underline hover:text-yellow-300">daotaotructuyen@hutech.edu.vn</a>
+        </p>
+      </div>
+      <p class="text-xs">
+        © V-HT.PTĐT HUTECH — Code by
+        <a href="http://zalo.me/tuanconghuynh" target="_blank" rel="noopener noreferrer" class="underline hover:text-yellow-300">
+          HC-Tuấn
+        </a>
+      </p>
     </div>
-  </div>
-
-  <footer class="max-w-6xl mx-auto px-6 pb-4 text-right text-xs text-gray-500">
-    © <span class="font-semibold"><a href="https://hutech.edu.vn/e-hutech" target="_blank" rel="noopener noreferrer">V-HT.PTĐT HUTECH</a></span>
-    ➖ Code by: <span class="font-semibold"><a href="http://zalo.me/tuanconghuynh" target="_blank" rel="noopener noreferrer">HC- Tuan</a></span>
   </footer>
 
   <!-- Modal Xoá -->
@@ -303,10 +403,24 @@
     </div>
   </div>
 
-  <script>
-  /* ===== Boot: đảm bảo API base/prefix rồi mới check /me ===== */
-  document.documentElement.style.visibility = 'hidden';
+  <!-- Modal xác nhận Đăng xuất dùng chung -->
+  <div class="overlay" id="logoutModal" role="dialog" aria-modal="true" aria-labelledby="lgTitle">
+    <div class="modal max-w-md" id="logoutBox" tabindex="-1">
+      <div class="px-6 py-4 border-b flex items-center justify-between">
+        <div id="lgTitle" class="font-semibold text-gray-800">Xác nhận</div>
+        <button class="btn btn-outline btn-xs" id="lgClose" aria-label="Đóng">✕</button>
+      </div>
+      <div class="px-6 py-5" id="lgDesc">
+        <p class="text-gray-700">Bạn có chắc chắn muốn đăng xuất không?</p>
+      </div>
+      <div class="px-6 py-4 border-t flex justify-end gap-3 bg-gray-50 rounded-b-2xl">
+        <button class="btn btn-outline" id="lgCancel">Hủy</button>
+        <button class="btn btn-primary" id="lgOK">Đăng xuất</button>
+      </div>
+    </div>
+  </div>
 
+<script>
   /* ===== helpers ===== */
   const $ = (id) => document.getElementById(id);
   const debounce = (fn, ms=400) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; };
@@ -339,7 +453,6 @@
   }
   const makeUrl = (path)=> apiBase() + (API_PREFIX || "") + path;
   async function apiFetch(path, init={}){ const opts={credentials:"include", ...init}; return await fetch(makeUrl(path), opts).catch(()=>null); }
-  // --- Ghi log vào Journal
   async function journalTrack(payload){
     try{
       await apiFetch('/journal/track', {
@@ -347,10 +460,18 @@
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify(payload || {})
       });
-    }catch(_){ /* không chặn luồng in nếu log lỗi */ }
+    }catch(_){}
   }
 
-  function handleAuth(r){ if(r && (r.status===401||r.status===403)){ showToast("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.","warn",2500); setTimeout(()=>location.href="/login",700); return true; } return false; }
+  function handleAuth(r){
+    if(r && (r.status===401||r.status===403)){
+      showToast("Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.","warn",2500);
+      const next = encodeURIComponent(location.pathname + location.search);
+      setTimeout(()=>location.href="/auth_login.html?next="+next,700);
+      return true;
+    }
+    return false;
+  }
   const safeJson = async (r)=>{ try{ return await r.json(); }catch{ return {}; } };
 
   async function ensureApiBaseAndPrefix(){
@@ -359,12 +480,25 @@
     let pref = await pingPrefix(base);
     if (pref === null){
       const guesses=[base, window.location.origin, "http://127.0.0.1:8000", "http://localhost:8000"];
-      for (const g of guesses){ const p = await pingPrefix(g); if (p !== null){ $("apiBase").value=g; localStorage.setItem(STORAGE_KEY,g); API_PREFIX=p; return; } }
+      for (const g of guesses){
+        const p = await pingPrefix(g);
+        if (p !== null){
+          $("apiBase").value=g;
+          localStorage.setItem(STORAGE_KEY,g);
+          API_PREFIX=p;
+          return;
+        }
+      }
       for(;;){
         const m = prompt("Không kết nối được API.\nNhập IP/URL server (vd: http://192.168.2.82:8000):", base);
         if(!m) break;
         const p=await pingPrefix(m.trim());
-        if(p!==null){ $("apiBase").value=m.trim(); localStorage.setItem(STORAGE_KEY,m.trim()); API_PREFIX=p; return; }
+        if(p!==null){
+          $("apiBase").value=m.trim();
+          localStorage.setItem(STORAGE_KEY,m.trim());
+          API_PREFIX=p;
+          return;
+        }
         base=m.trim();
       }
       API_PREFIX="";
@@ -392,31 +526,102 @@
     const toks=b.split(/\s+/).filter(Boolean); return toks.every(t=>a.includes(t)) ? 60 : 0;
   }
 
+  /* ========== User dropdown + logout modal ========== */
+  (function menuSetup(){
+    const btn = document.getElementById('userMenuBtn');
+    const menu = document.getElementById('userMenu');
+    if(!btn || !menu) return;
+    function openMenu(on){
+      menu.classList.toggle('show', on);
+      btn.setAttribute('aria-expanded', String(on));
+    }
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      openMenu(!menu.classList.contains('show'));
+    });
+    document.addEventListener('click', ()=> menu.classList.contains('show') && openMenu(false));
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') openMenu(false); });
+    document.getElementById('btnMenuLogout')?.addEventListener('click', ()=>{
+      openMenu(false);
+      if (typeof window.openLogout === 'function') window.openLogout();
+    });
+  })();
+
+  (function(){
+    const wrap = document.getElementById('logoutModal');
+    const box  = document.getElementById('logoutBox');
+    const ok   = document.getElementById('lgOK');
+    const cxl  = document.getElementById('lgCancel');
+    const x    = document.getElementById('lgClose');
+    let last=null;
+
+    function trapFocus(container, e){
+      if(e.key!=='Tab') return;
+      const f = container.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
+      if(!f.length) return;
+      const first=f[0], lastEl=f[f.length-1];
+      if(e.shiftKey && document.activeElement===first){ e.preventDefault(); lastEl.focus(); }
+      else if(!e.shiftKey && document.activeElement===lastEl){ e.preventDefault(); first.focus(); }
+    }
+
+    function open(){
+      last=document.activeElement;
+      wrap.classList.add('show');
+      requestAnimationFrame(()=>box.focus());
+      document.body.classList.add('overflow-hidden');
+    }
+    function close(){
+      wrap.classList.remove('show');
+      document.body.classList.remove('overflow-hidden');
+      last?.focus?.();
+    }
+    window.openLogout = open;
+
+    ok.addEventListener('click', async ()=>{
+      try{ await apiFetch('/logout',{method:'POST'});}catch(_){}
+      location.href='/auth_login.html';
+    });
+    cxl.addEventListener('click', close);
+    x.addEventListener('click', close);
+    wrap.addEventListener('click', e=>{ if(e.target===wrap) close(); });
+    box.addEventListener('keydown', (e)=> trapFocus(box,e));
+
+    // nút navLogout "cũ" (bị ẩn) vẫn mở modal
+    $('navLogout')?.addEventListener('click', (e)=>{ e.preventDefault(); open(); });
+  })();
+
   /* ===== Auth UI (/me) ===== */
   async function refreshAuthUI(){
     try{
-      const r = await apiFetch('/me', { credentials:'include' });
+      const r = await apiFetch('/me', { credentials:'include', cache:'no-store' });
       if (!r || !r.ok){
         $('navHello')?.classList.add("hidden");
-        $('navLogin')?.classList.remove("hidden");
-        $('navLogout')?.classList.add("hidden");
         const rec = $('nguoi_nhan_ky_ten'); if (rec) rec.value = "";
         return;
       }
       const me = await r.json();
 
-      const role = me.role || me.roles?.[0] || "";
-      const displayName = me.full_name || me.display_name || me.name || me.username || "";
+      const role = me.role || (Array.isArray(me.roles) ? me.roles[0] : "") || "";
+      const displayName = me.full_name || me.display_name || me.name || me.username || "Người dùng";
 
-      $('navHello').textContent = `Xin chào, ${displayName}${role ? ' ('+role+')' : ''}`;
-      $('navHello').classList.remove("hidden");
-      $('navLogin')?.classList.add("hidden");
-      $('navLogout')?.classList.remove("hidden");
+      const navHello = $('navHello');
+      if (navHello){
+        navHello.textContent = `Xin chào, ${displayName}${role ? ' ('+role+')' : ''}`;
+        navHello.classList.remove("hidden");
+      }
+
+      // sidebar
+      const hName = document.getElementById('helloName');
+      const hRole = document.getElementById('helloRole');
+      if (hName) hName.textContent = displayName;
+      if (hRole) hRole.textContent = role || 'User';
 
       const rec = $('nguoi_nhan_ky_ten');
-      if (rec && !rec.value) { rec.value = displayName; rec.title = `Tự động theo tài khoản: ${displayName}`; }
+      if (rec && !rec.value) {
+        rec.value = displayName;
+        rec.title = `Tự động theo tài khoản: ${displayName}`;
+      }
 
-      // Fallback checklist từ /me nếu có
       if (me.checklist || me.settings?.checklist) {
         window.__CHECKLIST_FROM_ME__ = me.checklist || me.settings.checklist;
       }
@@ -425,14 +630,19 @@
       }
     }catch(_){
       $('navHello')?.classList.add("hidden");
-      $('navLogin')?.classList.remove("hidden");
-      $('navLogout')?.classList.add("hidden");
     }
   }
-  $('navLogout')?.addEventListener('click', async ()=>{ try{ await apiFetch('/logout', { method:'POST', credentials:'include' }); }catch(_){ } location.href='/login'; });
 
   /* ===== Checklist ===== */
-  const DEFAULT_QTY = { bang_tot_nghiep_dai_hoc:2, bang_diem_dai_hoc:2, bang_tot_nghiep_cao_dang:2, bang_diem_cao_dang:2, bang_tot_nghiep_trung_cap:2, bang_diem_trung_cap:2, anh_3x4:2 };
+  const DEFAULT_QTY = {
+    bang_tot_nghiep_dai_hoc:2,
+    bang_diem_dai_hoc:2,
+    bang_tot_nghiep_cao_dang:2,
+    bang_diem_cao_dang:2,
+    bang_tot_nghiep_trung_cap:2,
+    bang_diem_trung_cap:2,
+    anh_3x4:2
+  };
   const getDefaultQty = (code) => DEFAULT_QTY[code] ?? 1;
 
   function renderChecklistFromData(data) {
@@ -461,7 +671,6 @@
   }
 
   async function loadChecklist() {
-    // 1) cố lấy từ /checklist/active
     try {
       const r = await apiFetch("/checklist/active");
       if (r && r.ok) {
@@ -470,14 +679,11 @@
         return;
       }
     } catch (_) {}
-
-    // 2) fallback: me.checklist hoặc me.settings.checklist (nếu trước đó refreshAuthUI đã lấy)
     if (window.__CHECKLIST_FROM_ME__) {
       renderChecklistFromData(window.__CHECKLIST_FROM_ME__);
       showToast("Dùng checklist từ /me (fallback).", "warn");
       return;
     }
-
     showToast("Không lấy được checklist", "error");
   }
 
@@ -518,50 +724,46 @@
     const r = await apiFetch("/me", { credentials: "include", cache: "no-store" });
     if (!r || !r.ok) {
       const next = encodeURIComponent(location.pathname + location.search);
-      location.replace(`/login?next=${next}`);
+      location.replace(`/auth_login.html?next=${next}`);
       return;
     }
     try { localStorage.setItem("apiBase", apiBase()); } catch {}
     document.documentElement.style.visibility = '';
   })();
 
-  /* ===== Bind name inputs in form ===== */
-function bindNameInputs(){
-  const elHD = $('ho_dem'), elT = $('ten'), elFull = $('ho_ten');
-  const mir  = $('fullNameMirror');
-  if(!elHD || !elT || !elFull) return;
+  /* ===== Bind name inputs ===== */
+  function bindNameInputs(){
+    const elHD = $('ho_dem'), elT = $('ten'), elFull = $('ho_ten');
+    const mir  = $('fullNameMirror');
+    if(!elHD || !elT || !elFull) return;
 
-  // chỉ dùng lúc KẾT THÚC nhập (blur/change) để title-case + gọn khoảng trắng
-  const normalizeNow = ()=>{
-    elHD.value = titleCaseVN(elHD.value);
-    elT.value  = titleCaseVN(elT.value);
-    const full = joinFullName(elHD.value, elT.value);
-    elFull.value = full;
-    if (mir) mir.textContent = full;
-  };
+    const normalizeNow = ()=>{
+      elHD.value = titleCaseVN(elHD.value);
+      elT.value  = titleCaseVN(elT.value);
+      const full = joinFullName(elHD.value, elT.value);
+      elFull.value = full;
+      if (mir) mir.textContent = full;
+    };
 
-  // khi đang gõ (input): KHÔNG chuẩn hoá, chỉ cập nhật mirror & hidden
-  const liveMirror = ()=>{
-    const full = [elHD.value, elT.value].filter(Boolean).join(' ');
-    elFull.value = full;           // để BE vẫn nhận đúng ngay khi đang gõ
-    if (mir) mir.textContent = full;
-  };
+    const liveMirror = ()=>{
+      const full = [elHD.value, elT.value].filter(Boolean).join(' ');
+      elFull.value = full;
+      if (mir) mir.textContent = full;
+    };
 
-  // đang gõ: không đụng vào khoảng trắng của người dùng
-  elHD.addEventListener('input', liveMirror);
-  elT .addEventListener('input', liveMirror);
+    elHD.addEventListener('input', liveMirror);
+    elT .addEventListener('input', liveMirror);
 
-  // kết thúc nhập mới chuẩn hoá
-  ['blur','change'].forEach(ev=>{
-    elHD.addEventListener(ev, normalizeNow);
-    elT .addEventListener(ev, normalizeNow);
-  });
+    ['blur','change'].forEach(ev=>{
+      elHD.addEventListener(ev, normalizeNow);
+      elT .addEventListener(ev, normalizeNow);
+    });
 
-  // khởi tạo mirror lần đầu
-  liveMirror();
-}
+    liveMirror();
+  }
   bindNameInputs();
-  // ===== Mã HS theo NHÓM (Khóa, Đợt) + helper hiển thị 4 số =====
+
+  // ===== Mã HS theo Nhóm (Khóa, Đợt) =====
   function composeMaHoSoByGroup(khoa, dot, seq) { return `HS-${String(khoa).trim()}-${String(dot).trim()}-${String(seq).padStart(4,'0')}`; }
   function extractSeq4(code) { const m = String(code || '').match(/(\d{4})$/); return m ? m[1] : ''; }
 
@@ -587,7 +789,7 @@ function bindNameInputs(){
     }
     return max;
   }
-  async function generateNextSeq4(khoa, dot) { if (!khoa || !dot) return ""; const cur = await getMaxSeqInGroup(khoa, dot); return String(cur + 1).padStart(4, '0'); }
+  async function generateNextSeq4(khoa, dot) { if (!khoa || !dot) return ""; const cur = await getMaxSeqInGroup(khoa, dot); return String(cur + 1).padStart(4,'0'); }
   async function generateNextMaHoSoByGroup(khoa, dot) { const max = await getMaxSeqInGroup(khoa, dot); return composeMaHoSoByGroup(khoa, dot, max + 1); }
 
   async function payloadForCreate() {
@@ -746,7 +948,6 @@ function bindNameInputs(){
     }
     if (r && r.status === 404) { showToast(`Không tìm thấy MSHV ${mshv}`, "warn"); throw new Error(`Không tìm thấy hồ sơ ${mshv}`); }
 
-    // Fallback theo search
     if (!r || r.status === 405) {
       const rs = await apiFetch(`/applicants/search?q=${encodeURIComponent(mshv)}`);
       if (rs && rs.ok) {
@@ -852,7 +1053,7 @@ function bindNameInputs(){
 
     try {
       if (window.loadedApplicant?.ma_so_hv) {
-        const reason = await askUpdateReason();   // modal chọn lệnh bổ sung
+        const reason = await askUpdateReason();
         if (!reason) return;
 
         const body = payloadForUpdate();
@@ -872,7 +1073,6 @@ function bindNameInputs(){
         }
         const res = await r.json();
         showToast(`Đã cập nhật MSHV ${res.ma_so_hv}`, 'success');
-        // 👉 Tải lại dữ liệu mới nhất và đổ lại form (không xóa)
         const mshv = res.ma_so_hv || window.loadedApplicant?.ma_so_hv;
         if (mshv) {
           const a = await loadApplicantByMSHV(mshv);
@@ -883,15 +1083,14 @@ function bindNameInputs(){
         } else {
           $('lookupMsg').textContent = 'Đã cập nhật.';
         }
-    } else {
-      // ===== CREATE =====
-      const created = await createApplicant();
-      if (created) {
-        showToast(`Đã lưu hồ sơ mới: ${created.ma_so_hv}`, 'success');
-        $('msg').textContent = `Đã lưu MSHV ${created.ma_so_hv}`;
-        resetToNewForm();
+      } else {
+        const created = await createApplicant();
+        if (created) {
+          showToast(`Đã lưu hồ sơ mới: ${created.ma_so_hv}`, 'success');
+          $('msg').textContent = `Đã lưu MSHV ${created.ma_so_hv}`;
+          resetToNewForm();
+        }
       }
-    }
     } catch (err) {
       $('lookupMsg').textContent = err.message || 'Lỗi xử lý.';
       showToast(err.message || 'Lỗi xử lý!', 'error');
@@ -993,8 +1192,9 @@ function bindNameInputs(){
     try { const t = await r.text(); const j = JSON.parse(t); if (j?.detail) msg = j.detail; } catch(_){}
     showToast(msg, "error", 4000);
   }
+  $('btnDeleteApplicant')?.addEventListener('click', deleteLoadedApplicant);
 
-  /* ===== Tìm theo tên: 1 ô Họ tên ===== */
+  /* ===== Tìm theo tên ===== */
   async function searchByName(fullName) {
     const q = normSpace(fullName);
     if (q.length < 2) throw new Error("Nhập tối thiểu 2 ký tự để tìm theo tên.");
@@ -1117,7 +1317,6 @@ function bindNameInputs(){
     }catch(e){ $('lookupMsg').textContent = e.message || "Lỗi tìm kiếm."; showToast(e.message || "Lỗi tìm kiếm.", "error"); }
   }, 400));
 
-  // Ẩn list khi click ngoài
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#nameResults') && !e.target.closest('#q_ho_ten')) {
       $('nameResults')?.classList.add('hidden');
@@ -1259,11 +1458,10 @@ function bindNameInputs(){
     ul._idx = idx;
   });
 
-  /* ===== In PDF (khớp BE) ===== */
+  /* ===== In PDF ===== */
   function openPdf(url){
     const w = window.open(url, "_blank", "noopener,noreferrer");
     if (!w) {
-      // Chỉ cảnh báo, KHÔNG điều hướng tab hiện tại
       showToast('Trình duyệt đang chặn pop-up. Hãy bật pop-up cho trang này rồi bấm lại.', 'warn', 4000);
     }
   }
@@ -1272,7 +1470,6 @@ function bindNameInputs(){
     if (!cur?.ma_so_hv) { showToast("Chưa tải hồ sơ nào.", "warn"); return; }
     if (isMarkedDeleted(cur.ma_so_hv) || isSoftDeleted(cur)) { showToast("Hồ sơ đã bị xóa, không thể in!", "warn"); return; }
 
-    // 🧠 Ghi nhật ký
     await journalTrack({
       action: 'PRINT_IN',
       detail: { scope: 'SINGLE', filters: { mshv: cur.ma_so_hv }, name_mode: 'A5', count: 1 }
@@ -1286,7 +1483,6 @@ function bindNameInputs(){
     if (!cur?.ma_so_hv) { showToast("Chưa tải hồ sơ nào!", "warn"); return; }
     if (isMarkedDeleted(cur.ma_so_hv) || isSoftDeleted(cur)) { showToast("Hồ sơ đã bị xóa, không thể in!", "warn"); return; }
 
-    // 🧠 Ghi nhật ký
     await journalTrack({
       action: 'PRINT_IN',
       detail: { scope: 'SINGLE', filters: { mshv: cur.ma_so_hv }, name_mode: 'A4', count: 1 }
@@ -1334,7 +1530,6 @@ function bindNameInputs(){
   document.addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $('btnSaveOrUpdate')?.click(); } });
   document.addEventListener('input', (e)=>{ const t = e.target; if (t.classList?.contains('qty')) { let v = parseInt(t.value||'0',10); if (!Number.isFinite(v) || v < 0) v = 0; if (v > 50) v = 50; t.value = String(v); } });
 
-  // Change warn
   ['khoa','dot'].forEach(id=>{
     $(id)?.addEventListener('change', ()=>{ if (window.loadedApplicant?.ma_so_hv) showToast('Đang mở hồ sơ – thay đổi Khóa/Đợt chỉ ảnh hưởng mã mới.', 'warn'); });
   });
@@ -1349,7 +1544,7 @@ function bindNameInputs(){
     await refreshAuthUI();
     await loadChecklist();
     await tryPreviewMaHoSo(true);
-    bindNameInputs(); 
+    bindNameInputs();
     setPrintButtonsEnabled(false);
 
     const url = new URL(window.location.href);
@@ -1379,14 +1574,6 @@ function bindNameInputs(){
     })();
   });
 
-  document.addEventListener("DOMContentLoaded", async () => {
-    try {
-      const today = new Date().toISOString().split("T")[0];
-      const ngayNhan = document.getElementById("ngay_nhan_hs");
-      if (ngayNhan) ngayNhan.value = today;
-    } catch (err) { console.error("⚠️ Lỗi khi sinh mã hồ sơ tự động:", err); }
-  });
-
   // Test API & switch base
   $('btnTestApi').addEventListener('click', async ()=>{
     const base = apiBase();
@@ -1400,6 +1587,25 @@ function bindNameInputs(){
     if (pref === null) showToast("Không ping được API /health", "warn");
     else { API_PREFIX = pref; showToast("Đã cập nhật máy chủ API", "success"); }
   });
-  </script>
+
+  // Nút reload checklist riêng
+  $('btnReloadChecklist').addEventListener('click', async ()=>{
+    await loadChecklist();
+    showToast('Đã tải lại danh mục hồ sơ.', 'success');
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    const path = location.pathname.replace(/\/+$/, '');
+
+    document.querySelectorAll('.nav-item').forEach(a => {
+      const href = (a.getAttribute('href') || '').replace(/\/+$/, '');
+      if (!href) return;
+
+      if (path === href || path.endsWith(href)) {
+        a.classList.add('nav-item-active');
+      }
+    });
+  });
+
+</script>
 </body>
 </html>

@@ -47,14 +47,14 @@
     /* ✅ Nút xác nhận */
     .confirm-btn {
       display: inline-block;
-      background: #d60000;
-      color: #fff !important;
+      background: #39fc63;
+      color: #000000 !important;
       padding: 10px 18px;
       border-radius: 8px;
       font-weight: bold;
       font-size: 14px;
       text-decoration: none;
-      border: 1px solid #b00000;
+      border: 1px solid #39fc63;
       margin-top: 6px;
     }
     .confirm-btn:hover {
@@ -77,6 +77,21 @@
       font-weight: 600;
       width: 35%;
       background: #f7f8fa;
+    }
+     /* ✅ Căn giữa 2 cột trạng thái & số lượng */
+    td.status, th.status,
+    td.qty, th.qty {
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .status-ok {
+      color: #059669;
+      font-weight: 600;
+    }
+    .status-fail {
+      color: #dc2626;
+      font-weight: 600;
     }
   </style>
 </head>
@@ -123,8 +138,46 @@
     </div>
     {% endif %}
 
-    <p>📎 Hồ sơ chi tiết của Anh/Chị được đính kèm trong email này!</p>
-    <p>Anh/Chị vui lòng <b>kiểm tra kỹ thông tin</b> và <b>xác nhận lại</b> qua biểu mẫu bên dưới để hoàn tất hồ sơ nhập học.</p>
+    <!-- DANH MỤC HỒ SƠ ĐÃ NHẬN -->
+    <p style="font-weight:bold; margin:16px 0 8px; color:#0033A0;">Danh mục hồ sơ:</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+          style="border-collapse:collapse;border:1px solid #e5e7eb;">
+      <thead>
+        <tr style="background:#f7f8fa;">
+          <th style="text-align:left;padding:8px 10px;">Hạng mục</th>
+          <th class="status" style="text-align:center;padding:8px 10px;">Trạng thái</th>
+          <th class="qty" style="text-align:center;padding:8px 10px;">Số lượng</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for d in docs if (d.so_luong or 0)|int > 0 %}
+        <tr>
+          <td style="padding:10px 12px;border-top:1px solid #e5e7eb;">
+            {{ d.name }}
+          </td>
+          <td class="status" style="padding:10px 12px;border-top:1px solid #e5e7eb;text-align:center;">
+            ✅ <span style="color:#16a34a;font-weight:600;">Đã nhận</span>
+          </td>
+          <td class="qty" style="padding:10px 12px;border-top:1px solid #e5e7eb;text-align:center;">
+            {{ d.so_luong or 0 }}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+
+    </table>
+
+    <!-- ✅ Thông báo bổ sung hồ sơ (chỉ hiển thị nếu có thiếu) -->
+    {% if has_missing %}
+    <p style="margin-top:14px;color:#dc2626;font-weight:bold;">
+      ⚠️ Một số hạng mục hồ sơ chưa nộp đủ:
+      Anh/Chị vui lòng bổ sung sớm để hoàn tất thủ tục nhập học.
+    </p>
+    {% endif %}
+    <!-- KẾT THÚC DANH MỤC HỒ SƠ -->
+
+    <p>📎 Biên nhận chi tiết của Anh/Chị được đính kèm trong email này!</p>
+    <p>Anh/Chị vui lòng <b>kiểm tra kỹ thông tin</b> và <b>xác nhận lại</b> qua biểu mẫu bên dưới để hoàn tất thông tin.</p>
 
     <!-- Nút xác nhận -->
     <div style="margin-top:12px;text-align:center;">

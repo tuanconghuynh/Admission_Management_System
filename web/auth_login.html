@@ -5,32 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Đăng nhập | Admission_Management_System</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/style.css">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="/hutech.png" sizes="32x32">
   <link rel="apple-touch-icon" href="/hutech.png">
   <meta name="theme-color" content="#2563eb">
 
-  <!-- (Tùy chọn) CSRF meta do BE render -->
-  <!-- <meta name="csrf-token" content="{{ csrf_token }}"> -->
-
-  <style>
-    body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-    /* nền banner toàn màn hình, mờ + tối nhẹ */
-    .login-bg{
-      position:fixed; inset:0; z-index:-1;
-      background:url('banner.png') center/cover no-repeat;
-      filter:blur(4px) saturate(105%);
-    }
-    .login-overlay{
-      position:fixed; inset:0; z-index:-1;
-      background:linear-gradient(to bottom, rgba(0,0,0,.25), rgba(0,0,0,.35));
-    }
-    .btn:disabled{opacity:.7; cursor:not-allowed}
-    .visually-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-  </style>
+ 
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
+<body class="no-ams-bg min-h-screen flex items-center justify-center p-4">
   <!-- Background (banner + overlay) -->
   <div class="login-bg" aria-hidden="true"></div>
   <div class="login-overlay" aria-hidden="true"></div>
@@ -71,9 +55,9 @@
         <div class="flex items-center justify-between">
           <label class="inline-flex items-center gap-2 text-sm text-gray-700 select-none">
             <input id="remember" type="checkbox" class="rounded border-gray-300">
-            <span>Nhớ tài khoản trên máy này</span>
+            <span>Remember me</span>
           </label>
-          <a href="mailto:hc.tuan@hutech.edu.vn" class="text-sm text-blue-600 hover:underline">Quên mật khẩu?</a>
+          <a href="mailto:hc.tuan@hutech.edu.vn" class="text-sm text-blue-600 hover:underline">Forgot password?</a>
         </div>
 
         <button id="btnLogin"
