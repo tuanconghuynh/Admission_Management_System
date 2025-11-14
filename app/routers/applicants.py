@@ -272,9 +272,13 @@ def get_by_code(
         )
 
     if not a:
-        write_audit(db, action="READ", target_type="Applicant", target_id=k, status="FAILURE", request=request)
+        write_audit(db, action="READ", target_type="Applicant", target_id=k,
+                    status="FAILURE", request=request)
         db.commit()
-        raise HTTPException(404, "Not Found")
+        raise HTTPException(
+            404,
+            detail="Không tìm thấy hồ sơ phù hợp với mã tra cứu đã nhập."
+        )
 
     # Chặn hồ sơ đã xoá mềm
     if hasattr(Applicant, "deleted_at") and getattr(a, "deleted_at", None):
@@ -330,7 +334,6 @@ def get_by_code(
         "docs": [{"code": d.code, "so_luong": int(d.so_luong or 0)} for d in docs],
     }
 
-
 @router.get("/by-mshv/{ma_so_hv}")
 def get_by_mshv(
     ma_so_hv: str,
@@ -348,17 +351,43 @@ def get_by_mshv(
     if not a:
         a = db.query(Applicant).filter(Applicant.ma_so_hv.ilike(f"%{key}%")).first()
     if not a:
-        write_audit(db, action="READ", target_type="Applicant", target_id=key, status="FAILURE", request=request)
+        write_audit(db, action="READ", target_type="Applicant", target_id=key,
+                    status="FAILURE", request=request)
         db.commit()
-        raise HTTPException(status_code=404, detail="Not Found")
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy học viên / hồ sơ nào với MSHV đã nhập."
+        )
 
     # Chặn hồ sơ đã xoá mềm
     if hasattr(Applicant, "deleted_at") and getattr(a, "deleted_at", None):
         raise HTTPException(410, "Hồ sơ đã bị xoá tạm.")
 
+    # ===== DOCS & CHECKLIST =====
     docs = db.query(ApplicantDoc).filter(
         ApplicantDoc.applicant_ma_so_hv == a.ma_so_hv
     ).all()
+    docs_map = {d.code: int(d.so_luong or 0) for d in docs}
+
+    # Lấy danh mục checklist của version hiện tại (nếu có)
+    checklist_items = []
+    if getattr(a, "checklist_version_id", None):
+        q = db.query(ChecklistItem).filter(ChecklistItem.version_id == a.checklist_version_id)
+        if hasattr(ChecklistItem, "order_no"):
+            q = q.order_by(getattr(ChecklistItem, "order_no").asc())
+        else:
+            q = q.order_by(ChecklistItem.id.asc())
+        items = q.all()
+
+        for it in items:
+            cnt = docs_map.get(it.code, 0)
+            checklist_items.append({
+                "code": it.code,
+                "label": getattr(it, "display_name", None) or getattr(it, "name", None) or it.code,
+                "order_no": getattr(it, "order_no", 0),
+                "so_luong": cnt,
+                "done": cnt > 0,
+            })
 
     def pick(*names):
         for n in names:
@@ -396,28 +425,49 @@ def get_by_mshv(
     applicant_payload = {
         "id": a.ma_so_hv,
         "applicant_id": a.ma_so_hv,
+
         "ma_ho_so": a.ma_ho_so,
+        "ma_so_hv": a.ma_so_hv,
+
         "ngay_nhan_hs": _to_dmy2(a.ngay_nhan_hs),
         "ngay_nhan_hs_iso": _to_iso2(a.ngay_nhan_hs),
         "ngay_sinh": _to_dmy2(a.ngay_sinh),
         "ngay_sinh_iso": _to_iso2(a.ngay_sinh),
+
         "ho_ten": a.ho_ten,
-        "ma_so_hv": a.ma_so_hv,
+        "ho_dem": getattr(a, "ho_dem", None),
+        "ten": getattr(a, "ten", None),
+        "full_name": _display_name(
+            getattr(a, "ho_dem", None),
+            getattr(a, "ten", None),
+            getattr(a, "ho_ten", None),
+        ),
+
         "so_dt": a.so_dt,
+        "email_hoc_vien": getattr(a, "email_hoc_vien", None),
+
         "nganh_nhap_hoc": pick("nganh_nhap_hoc", "nganh"),
         "dot": pick("dot", "dot_tuyen"),
         "khoa": pick("khoa", "khoa_hoc", "khoahoc", "nien_khoa"),
         "da_tn_truoc_do": a.da_tn_truoc_do,
         "ghi_chu": a.ghi_chu,
         "nguoi_nhan_ky_ten": pick("nguoi_nhan_ky_ten", "nguoi_nhan", "nguoi_ky"),
+
         "status": getattr(a, "status", None),
         "printed": getattr(a, "printed", None),
         "checklist_version_id": getattr(a, "checklist_version_id", None),
-        "email_hoc_vien": getattr(a, "email_hoc_vien", None),
-        # 🆕 giới tính
+
+        # 🆕 giới tính & dân tộc
         "gioi_tinh": getattr(a, "gioi_tinh", None),
-        # 🆕 dân tộc
         "dan_toc": getattr(a, "dan_toc", None),
+
+        # 🆕 nhật ký cập nhật
+        "updated_at": _to_iso2(getattr(a, "updated_at", None)) if hasattr(a, "updated_at") else None,
+        "updated_by": getattr(a, "updated_by", None)
+                      or getattr(a, "nguoi_nhan_ky_ten", None),
+
+        # 🆕 checklist đã map với docs
+        "checklist": checklist_items,
     }
 
     write_audit(db, action="READ", target_type="Applicant", target_id=a.ma_so_hv, status="SUCCESS", request=request)
@@ -427,7 +477,6 @@ def get_by_mshv(
         "applicant": applicant_payload,
         "docs": [{"code": d.code, "so_luong": int(d.so_luong or 0)} for d in docs],
     }
-
 
 # ================= CREATE =================
 @router.post("", status_code=201)
@@ -654,7 +703,10 @@ def find_by_ma_ho_so(
         .first()
     )
     if not a:
-        raise HTTPException(404, "Not Found")
+        raise HTTPException(
+            404,
+            detail="Không tìm thấy hồ sơ với mã hồ sơ đã nhập."
+        )
 
     # Chặn hồ sơ đã xoá mềm
     if hasattr(Applicant, "deleted_at") and getattr(a, "deleted_at", None):
@@ -1057,4 +1109,14 @@ def get_recent_applicants(db: Session = Depends(get_db), limit: int = 50):
         "ten": getattr(a, "ten", None),
         "full_name": _display_name(getattr(a, "ho_dem", None), getattr(a, "ten", None), getattr(a, "ho_ten", None)),
     } for a in rows]
+
+@router.get("/{ma_so_hv}")
+def get_applicant_detail(
+    ma_so_hv: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    user=Depends(require_roles("Admin", "NhanVien", "CongTacVien")),
+):
+    # dùng lại y chang get_by_mshv
+    return get_by_mshv(ma_so_hv=ma_so_hv, request=request, db=db, user=user)
 

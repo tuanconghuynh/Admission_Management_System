@@ -43,7 +43,7 @@
       <div class="flex flex-col items-end gap-2">
         <div class="flex flex-wrap items-center gap-2 text-sm">
           <label for="apiBase" class="text-gray-600 font-medium">API Base</label>
-          <input id="apiBase" class="input w-48 md:w-72" placeholder="http://..." />
+          <input id="apiBase" class="input w-48 md:w-55" placeholder="http://..." />
           <button class="btn btn-outline" id="btnTestApi" title="Kiểm tra kết nối API">🔍 Test</button>
         </div>
         <span id="navHello" class="text-xs text-gray-500 hidden"></span>
@@ -61,7 +61,7 @@
                 class="w-full justify-between text-sm text-gray-700 bg-white hover:bg-slate-50 px-3 py-2 rounded-lg shadow border flex items-center gap-2"
                 aria-haspopup="true" aria-expanded="false" aria-controls="userMenu">
           <span>
-            <span>Hi, <b id="helloName">—</b></span>
+            <span><b id="helloName">—</b></span>
             <span class="text-gray-500"> (<span id="helloRole">—</span>)</span>
           </span>
           <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" class="text-gray-500" aria-hidden="true">
@@ -72,12 +72,21 @@
         </button>
 
         <div id="userMenu"
-             class="menu absolute left-4 top-[calc(100%+4px)] w-[calc(100%-2rem)] bg-white border rounded-xl shadow-lg overflow-hidden z-20"
-             role="menu">
-          <a href="/account" class="block px-4 py-2 hover:bg-gray-50 text-sm" role="menuitem">🔎 Thông tin tài khoản</a>
-          <a href="/account" class="block px-4 py-2 hover:bg-gray-50 text-sm" role="menuitem">🔐 Đổi mật khẩu</a>
+            class="menu absolute right-0 top-[calc(100%+4px)] w-48 md:w-56
+                    bg-white border rounded-lg shadow-md overflow-hidden z-20 text-xs"
+            role="menu">
+          <a href="/account"
+            class="block px-3 py-1.5 hover:bg-gray-50"
+            role="menuitem">
+            🔎 Thông tin tài khoản
+          </a>
+          <a href="/account"
+            class="block px-3 py-1.5 hover:bg-gray-50"
+            role="menuitem">
+            🔐 Đổi mật khẩu
+          </a>
           <button id="btnMenuLogout"
-                  class="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm text-red-600"
+                  class="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-red-600"
                   role="menuitem">
             ↩️ Đăng xuất
           </button>
@@ -134,18 +143,18 @@
             <!-- Khối 1: Mã, ngày, khóa, đợt -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="label">Mã hồ sơ (4 số cuối)</label>
+                <label class="label">Mã hồ sơ</label>
                 <input class="input" id="ma_ho_so" placeholder="0000" readonly />
               </div>
               <div>
-                <label class="label">Ngày nhận HS (Mặc định)</label>
+                <label class="label">Ngày nhận HS</label>
                 <input class="input" id="ngay_nhan_hs" type="date" readonly disabled />
               </div>
               <div>
                 <label class="label" for="khoa">Niên Khóa</label>
                 <select class="input" id="khoa" name="khoa">
                   <option value="">-- Chọn khóa --</option>
-                  <option>23</option><option>24</option><option>25</option><option>26</option>
+                  <option>24</option><option>25</option><option>26</option>
                   <option>27</option><option>28</option><option>29</option><option>30</option>
                 </select>
               </div>
@@ -192,7 +201,7 @@
               </div>
               <div>
                 <label class="label">Dân tộc</label>
-                <input class="input" id="dan_toc" placeholder="Kinh, Hoa, Khmer..." />
+                <input class="input" id="dan_toc"/>
               </div>
               <div>
                 <label class="label">Ngày sinh</label>
@@ -200,11 +209,11 @@
               </div>
               <div>
                 <label class="label">Số điện thoại</label>
-                <input class="input" id="so_dt" placeholder="012.345.678"/>
+                <input class="input" id="so_dt"/>
               </div>
               <div>
                 <label class="label">Email học viên</label>
-                <input class="input" id="email_hoc_vien" type="email" placeholder="nguyenvana@gmail.com"/>
+                <input class="input" id="email_hoc_vien" type="email"/>
               </div>
               <div>
                 <label class="label">Ngành nhập học</label>
@@ -219,10 +228,12 @@
                   <option>Quản lý xây dựng</option>
                   <option>Tài chính - Ngân hàng</option>
                   <option>Marketing</option>
+                  <option>Quản trị khách sạn</option>
+                  <option>Quản trị dịch vụ du lịch và lữ hành</option>
                 </select>
               </div>
               <div>
-                <label class="label">Đã TN trước đó</label>
+                <label class="label">Đã Tốt nghiệp trước đó</label>
                 <select class="input" id="da_tn_truoc_do">
                   <option value="">-- Chọn Đối tượng --</option>
                   <option>THPT</option><option>Trung cấp</option><option>Cao đẳng</option><option>Đại học</option>
@@ -261,28 +272,34 @@
               <input class="input" id="ghi_chu" />
             </div>
 
-            <div class="mt-6 flex gap-3 flex-wrap items-center">
-              <button id="btnSaveOrUpdate" class="btn btn-secondary">Lưu</button>
-              <span class="text-xs text-gray-500">Hoặc bấm <b>Ctrl + Enter</b> để lưu nhanh.</span>
+            <div class="mt-6 flex flex-col items-center gap-2">
+              <button id="btnSaveOrUpdate" class="btn btn-secondary min-w-[160px]">
+                Lưu
+              </button>
+              <span class="text-xs text-gray-500 text-center">
+                Hoặc bấm <b>Ctrl + Enter</b> để lưu nhanh.
+              </span>
+
+              <!-- Thông báo trạng thái lưu / cập nhật -->
+              <p id="msg" class="text-sm text-emerald-600 text-center"></p>
             </div>
-            <div id="msg" class="mt-3 text-sm text-green-700"></div>
           </section>
 
           <!-- Panel phải -->
           <aside class="card space-y-6 lg:sticky lg:top-4">
             <section>
-              <div class="section-title">Tra cứu & Chỉnh sửa hồ sơ</div>
+              <div class="section-title"><center>TRA CỨU HỒ SƠ</center></div>
 
               <label class="label">Nhập Mã Số Học Viên</label>
               <div class="flex gap-2 relative">
                 <input class="input flex-1" id="q_ma_so_hv" placeholder="VD: 2510xxxxxx" />
-                <button id="btnLoadApplicantMSHV" class="btn btn-outline">Tải</button>
+                <button id="btnLoadApplicantMSHV" class="btn-print">🔎</button>
               </div>
 
-              <label class="label mt-3 block">Hoặc Nhập Họ tên</label>
+              <label class="label mt-3 block">Nhập Họ tên</label>
               <div class="flex gap-2 relative">
-                <input class="input flex-1" id="q_ho_ten" placeholder="VD: Nguyễn Văn An" />
-                <button id="btnSearchByName" class="btn btn-outline">Tìm</button>
+                <input class="input flex-1" id="q_ho_ten" />
+                <button id="btnSearchByName" class="btn-print">🔎</button>
 
                 <!-- dropdown gợi ý theo tên -->
                 <div id="nameResults" class="absolute left-0 top-full mt-1 z-50 w-full max-h-64 overflow-auto rounded-md border bg-white shadow hidden">
@@ -291,59 +308,18 @@
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-2 mt-3">
-                <button id="btnUpdateApplicant" class="btn btn-secondary">Cập nhật</button>
-                <button id="btnDeleteApplicant" class="btn btn-outline">Xóa</button>
-
-                <!-- Modal cập nhật lý do -->
-                <div id="modalUpdateReason" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 backdrop-blur-sm">
-                  <div class="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-2xl transform transition-all scale-100">
-                    <div class="px-6 py-4 border-b flex items-center justify-between bg-blue-50 rounded-t-2xl">
-                      <div class="text-lg font-bold text-blue-800">📝 YÊU CẦU CẬP NHẬT HỒ SƠ</div>
-                      <button id="urClose" class="text-sm px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-2 focus:ring-blue-300">❌</button>
-                    </div>
-
-                    <div class="p-6 space-y-4 text-base">
-                      <div>
-                        <label for="updateReasonSelect" class="block font-semibold text-gray-800 mb-2">Yêu cầu cập nhật</label>
-                        <select id="updateReasonSelect" class="input w-full h-12 text-base">
-                          <option value="">-- Chọn lệnh bổ sung --</option>
-                          <option value="capnhat_hoso_moi">Cập nhật hồ sơ mới</option>
-                          <option value="bosung_hoso">Bổ sung hồ sơ</option>
-                          <option value="capnhat_thongtin">Cập nhật thông tin học viên</option>
-                          <option value="capnhat_chungchi">Cập nhật chứng chỉ</option>
-                          <option value="chinhsua_hoso">Chỉnh sửa hồ sơ</option>
-                          <option value="khac">Lý do khác...</option>
-                        </select>
-                      </div>
-
-                      <div id="reasonOtherWrap" class="hidden">
-                        <label for="updateReasonText" class="block font-semibold text-gray-800 mb-2">Nhập lý do khác</label>
-                        <textarea id="updateReasonText" rows="3" class="input w-full text-base" placeholder="Nhập lý do khác..."></textarea>
-                      </div>
-                    </div>
-
-                    <div class="px-6 py-4 border-t flex justify-end gap-3 bg-gray-50 rounded-b-2xl">
-                      <button id="urCancel" class="px-5 py-2 text-sm border border-gray-400 rounded-lg hover:bg-gray-100">Hủy</button>
-                      <button id="urOK" class="px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Cập nhật</button>
-                    </div>
-                  </div>
+              <!-- In -->
+              <section id="sectionPrintLoaded" class="mt-2">
+                <div class="flex gap-2">
+                  <button id="btnPrintLoadedA5" class="btn-print" disabled>In A5</button>
+                  <button id="btnPrintLoadedA4" class="btn-print" disabled>In A4</button>
                 </div>
-              </div>
+                <p id="lookupMsg" class="text-sm text-gray-600 mt-2"></p>
+              </section>
             </section>
 
-            <!-- In -->
-            <section id="sectionPrintLoaded" class="mt-2">
-              <div class="flex gap-2">
-                <button id="btnPrintLoadedA5" class="btn btn-outline" disabled>In A5</button>
-                <button id="btnPrintLoadedA4" class="btn btn-outline" disabled>In A4</button>
-              </div>
-              <p id="lookupMsg" class="text-sm text-gray-600 mt-2"></p>
-            </section>
-
-            <hr/>
-
-            <section>
+            <!-- TRỢ GIÚP: đẩy xuống dưới, có viền trên -->
+            <section class="mt-10 pt-4 border-t border-slate-200">
               <div class="section-title"><center>TRỢ GIÚP</center></div>
               <ul class="list-disc ml-5 text-sm text-gray-600 space-y-1">
                 <li>Chọn API Base rồi nhấn nút Test cho lần đầu hoặc khi đổi server.</li>
@@ -358,7 +334,6 @@
             </section>
           </aside>
         </div>
-
       </div>
     </section>
   </main>
@@ -384,21 +359,48 @@
     </div>
   </footer>
 
-  <!-- Modal Xoá -->
-  <div id="modalDel" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-2xl shadow-2xl w-[92vw] max-w-xl">
-      <div class="px-5 py-4 border-b flex items-center justify-between">
-        <div class="font-semibold">Xoá hồ sơ</div>
-        <button id="mdClose" class="btn btn-outline btn-xs">Đóng</button>
+  <!-- Modal cập nhật lý do (ĐỂ NGOÀI, NGAY DƯỚI MAIN/FOOTER) -->
+  <div id="modalUpdateReason"
+       class="fixed inset-0 bg-slate-900/50 hidden z-50 backdrop-blur-sm
+              flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-2xl transform transition-all">
+      <div class="px-6 py-4 border-b flex items-center justify-between bg-blue-50 rounded-t-2xl">
+        <div class="text-lg font-bold text-blue-800">📝 YÊU CẦU CẬP NHẬT HỒ SƠ</div>
+        <button id="urClose"
+                class="text-sm px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-2 focus:ring-blue-300">
+          ❌
+        </button>
       </div>
-      <div class="p-5 space-y-3">
-        <div id="mdTitle" class="text-sm text-slate-700"></div>
-        <label class="text-sm font-semibold text-gray-800 block mb-1">Lý do xoá (bắt buộc)</label>
-        <textarea id="mdReason" rows="4" class="input w-full" placeholder="Nhập lý do..."></textarea>
+
+      <div class="p-6 space-y-4 text-base">
+        <div>
+          <label for="updateReasonSelect" class="block font-semibold text-gray-800 mb-2">
+            Yêu cầu cập nhật
+          </label>
+          <select id="updateReasonSelect" class="input w-full h-12 text-base">
+            <option value="">-- Chọn lệnh bổ sung --</option>
+            <option value="capnhat_hoso_moi">Cập nhật hồ sơ mới</option>
+            <option value="bosung_hoso">Bổ sung hồ sơ</option>
+            <option value="capnhat_thongtin">Cập nhật thông tin học viên</option>
+            <option value="capnhat_chungchi">Cập nhật chứng chỉ</option>
+            <option value="chinhsua_hoso">Chỉnh sửa hồ sơ</option>
+            <option value="khac">Lý do khác...</option>
+          </select>
+        </div>
+
+        <div id="reasonOtherWrap" class="hidden">
+          <label for="updateReasonText" class="block font-semibold text-gray-800 mb-2">
+            Nhập lý do khác
+          </label>
+          <textarea id="updateReasonText" rows="3"
+                    class="input w-full text-base"
+                    placeholder="Nhập lý do khác..."></textarea>
+        </div>
       </div>
-      <div class="px-5 py-4 border-t flex justify-end gap-2">
-        <button id="mdCancel" class="btn btn-outline">Hủy</button>
-        <button id="mdOK" class="btn btn-secondary">OK</button>
+
+      <div class="px-6 py-4 border-t flex justify-end gap-3 bg-gray-50 rounded-b-2xl">
+        <button id="urCancel" class="btn btn-outline">Hủy</button>
+        <button id="urOK" class="btn btn-secondary">Cập nhật</button>
       </div>
     </div>
   </div>
@@ -700,7 +702,7 @@
     });
   }
 
-  /* ===== Deleted flags helper ===== */
+  /* ===== Deleted flags helper (từ server) ===== */
   function isSoftDeleted(x) {
     if (!x) return false;
     const status = String(x.status ?? x.trang_thai ?? x.trangthai ?? '').toUpperCase().trim();
@@ -890,15 +892,6 @@
     return payload;
   }
 
-  // ===== Local tombstone cho MSHV đã xoá =====
-  const TOMBSTONE_KEY = 'deleted_mshv_set_v1';
-  function getDeletedSet(){ try{ return new Set(JSON.parse(localStorage.getItem(TOMBSTONE_KEY)||'[]')); }catch{ return new Set(); } }
-  function saveDeletedSet(set){ try{ localStorage.setItem(TOMBSTONE_KEY, JSON.stringify([...set])); }catch{} }
-  function markDeleted(mshv){ const s=getDeletedSet(); s.add(String(mshv).trim()); saveDeletedSet(s); }
-  function isMarkedDeleted(mshv){ return getDeletedSet().has(String(mshv).trim()); }
-  function clearMarkedDeleted(mshv){ const s=getDeletedSet(); s.delete(String(mshv).trim()); saveDeletedSet(s); }
-
-  /* ===== Lookup / Update / Delete ===== */
   let loadedDocsByCode = {};
   function setPrintButtonsEnabled(on) { $('btnPrintLoadedA5').disabled = !on; $('btnPrintLoadedA4').disabled = !on; }
 
@@ -972,27 +965,38 @@
 
   function askUpdateReason() {
     return new Promise((resolve) => {
-      const wrap = $('modalUpdateReason');
+      const wrap   = $('modalUpdateReason');
       const select = $('updateReasonSelect');
-      const txt = $('updateReasonText');
-      const ok = $('urOK');
+      const txt    = $('updateReasonText');
+      const ok     = $('urOK');
       const cancel = $('urCancel');
-      const close = $('urClose');
+      const close  = $('urClose');
 
-      select.value = ""; txt.value = "";
-      const toggleOther = ()=>{ (select.value === 'khac') ? txt.parentElement.classList.remove('hidden') : txt.parentElement.classList.add('hidden'); };
+      select.value = "";
+      txt.value = "";
+
+      const toggleOther = () => {
+        if (select.value === 'khac') {
+          txt.parentElement.classList.remove('hidden');
+        } else {
+          txt.parentElement.classList.add('hidden');
+        }
+      };
       toggleOther();
 
-      wrap.classList.remove('hidden'); wrap.classList.add('flex');
+      wrap.classList.remove('hidden');
+      wrap.classList.add('flex');
 
       const onBackdrop = (e) => { if (e.target === wrap) done(null); };
       const onEsc = (e) => { if (e.key === 'Escape') done(null); };
+
       wrap.addEventListener('click', onBackdrop);
       document.addEventListener('keydown', onEsc);
       select.addEventListener('change', toggleOther);
 
       const done = (v) => {
-        wrap.classList.add('hidden'); wrap.classList.remove('flex');
+        wrap.classList.add('hidden');
+        wrap.classList.remove('flex');
         ok.onclick = cancel.onclick = close.onclick = null;
         wrap.removeEventListener('click', onBackdrop);
         document.removeEventListener('keydown', onEsc);
@@ -1001,27 +1005,16 @@
       };
 
       ok.onclick = () => {
-        const key = select.value;
+        const key  = select.value;
         const text = txt.value.trim();
-        if (!key) { showToast("Vui lòng chọn lý do cập nhật.", "warn"); return; }
-        if (key === "khac" && !text) { showToast("Nhập lý do khác.", "warn"); return; }
+        if (!key)  { showToast("Vui lòng chọn lý do cập nhật.", "warn"); return; }
+        if (key === "khac" && !text) {
+          showToast("Nhập lý do khác.", "warn");
+          return;
+        }
         done({ key, text });
       };
       cancel.onclick = close.onclick = () => done(null);
-    });
-  }
-
-  function askDeleteReason(title, defText=""){
-    return new Promise((resolve)=>{
-      const wrap = $('modalDel'); const titleEl = $('mdTitle'); const input = $('mdReason');
-      const ok = $('mdOK'); const cancel = $('mdCancel'); const close = $('mdClose');
-      titleEl.textContent = title || "Xoá hồ sơ này?"; input.value = defText || "";
-      wrap.classList.remove('hidden'); wrap.classList.add('flex'); input.focus();
-
-      const done = (v)=>{ wrap.classList.add('hidden'); wrap.classList.remove('flex'); ok.onclick=cancel.onclick=close.onclick=null; resolve(v); };
-      ok.onclick = ()=>{ const v = (input.value||"").trim(); if(!v){ showToast("Vui lòng nhập lý do xoá.", "warn"); input.focus(); return; } done(v); };
-      cancel.onclick = close.onclick = ()=> done(null);
-      wrap.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ e.preventDefault(); done(null); } }, { once:true });
     });
   }
 
@@ -1038,6 +1031,7 @@
     clearForm();
     $('ngay_nhan_hs').value = today;
     window.loadedApplicant = null;
+    refreshMainButtonLabel(); 
     setPrintButtonsEnabled(false);
     $('lookupMsg').textContent = "";
     $('msg').textContent = "";
@@ -1077,6 +1071,7 @@
         if (mshv) {
           const a = await loadApplicantByMSHV(mshv);
           window.loadedApplicant = { ma_so_hv: a.ma_so_hv, ma_ho_so: a.ma_ho_so };
+          refreshMainButtonLabel();
           populateFormFromApplicant(a, a.docs || []);
           setPrintButtonsEnabled(true);
           $('lookupMsg').textContent = `Đã cập nhật xong MSHV ${a.ma_so_hv}.`;
@@ -1099,7 +1094,6 @@
     }
   }
   $('btnSaveOrUpdate')?.addEventListener('click', saveOrUpdate);
-  $('btnUpdateApplicant')?.addEventListener('click', saveOrUpdate);
 
   async function createApplicant(){
     const markError = (elId, msg) => {
@@ -1162,37 +1156,9 @@
     }
 
     window.loadedApplicant = { ma_so_hv: j.ma_so_hv || body.ma_so_hv, ma_ho_so: j.ma_ho_so || body.ma_ho_so };
-    clearMarkedDeleted(window.loadedApplicant.ma_so_hv);
     setPrintButtonsEnabled(true);
     return j;
   }
-
-  async function deleteLoadedApplicant(){
-    if(!window.loadedApplicant?.ma_so_hv) { showToast("Chưa tải hồ sơ nào để xoá.", "warn"); return; }
-    const mshv = window.loadedApplicant.ma_so_hv;
-    const reason = await askDeleteReason(`Xoá tạm hồ sơ MSHV ${mshv}?`, "");
-    if (reason === null) return;
-
-    const r = await apiFetch(`/applicants/${encodeURIComponent(mshv)}`, {
-      method: "DELETE", headers: { "Content-Type":"application/json" }, body: JSON.stringify({ reason })
-    });
-    if (handleAuth(r)) return;
-
-    if (r && r.status === 204){
-      markDeleted(mshv);
-      window.loadedApplicant = null; loadedDocsByCode = {};
-      setPrintButtonsEnabled(false);
-      await clearForm();
-      $('lookupMsg').textContent = "Đã xoá hồ sơ!";
-      showToast("Đã xoá hồ sơ và ghi vào lưu trữ!", "success");
-      return;
-    }
-
-    let msg = `Xoá thất bại (HTTP ${r ? r.status : '???'})`;
-    try { const t = await r.text(); const j = JSON.parse(t); if (j?.detail) msg = j.detail; } catch(_){}
-    showToast(msg, "error", 4000);
-  }
-  $('btnDeleteApplicant')?.addEventListener('click', deleteLoadedApplicant);
 
   /* ===== Tìm theo tên ===== */
   async function searchByName(fullName) {
@@ -1468,7 +1434,7 @@
   $("btnPrintLoadedA5").onclick = async (e) => { e.preventDefault();
     const cur = window.loadedApplicant;
     if (!cur?.ma_so_hv) { showToast("Chưa tải hồ sơ nào.", "warn"); return; }
-    if (isMarkedDeleted(cur.ma_so_hv) || isSoftDeleted(cur)) { showToast("Hồ sơ đã bị xóa, không thể in!", "warn"); return; }
+    if (isSoftDeleted(cur)) { showToast("Hồ sơ đã bị xóa, không thể in!", "warn"); return; }
 
     await journalTrack({
       action: 'PRINT_IN',
@@ -1481,7 +1447,7 @@
   $("btnPrintLoadedA4").onclick = async (e) => { e.preventDefault();
     const cur = window.loadedApplicant;
     if (!cur?.ma_so_hv) { showToast("Chưa tải hồ sơ nào!", "warn"); return; }
-    if (isMarkedDeleted(cur.ma_so_hv) || isSoftDeleted(cur)) { showToast("Hồ sơ đã bị xóa, không thể in!", "warn"); return; }
+    if (isSoftDeleted(cur)) { showToast("Hồ sơ đã bị xóa, không thể in!", "warn"); return; }
 
     await journalTrack({
       action: 'PRINT_IN',
@@ -1501,22 +1467,11 @@
     try {
       let a = await loadApplicantByMSHV(mshv);
 
-      if (!isSoftDeleted(a) && !isSoftDeleted(a?.applicant)) {
-        clearMarkedDeleted(mshv);
-      } else {
-        $('lookupMsg').textContent = `MSHV ${mshv} đã bị xóa`;
-        showToast(`MSHV ${mshv} đã bị xóa`, 'warn');
-        window.loadedApplicant = null;
-        setPrintButtonsEnabled(false);
-        await clearForm();
-        return;
-      }
-
       window.loadedApplicant = { ma_so_hv: a.ma_so_hv, ma_ho_so: a.ma_ho_so };
       populateFormFromApplicant(a, a.docs || []);
       setPrintButtonsEnabled(true);
       const displayFull = a.ho_ten || joinFullName(a.ho_dem, a.ten);
-      $('lookupMsg').textContent = `Đã tải hồ sơ: ${displayFull} • Mã HS ${a.ma_ho_so} • MSHV ${a.ma_so_hv}`;
+      $('lookupMsg').textContent = `Đã tải: ${a.ma_ho_so} ➖ ${displayFull} ➖ ${a.ma_so_hv}`;
     } catch (e) {
       $('lookupMsg').textContent = e.message || 'Không tải được hồ sơ.';
       window.loadedApplicant = null;
@@ -1546,32 +1501,11 @@
     await tryPreviewMaHoSo(true);
     bindNameInputs();
     setPrintButtonsEnabled(false);
+    refreshMainButtonLabel(); 
 
     const url = new URL(window.location.href);
     const mshv = url.searchParams.get('mshv');
     if (mshv) { $('q_ma_so_hv').value = mshv; $('btnLoadApplicantMSHV').click(); }
-
-    try {
-      const bc = new BroadcastChannel('app-events');
-      bc.onmessage = (ev) => {
-        const t = ev?.data?.type;
-        const id = String(ev?.data?.mssv || '');
-        if (!id) return;
-        if (t === 'APPLICANT_RESTORED' || t === 'APPLICANT_DELETED_PERMANENT' || t === 'APPLICANT_RECREATED') {
-          clearMarkedDeleted(id);
-        }
-      };
-    } catch (_) {}
-
-    (function syncTombstoneFromStorage(){
-      try {
-        const r1 = localStorage.getItem('restored.mssv');
-        const r2 = localStorage.getItem('purged.mssv');
-        [r1, r2].filter(Boolean).forEach(id => clearMarkedDeleted(id));
-        if (r1) localStorage.removeItem('restored.mssv');
-        if (r2) localStorage.removeItem('purged.mssv');
-      } catch(_) {}
-    })();
   });
 
   // Test API & switch base
@@ -1605,6 +1539,12 @@
       }
     });
   });
+
+  function refreshMainButtonLabel() {
+    const btn = $('btnSaveOrUpdate');
+    if (!btn) return;
+    btn.textContent = window.loadedApplicant?.ma_so_hv ? 'Cập nhật' : 'Lưu';
+  }
 
 </script>
 </body>

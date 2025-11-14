@@ -43,7 +43,7 @@
         <button id="userMenuBtn"
                 class="w-full justify-between text-sm text-gray-700 bg-white hover:bg-slate-50 px-3 py-2 rounded-lg shadow border flex items-center gap-2"
                 aria-haspopup="true" aria-expanded="false" aria-controls="userMenu">
-          <span>Hi, <b id="helloName">—</b>
+          <span><b id="helloName">—</b>
             <span class="text-gray-500">(<span id="helloRole">—</span>)</span>
           </span>
           <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" class="text-gray-500" aria-hidden="true">
@@ -54,12 +54,21 @@
         </button>
 
         <div id="userMenu"
-             class="menu absolute left-4 top-[calc(100%+4px)] w-[calc(100%-2rem)] bg-white border rounded-xl shadow-lg overflow-hidden z-20"
-             role="menu">
-          <a href="/account" class="block px-4 py-2 hover:bg-gray-50 text-sm" role="menuitem">🔎 Thông tin tài khoản</a>
-          <a href="/account" class="block px-4 py-2 hover:bg-gray-50 text-sm" role="menuitem">🔐 Đổi mật khẩu</a>
+            class="menu absolute right-0 top-[calc(100%+4px)] w-48 md:w-56
+                    bg-white border rounded-lg shadow-md overflow-hidden z-20 text-xs"
+            role="menu">
+          <a href="/account"
+            class="block px-3 py-1.5 hover:bg-gray-50"
+            role="menuitem">
+            🔎 Thông tin tài khoản
+          </a>
+          <a href="/account"
+            class="block px-3 py-1.5 hover:bg-gray-50"
+            role="menuitem">
+            🔐 Đổi mật khẩu
+          </a>
           <button id="btnMenuLogout"
-                  class="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm text-red-600"
+                  class="w-full text-left px-3 py-1.5 hover:bg-gray-50 text-red-600"
                   role="menuitem">
             ↩️ Đăng xuất
           </button>

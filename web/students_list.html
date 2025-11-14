@@ -10,6 +10,11 @@
   <link rel="apple-touch-icon" href="hutech.png">
   <meta name="theme-color" content="#2563eb">
   <link rel="stylesheet" href="style.css">
+  <!-- Flatpickr datepicker -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/vn.js"></script>
    <style>
     /* Hover nhẹ logo */
     a:hover img { transform: scale(1.05); transition: transform 0.2s ease; }
@@ -57,7 +62,7 @@
           class="w-full justify-between text-sm text-gray-700 bg-white hover:bg-slate-50 px-3 py-2 rounded-lg shadow border flex items-center gap-2"
           aria-haspopup="true" aria-expanded="false" aria-controls="userMenu">
           <span>
-            Hi, <b id="helloName">—</b>
+            <b id="helloName">—</b>
             <span class="text-gray-500">(<span id="helloRole">—</span>)</span>
           </span>
           <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" class="text-gray-500" aria-hidden="true">
@@ -69,7 +74,8 @@
 
         <!-- Dropdown user -->
         <div id="userMenu"
-             class="menu absolute left-4 top-[calc(100%+4px)] w-[calc(100%-2rem)] bg-white border rounded-xl shadow-lg overflow-hidden z-20"
+             class="menu absolute right-0 top-[calc(100%+4px)] w-48 md:w-56
+            bg-white border rounded-lg shadow-md overflow-hidden z-20 text-xs"
              role="menu">
           <a href="/account" class="block px-4 py-2 hover:bg-gray-50" role="menuitem">
             🔎 Thông tin tài khoản
@@ -137,8 +143,12 @@
                   <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true">🔎</span>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                  <input id="filterDot"  class="input" placeholder="Lọc theo Đợt"  title="VD: 1 hoặc 1/2025" />
-                  <input id="filterKhoa" class="input" placeholder="Lọc theo Khóa" title="VD: 27" />
+                  <select id="filterKhoa" class="input" title="Lọc theo Khóa">
+                    <option value="">Tất cả khóa</option>
+                  </select>
+                  <select id="filterDot" class="input" title="Lọc theo Đợt">
+                    <option value="">Tất cả đợt</option>
+                  </select>
                 </div>
                 <button id="btnSearch" class="btn btn-outline shrink-0" aria-label="Tìm">🔎 Tìm</button>
               </div>
@@ -171,7 +181,7 @@
             <div class="rounded-2xl border bg-white/70 p-3 shadow-sm">
               <div class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Theo ngày</div>
               <div class="flex flex-wrap items-end gap-2">
-                <input id="day" type="date" class="input w-44" />
+                <input id="day" type="text" class="input w-60" placeholder="Chọn ngày..." />
                 <div class="ml-auto flex items-center gap-2">
                   <button id="btnPrintDay"  class="btn btn-outline">🖨️ In</button>
                   <button id="btnExportDay" class="btn btn-outline">⬇️ Xuất Excel</button>
@@ -182,8 +192,12 @@
             <div class="rounded-2xl border bg-white/70 p-3 shadow-sm">
               <div class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Theo đợt / khóa</div>
               <div class="flex flex-wrap items-end gap-2">
-                <input id="dot"     class="input w-40" placeholder="Đợt: " />
-                <input id="dotKhoa" class="input w-28" placeholder="Khóa: " />
+                <select id="dotKhoa" class="input w-40">
+                  <option value="">-- Chọn khóa --</option>
+                </select>
+                <select id="dot" class="input w-40">
+                  <option value="">-- Chọn đợt --</option>
+                </select>
                 <div class="ml-auto flex items-center gap-2">
                   <button id="btnPrintDot"  class="btn btn-outline">🖨️ In</button>
                   <button id="btnExportDot" class="btn btn-outline">⬇️ Xuất Excel</button>
@@ -469,7 +483,133 @@
       </div>
     </div>
   </div>
-</body>
+
+  <!-- Drawer xem chi tiết hồ sơ -->
+<div id="detailDrawer" class="fixed inset-0 z-[9500] hidden">
+  <!-- Nền mờ -->
+  <div class="absolute inset-0 bg-black/40" id="detailBackdrop"></div>
+
+  <!-- Panel phải -->
+  <div class="absolute right-0 top-0 h-full w-full sm:w-[520px] bg-white shadow-2xl flex flex-col">
+    <!-- Header -->
+    <div class="px-5 py-4 border-b flex items-start justify-between gap-3">
+      <div>
+        <div class="text-xs uppercase text-gray-400 tracking-wide">HỒ SƠ HỌC VIÊN</div>
+        <h3 id="detailName" class="text-lg font-semibold text-gray-900">
+          Đang tải…
+        </h3>
+        <p class="text-sm text-gray-600 mt-1">
+          MSHV: <span id="detailMSHV" class="font-mono text-gray-800">—</span>
+          • Mã HS: <span id="detailMaHS" class="font-mono text-gray-800">—</span>
+        </p>
+      </div>
+      <div class="flex flex-col items-end gap-2">
+        <span id="detailStatusBadge"
+              class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+          Đang tải…
+        </span>
+        <button id="detailCloseBtn"
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 text-gray-500"
+                aria-label="Đóng">
+          ✕
+        </button>
+      </div>
+    </div>
+
+    <!-- Nội dung -->
+    <div class="flex-1 overflow-auto px-5 py-4 space-y-4 text-sm">
+      <!-- Thông tin chung -->
+      <section class="border rounded-xl p-3 bg-gray-50/60">
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="font-semibold text-gray-800">Thông tin chung</h4>
+          <span id="detailGenderBadge"
+                class="inline-flex px-2 py-0.5 rounded-full text-[11px] bg-blue-50 text-blue-700 border border-blue-100">
+            —
+          </span>
+        </div>
+        <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+          <div><span class="text-gray-500">Họ đệm:</span> <span id="detailHoDem" class="font-medium">—</span></div>
+          <div><span class="text-gray-500">Tên:</span> <span id="detailTen" class="font-medium">—</span></div>
+          <div><span class="text-gray-500">Ngày sinh:</span> <span id="detailNgaySinh">—</span></div>
+          <div><span class="text-gray-500">Giới tính:</span> <span id="detailGioiTinh">—</span></div>
+          <div><span class="text-gray-500">Dân tộc:</span> <span id="detailDanToc">—</span></div>
+        </div>
+      </section>
+
+      <!-- Liên hệ -->
+      <section class="border rounded-xl p-3">
+        <h4 class="font-semibold text-gray-800 mb-2">Thông tin liên hệ</h4>
+        <div class="space-y-1">
+          <div><span class="text-gray-500">Số điện thoại:</span> <span id="detailSoDT" class="font-mono">—</span></div>
+          <div><span class="text-gray-500">Email học viên:</span>
+            <a id="detailEmail" href="#" class="text-blue-600 hover:underline break-all">—</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Thông tin nhập học -->
+      <section class="border rounded-xl p-3 bg-gray-50/60">
+        <h4 class="font-semibold text-gray-800 mb-2">Thông tin nhập học</h4>
+        <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+          <div><span class="text-gray-500">Ngành:</span> <span id="detailNganh" class="font-medium">—</span></div>
+          <div><span class="text-gray-500">Khóa:</span> <span id="detailKhoa" class="font-medium">—</span></div>
+          <div><span class="text-gray-500">Đợt:</span> <span id="detailDot">—</span></div>
+          <div><span class="text-gray-500">Ngày nhận HS:</span> <span id="detailNgayNhan">—</span></div>
+          <div class="col-span-2">
+            <span class="text-gray-500">Người nhận/kiểm:</span>
+            <span id="detailNguoiNhan" class="font-medium">—</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tình trạng hồ sơ -->
+      <section class="border rounded-xl p-3">
+        <div class="flex items-center justify-between mb-1.5">
+          <h4 class="font-semibold text-gray-800">Tình trạng hồ sơ</h4>
+          <span id="detailChecklistSummary" class="text-xs text-gray-500">—</span>
+        </div>
+        <ul id="detailChecklist" class="space-y-1 text-sm">
+          <!-- sẽ render từ BE -->
+          <li class="text-gray-500 italic">Đang tải danh mục hồ sơ…</li>
+        </ul>
+      </section>
+
+      <!-- Ghi chú & nhật ký -->
+      <section class="border rounded-xl p-3">
+        <h4 class="font-semibold text-gray-800 mb-2">Ghi chú</h4>
+        <p id="detailGhiChu" class="text-sm text-gray-700 whitespace-pre-line">
+          —
+        </p>
+        <div class="mt-3 text-xs text-gray-500">
+          <div>Cập nhật lần cuối: <span id="detailUpdatedAt">—</span></div>
+          <div>Người cập nhật: <span id="detailUpdatedBy">—</span></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Footer action -->
+    <div class="px-5 py-3 border-t bg-gray-50 flex items-center justify-between">
+      <button id="detailOpenEditBtn"
+              class="btn btn-outline btn-xs">
+        ✏️ Mở trang Sửa hồ sơ
+      </button>
+      <div class="flex gap-2">
+        <button id="detailPrintA5Btn" class="btn btn-soft btn-xs">🖨️ In A5</button>
+        <button id="detailPrintA4Btn" class="btn btn-primary btn-xs">🖨️ In A4</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GLOBAL LOADING OVERLAY -->
+<div id="globalLoading"
+     class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden
+            flex items-center justify-center z-[9999]">
+  <div class="bg-white px-6 py-4 rounded-xl shadow-lg text-center animate-fade">
+    <div class="loader mb-3"></div>
+    <div class="font-semibold text-gray-700">Đang tải dữ liệu, vui lòng đợi...</div>
+  </div>
+</div>
 
   <script>
     // Ẩn lúc kiểm tra login
@@ -631,23 +771,51 @@
     }
 
     function renderRows(items){
-      const tbody = $("tbody"); tbody.innerHTML = "";
+      const tbody = $("tbody"); 
+      tbody.innerHTML = "";
       (items||[]).forEach((it) => {
-        const nganh = it.nganh_nhap_hoc ?? it.nganh ?? "";
-        const khoa  = it.khoa ?? it.khoa_hoc ?? it.khoahoc ?? "";
-        const dot   = it.dot ?? it.dot_tuyen ?? "";
-        const nguoi = it.nguoi_nhan_ky_ten ?? it.nguoi_nhan ?? it.nguoi_ky ?? "";
         const mshv = it.ma_so_hv;
+
+        // ✅ THÊM 4 DÒNG NÀY
+        const nganh = it.nganh_nhap_hoc ?? it.nganh ?? "";
+        const dot   = it.dot ?? it.dot_tuyen ?? "";
+        const khoa  = it.khoa ?? it.khoa_hoc ?? it.khoahoc ?? "";
+        const nguoi = it.nguoi_nhan_ky_ten ?? it.nguoi_nhan ?? it.nguoi_ky ?? "";
+
         const tr = document.createElement("tr");
         tr.className = "row-alt";
         tr.innerHTML = `
           <td class="border-b text-center">
             <input type="checkbox" class="rowChk accent-blue-600" data-mshv="${encodeURIComponent(mshv)}" />
           </td>
-          <td class="border-b whitespace-nowrap font-medium">${dash(it.ma_ho_so)}</td>
-          <td class="border-b">${dash(it.ho_dem || '')}</td> 
-          <td class="border-b">${dash(it.ten || '')}</td>
-          <td class="border-b">${dash(mshv)}</td>
+          <td class="border-b whitespace-nowrap font-medium">
+            <button class="text-blue-700 hover:underline link-detail"
+                    data-mshv="${encodeURIComponent(mshv)}"
+                    title="Xem chi tiết hồ sơ">
+              ${dash(it.ma_ho_so)}
+            </button>
+          </td>
+          <td class="border-b">
+            <button class="text-blue-700 hover:underline link-detail"
+                    data-mshv="${encodeURIComponent(mshv)}"
+                    title="Xem chi tiết hồ sơ">
+              ${dash(it.ho_dem || '')}
+            </button>
+          </td> 
+          <td class="border-b">
+            <button class="text-blue-700 hover:underline link-detail"
+                    data-mshv="${encodeURIComponent(mshv)}"
+                    title="Xem chi tiết hồ sơ">
+              ${dash(it.ten || '')}
+            </button>
+          </td>
+          <td class="border-b">
+            <button class="text-blue-700 hover:underline font-mono link-detail"
+                    data-mshv="${encodeURIComponent(mshv)}"
+                    title="Xem chi tiết hồ sơ">
+              ${dash(mshv)}
+            </button>
+          </td>
           <td class="border-b text-center whitespace-nowrap">${dash(fmtDMY(it.ngay_nhan_hs))}</td>
           <td class="border-b">${dash(nganh)}</td>
           <td class="border-b text-center">${dash(dot)}</td>
@@ -665,12 +833,270 @@
           <td class="border-b text-center whitespace-nowrap">
             <div class="inline-flex gap-2">
               <button class="btn btn-outline btn-xs btn-pill btn-edit" data-mshv="${encodeURIComponent(mshv)}">Sửa</button>
-              <button class="btn btn-outline btn-xs btn-pill btn-del"  data-mshv="${encodeURIComponent(mshv)}">Xóa</button>
+              <button class="btn btn-outline btn-xs btn-pill btn-del text-rose-600 border border-rose-600 hover:bg-rose-600 hover:text-white" data-mshv="${encodeURIComponent(mshv)}">Xóa</button>
             </div>
           </td>`;
         tbody.appendChild(tr);
       });
-        updateBulkUI();
+
+      // ✅ Giữ nguyên phần sync checkbox + bulk
+      document.querySelectorAll('.rowChk').forEach(ch => {
+        const id = decodeURIComponent(ch.dataset.mshv || '');
+        if (id && selectedMSHV.has(id)) ch.checked = true;
+      });
+      selectedMSHV.clear();
+      updateBulkUI();
+    }
+
+    // ===== Drawer chi tiết hồ sơ =====
+    const detailDrawer = document.getElementById('detailDrawer');
+    const detailBackdrop = document.getElementById('detailBackdrop');
+    const detailCloseBtn = document.getElementById('detailCloseBtn');
+    const detailOpenEditBtn = document.getElementById('detailOpenEditBtn');
+    const detailPrintA5Btn = document.getElementById('detailPrintA5Btn');
+    const detailPrintA4Btn = document.getElementById('detailPrintA4Btn');
+
+    let currentDetailMSHV = null;
+
+    function openDetailDrawer() {
+      if (!detailDrawer) return;
+      detailDrawer.classList.remove('hidden');
+    }
+
+    function closeDetailDrawer() {
+      if (!detailDrawer) return;
+      detailDrawer.classList.add('hidden');
+      currentDetailMSHV = null;
+    }
+
+    // Đóng khi bấm nền / nút X / phím Esc
+    detailBackdrop?.addEventListener('click', closeDetailDrawer);
+    detailCloseBtn?.addEventListener('click', closeDetailDrawer);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !detailDrawer.classList.contains('hidden')) {
+        closeDetailDrawer();
+      }
+    });
+
+    // helper nhẹ
+    const $id = (id) => document.getElementById(id);
+
+    // map status -> nhiều badge
+    function setStatusBadge(app) {
+      const el = $id('detailStatusBadge');
+      if (!el) return;
+
+      const statusRaw = (app && (app.status || app.tinh_trang || '') || '')
+        .toString()
+        .toLowerCase();
+
+      const hasMaHS = !!(app && app.ma_ho_so && String(app.ma_ho_so).trim() !== '');
+
+      const printed =
+        !!(app &&
+          (app.printed === true ||
+            String(app.printed).toLowerCase() === 'true' ||
+            statusRaw === 'printed'));
+
+      const emailed =
+        !!(app &&
+          (app.email_sent === true ||
+            String(app.email_sent).toLowerCase() === 'true' ||
+            statusRaw === 'emailed' ||
+            (app.last_email_at && String(app.last_email_at).trim() !== '')));
+
+      // container
+      el.innerHTML = '';
+      el.className = 'inline-flex flex-wrap gap-1';
+
+      const badges = [];
+
+      // === 1. Badge theo status chính ===
+      if (['done', 'complete', 'đủ hồ sơ', 'du_ho_so'].includes(statusRaw)) {
+        badges.push({ text: 'Đã đủ hồ sơ', cls: 'bg-green-100 text-green-700' });
+      } else if (['missing', 'thiếu hồ sơ'].includes(statusRaw)) {
+        badges.push({ text: 'Thiếu hồ sơ', cls: 'bg-amber-100 text-amber-700' });
+      } else if (statusRaw === 'draft') {
+        badges.push({ text: 'Nháp / Chưa hoàn thành', cls: 'bg-sky-100 text-sky-700' });
+      } else if (['saved', 'new', 'created'].includes(statusRaw)) {
+        badges.push({ text: 'Đã lưu hồ sơ', cls: 'bg-sky-100 text-sky-700' });
+      } else if (statusRaw === 'printed') {
+        badges.push({ text: 'Đã in biên nhận', cls: 'bg-indigo-100 text-indigo-700' });
+      } else if (['emailed', 'email_sent', 'da_gui_email'].includes(statusRaw)) {
+        badges.push({ text: 'Đã gửi email', cls: 'bg-emerald-100 text-emerald-700' });
+      }
+
+      // Nếu hoàn toàn không có status
+      if (!badges.length) {
+        badges.push({ text: 'Chưa rõ tình trạng', cls: 'bg-slate-100 text-slate-700' });
+      }
+
+      // === 2. Badge theo mã hồ sơ ===
+      if (hasMaHS) {
+        badges.push({ text: 'Hồ sơ đã xử lý', cls: 'bg-blue-100 text-blue-700' });
+      } else {
+        badges.push({ text: 'Hồ sơ chờ xử lý', cls: 'bg-sky-100 text-sky-700' });
+      }
+
+      // === 3. Badge “Đã in biên nhận” nếu có cờ printed mà status không nói rõ ===
+      if (printed && !badges.some(b => b.text === 'Đã in biên nhận')) {
+        badges.push({ text: 'Đã in biên nhận', cls: 'bg-indigo-100 text-indigo-700' });
+      }
+
+      // === 4. Badge “Đã gửi email” nếu có log gửi email ===
+      if (emailed && !badges.some(b => b.text === 'Đã gửi email')) {
+        badges.push({ text: 'Đã gửi email', cls: 'bg-purple-100 text-purple-700' });
+      }
+
+      // render tất cả badge
+      badges.forEach(b => {
+        const span = document.createElement('span');
+        span.className =
+          'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ' + b.cls;
+        span.textContent = b.text;
+        el.appendChild(span);
+      });
+    }
+
+    function fillDetailDrawer(app) {
+      if (!app) app = {};
+
+      const fullName =
+        app.full_name ||
+        (app.ho_ten || `${app.ho_dem || ''} ${app.ten || ''}`).trim();
+
+      $id('detailName').textContent = fullName || '—';
+      $id('detailMSHV').textContent = app.ma_so_hv || '—';
+      $id('detailMaHS').textContent = app.ma_ho_so || '—';
+
+      // Họ đệm / Tên
+      $id('detailHoDem').textContent = app.ho_dem || '—';
+      $id('detailTen').textContent   = app.ten    || '—';
+
+      // Ngày sinh / giới tính / dân tộc
+      $id('detailNgaySinh').textContent = fmtDMY(app.ngay_sinh) || '—';
+      $id('detailGioiTinh').textContent = app.gioi_tinh || '—';
+      $id('detailDanToc').textContent   = app.dan_toc   || '—';
+
+      // Liên hệ
+      $id('detailSoDT').textContent = app.so_dt || app.so_dien_thoai || '—';
+
+      const email = app.email_hoc_vien || app.email || '';
+      const emailEl = $id('detailEmail');
+      if (emailEl) {
+        if (email) {
+          emailEl.textContent = email;
+          emailEl.href = 'mailto:' + email;
+        } else {
+          emailEl.textContent = '—';
+          emailEl.removeAttribute('href');
+        }
+      }
+
+      // Nhập học
+      $id('detailNganh').textContent =
+        app.nganh_nhap_hoc || app.nganh || '—';
+      $id('detailKhoa').textContent =
+        app.khoa || app.khoa_hoc || app.khoahoc || '—';
+      $id('detailDot').textContent =
+        app.dot || app.dot_tuyen || '—';
+      $id('detailNgayNhan').textContent = fmtDMY(app.ngay_nhan_hs) || '—';
+      $id('detailNguoiNhan').textContent =
+        app.nguoi_nhan_ky_ten || app.nguoi_nhan || app.nguoi_ky || '—';
+
+      // Ghi chú + nhật ký
+      $id('detailGhiChu').textContent = app.ghi_chu || '';
+
+      $id('detailUpdatedAt').textContent =
+        app.updated_at ? fmtDMY(app.updated_at) : '—';
+      $id('detailUpdatedBy').textContent =
+        app.updated_by || '—';
+
+      // Badge giới tính góc trên
+      const g = (app.gioi_tinh || '').toString().toLowerCase();
+      const gEl = $id('detailGenderBadge');
+      if (gEl) {
+        let txt = '—';
+        if (g === 'nam') txt = 'Nam';
+        else if (g === 'nữ' || g === 'nu') txt = 'Nữ';
+        else if (g) txt = app.gioi_tinh;
+        gEl.textContent = txt;
+      }
+
+      // Trạng thái hồ sơ (status)
+      setStatusBadge(app);
+
+      // Checklist hồ sơ
+      const checklistWrap = $id('detailChecklist');
+      const checklistSummary = $id('detailChecklistSummary');
+      if (checklistWrap) {
+        checklistWrap.innerHTML = '';
+        const list = app.checklist || [];
+        if (!list.length) {
+          checklistWrap.innerHTML =
+            '<li class="text-gray-500 italic">Chưa có dữ liệu checklist.</li>';
+          if (checklistSummary) checklistSummary.textContent = '—';
+        } else {
+          let done = 0;
+          list.forEach(item => {
+            const ok = item.done || item.da_nop || item.completed;
+            if (ok) done++;
+            const li = document.createElement('li');
+            li.className = 'flex items-center gap-2';
+            li.innerHTML = `
+              <span class="inline-flex w-4 h-4 rounded-full border flex-shrink-0
+                          ${ok ? 'bg-green-500 border-green-500' : 'border-gray-300'}">
+                ${ok ? '<span class="m-auto text-[10px] text-white">✓</span>' : ''}
+              </span>
+              <span class="${ok ? 'text-gray-800' : 'text-gray-600'}">
+                ${item.label || item.ten || item.name || ''}
+              </span>`;
+            checklistWrap.appendChild(li);
+          });
+
+          if (checklistSummary) {
+            checklistSummary.textContent = `${done}/${list.length} mục đã có`;
+          }
+        }
+      }
+    }
+
+    // Gọi API lấy chi tiết
+    async function openDetailByMSHV(mshv) {
+      try {
+        currentDetailMSHV = mshv;
+
+        // set UI "loading"
+        $id('detailName').textContent = 'Đang tải...';
+        $id('detailMSHV').textContent = mshv;
+        $id('detailMaHS').textContent = '—';
+        $id('detailStatusBadge').textContent = 'Đang tải...';
+        $id('detailStatusBadge').className =
+          'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700';
+
+        openDetailDrawer();
+
+        // Anh có thể đổi endpoint này cho khớp BE:
+        const r = await apiFetch(`/applicants/by-mshv/${encodeURIComponent(mshv)}`);
+        if (!r || !r.ok) {
+          let msg = `Không lấy được chi tiết hồ sơ (HTTP ${r?.status || '???'})`;
+          try {
+            const t = await r.text();
+            const j = JSON.parse(t);
+            if (j?.detail) msg = j.detail;
+          } catch {}
+          showToast(msg, 'error');
+          return;
+        }
+
+        const data = await r.json();
+        // nếu BE trả kiểu {applicant: {...}} thì đổi thành data.applicant
+        const app = data.applicant || data;
+
+        fillDetailDrawer(app);
+      } catch (e) {
+        showToast(e.message || 'Lỗi tải chi tiết hồ sơ', 'error');
+      }
     }
 
     // ===== Toast helper =====
@@ -801,8 +1227,9 @@
             }
           });
 
-          const url = a5 ? `/print/a5/${encodeURIComponent(mshv)}`
-                        : `/print/a4/${encodeURIComponent(mshv)}`;
+          const url = a5
+            ? `/applicants/${encodeURIComponent(mshv)}/print-a5`
+            : `/applicants/${encodeURIComponent(mshv)}/print`;
           await openPdfOrAlert(url);
           return;
         }
@@ -1068,10 +1495,51 @@
 
     async function buildSourceFull(){
       state.cacheAll = (await fetchUpTo(5000)).filter(notDeleted);
+
+      // 🔹 Lần đầu có dữ liệu thì build dropdown Đợt/Khóa
+      if (!filterOptionsBuilt) {
+        buildFilterOptions(state.cacheAll);
+      }
+
       const wantFilter = $("filterDot").value.trim() !== "" || $("filterKhoa").value.trim() !== "";
       let list = wantFilter ? applyClientFilters(state.cacheAll) : state.cacheAll.slice();
       list = applySort(list);
       return list;
+    }
+
+    let filterOptionsBuilt = false;
+
+    // Tạo options cho các dropdown Đợt / Khóa từ danh sách hồ sơ
+    function buildFilterOptions(list) {
+      const dotSet  = new Set();
+      const khoaSet = new Set();
+
+      (list || []).forEach(it => {
+        const dot  = (it.dot ?? it.dot_tuyen ?? '').toString().trim();
+        const khoa = (it.khoa ?? it.khoa_hoc ?? it.khoahoc ?? '').toString().trim();
+        if (dot)  dotSet.add(dot);
+        if (khoa) khoaSet.add(khoa);
+      });
+
+      const filterDotSel   = document.getElementById('filterDot');   // lọc trên danh sách
+      const filterKhoaSel  = document.getElementById('filterKhoa');  // lọc trên danh sách
+      const dotSel         = document.getElementById('dot');         // xuất theo đợt
+      const dotKhoaSel     = document.getElementById('dotKhoa');     // xuất theo khóa
+
+      const dots  = Array.from(dotSet).sort();
+      const khoas = Array.from(khoaSet).sort();
+
+      const buildOpts = (arr, firstLabel) =>
+        `<option value="">${firstLabel}</option>` +
+        arr.map(v => `<option value="${v}">${v}</option>`).join('');
+
+      if (filterDotSel)  filterDotSel.innerHTML  = buildOpts(dots,  'Tất cả đợt');
+      if (dotSel)        dotSel.innerHTML        = buildOpts(dots,  '-- Chọn đợt --');
+
+      if (filterKhoaSel) filterKhoaSel.innerHTML = buildOpts(khoas, 'Tất cả khóa');
+      if (dotKhoaSel)    dotKhoaSel.innerHTML    = buildOpts(khoas, '-- Chọn khóa --');
+
+      filterOptionsBuilt = true;
     }
 
     async function runSearch(){
@@ -1123,28 +1591,77 @@
     // ===== File helpers =====
     async function fetchFileOrAlert(url, filename, type = "excel"){
       const resp = await fetch(makeUrl(url), { credentials: "include" });
+
       if (!resp.ok){
-        let msg = `Không thể ${type === "pdf" ? "in" : "xuất"} (HTTP ${resp.status})`;
-        try { const t = await resp.text(); const j = JSON.parse(t); if (j?.detail) msg = j.detail; } catch(_){}
-        alert(msg);
+        let msg;
+        try {
+          const t = await resp.text();
+          const j = JSON.parse(t);
+
+          if (j?.detail && j.detail !== 'Not Found') {
+            // BE có message tiếng Việt thì ưu tiên
+            msg = j.detail;
+          } else if (resp.status === 404) {
+            msg = `Không tìm thấy dữ liệu phù hợp để ${
+              type === 'pdf' ? 'in' : 'xuất'
+            } Trong thời gian này!`;
+          } else {
+            msg = `Không thể ${
+              type === 'pdf' ? 'in' : 'xuất'
+            } (HTTP ${resp.status}).`;
+          }
+        } catch(_){
+          msg = `Không thể ${
+            type === 'pdf' ? 'in' : 'xuất'
+          } (HTTP ${resp.status}).`;
+        }
+
+        if (typeof showToast === 'function') {
+          showToast(msg, 'error', 2800);
+        } else {
+          alert(msg);
+        }
         return;
       }
+
       const blob = await resp.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = filename;
-      document.body.appendChild(a); a.click(); a.remove();
+      document.body.appendChild(a); 
+      a.click(); 
+      a.remove();
       setTimeout(()=>URL.revokeObjectURL(a.href), 60000);
     }
 
     async function openPdfOrAlert(url){
       const resp = await fetch(makeUrl(url), { credentials: "include" });
+
       if (!resp.ok){
-        let msg = `Không thể in (HTTP ${resp.status})`;
-        try { const t = await resp.text(); const j = JSON.parse(t); if (j?.detail) msg = j.detail; } catch(_){}
-        alert(msg);
+        let msg;
+        try {
+          const t = await resp.text();
+          const j = JSON.parse(t);
+
+          if (j?.detail && j.detail !== 'Not Found') {
+            msg = j.detail;
+          } else if (resp.status === 404) {
+            msg = 'Không có dữ liệu để in. Vui lòng kiểm tra lại ngày/đợt hoặc bộ lọc.';
+          } else {
+            msg = `Không thể in (HTTP ${resp.status}).`;
+          }
+        } catch(_){
+          msg = `Không thể in (HTTP ${resp.status}).`;
+        }
+
+        if (typeof showToast === 'function') {
+          showToast(msg, 'error', 2800);
+        } else {
+          alert(msg);
+        }
         return;
       }
+
       const blob = await resp.blob();
       const u = URL.createObjectURL(blob);
       window.open(u, "_blank");
@@ -1152,23 +1669,70 @@
     }
 
     // ===== Export/In ấn theo ngày/đợt =====
-    // ---- Theo ngày
+    // ---- Theo NGÀY
     const dayEl = $("day");
     if (dayEl) {
-      dayEl.value = new Date().toISOString().slice(0,10);
-
-      $("btnExportDay")?.addEventListener("click", async () => {
-        const d = $("day").value;
-        if (!d){ alert("Chọn ngày trước đã"); return; }
-        await journalTrack({ action:'EXPORT', detail:{ scope:'DAY', filters:{ day:d }, name_mode:'split', count:null }});
-        await fetchFileOrAlert(`/export/excel?day=${encodeURIComponent(d)}&name=split`, `tong_ngay_${d}.xlsx`, "excel");
+      // Khởi tạo Flatpickr
+      flatpickr(dayEl, {
+        locale: "vn",              // tiếng Việt
+        dateFormat: "Y-m-d",       // giá trị thực gửi về BE
+        altInput: true,            // ô hiển thị đẹp
+        altFormat: "d/m/Y",        // hiển thị cho người dùng
+        altInputClass: "input w-60",
+        defaultDate: new Date(),
+        allowInput: true
       });
 
+      // Nút Xuất Excel theo ngày
+      $("btnExportDay")?.addEventListener("click", async () => {
+        const day = dayEl.value.trim();        // format Y-m-d
+        if (!day) {
+          alert("Anh chọn ngày trước đã.");
+          return;
+        }
+        showLoading("Đang tải dữ liệu xuất, vui lòng đợi...");
+
+        await journalTrack({
+          action: "EXPORT",
+          detail: {
+            scope: "DAY",
+            filters: { day },
+            name_mode: "split",
+            count: null
+          }
+        });
+
+        const url = `/export/excel?day=${encodeURIComponent(day)}&name=split`;
+        await fetchFileOrAlert(
+          url,
+          `tong_ngay_${day}.xlsx`,
+          "excel"
+        );
+        hideLoading(); 
+      });
+
+      // Nút In theo ngày
       $("btnPrintDay")?.addEventListener("click", async () => {
-        const d = $("day").value;
-        if (!d){ alert("Chọn ngày trước đã"); return; }
-        await journalTrack({ action:'PRINT_IN', detail:{ scope:'DAY', filters:{ day:d }, name_mode:'default', count:null }});
-        await openPdfOrAlert(`/batch/print?day=${encodeURIComponent(d)}`);
+        const day = dayEl.value.trim();
+        if (!day) {
+          alert("Anh chọn ngày trước đã.");
+          return;
+        }
+        showLoading("Đang tải dữ liệu in, vui lòng đợi..."); 
+
+        await journalTrack({
+          action: "PRINT_IN",
+          detail: {
+            scope: "DAY",
+            filters: { day },
+            name_mode: "default",
+            count: null
+          }
+        });
+
+         const url = `/batch/print?day=${encodeURIComponent(day)}`;
+        await openPdfOrAlert(url);
+        hideLoading(); 
       });
     }
 
@@ -1179,22 +1743,26 @@
         const dot  = $("dot").value.trim();
         const khoa = $("dotKhoa")?.value.trim() || "";
         if (!dot){ alert("Nhập tên đợt trước đã"); return; }
+        showLoading("Đang tải dữ liệu in, vui lòng đợi...");
 
         await journalTrack({ action:'EXPORT', detail:{ scope:'DOT', filters:{ dot, ...(khoa?{khoa}:{}) }, name_mode:'split', count:null }});
         let url = `/export/excel-dot?dot=${encodeURIComponent(dot)}&name=split`;
         if (khoa) url += `&khoa=${encodeURIComponent(khoa)}`;
         await fetchFileOrAlert(url, `tong_dot_${dot}${khoa?`_khoa_${khoa}`:""}.xlsx`, "excel");
+        hideLoading(); 
       });
 
       $("btnPrintDot")?.addEventListener("click", async () => {
         const dot  = $("dot").value.trim();
         const khoa = $("dotKhoa")?.value.trim() || "";
         if (!dot){ alert("Nhập tên đợt trước đã"); return; }
+        showLoading("Đang tải dữ liệu xuất, vui lòng đợi...");
 
         await journalTrack({ action:'PRINT_IN', detail:{ scope:'DOT', filters:{ dot, ...(khoa?{khoa}:{}) }, name_mode:'default', count:null }});
         let url = `/batch/print-dot?dot=${encodeURIComponent(dot)}`;
         if (khoa) url += `&khoa=${encodeURIComponent(khoa)}`;
         await openPdfOrAlert(url);
+        hideLoading(); 
       });
     }
 
@@ -1228,10 +1796,10 @@
 
     // Lọc client theo đợt/khóa (debounce)
     ["filterDot","filterKhoa"].forEach(id=>{
-      $(id).addEventListener("input", debounce(async ()=>{
+      $(id).addEventListener("change", async ()=>{
         state.page = 1;
         await runSearch();
-      }, 250));
+      });
     });
 
     // ===== init =====
@@ -1432,6 +2000,25 @@
     XLSX.writeFile(wb, "batch_update_template.xlsx");
   }
   document.getElementById("btnDownloadTemplate")?.addEventListener("click", downloadXlsxTemplate);
+
+  // ===== Toggle khối "TOOL EDIT INFO • Excel" =====
+  (function bindExcelToggle(){
+    const btn = document.getElementById('btnExcelToggle');
+    const box = document.getElementById('excelBox');
+    if (!btn || !box) return;
+
+    btn.addEventListener('click', () => {
+      const isHidden = box.classList.contains('hidden');
+      // đảo trạng thái
+      box.classList.toggle('hidden', !isHidden);
+
+      // cập nhật aria-expanded + text nút cho dễ hiểu
+      btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+      btn.textContent = isHidden
+        ? '⬆️ Thu gọn khu Excel'
+        : '⚙️ Cập nhật từ Excel';
+    });
+  })();
 
   // Đọc file XLSX
   async function readFileToRows(file){
@@ -1820,6 +2407,15 @@ document.addEventListener('click', (e) => {
   if (mshv) openEmailModal(mshv);
 });
 
+// Bắt click vào các nút xem chi tiết
+document.addEventListener('click', (e) => {
+  const btnDetail = e.target.closest('.link-detail');
+  if (!btnDetail) return;
+  const mshv = decodeURIComponent(btnDetail.dataset.mshv || '');
+  if (!mshv) return;
+  openDetailByMSHV(mshv);
+});
+
 // ===== Nút Gửi trong modal =====
 async function sendEmail(){
   const mshv   = $('email_mshv')?.value.trim();
@@ -2009,6 +2605,45 @@ $('btnSendBulk')?.addEventListener('click', async ()=>{
     }
   });
 })();
+
+// Nút mở trang Sửa hồ sơ
+detailOpenEditBtn?.addEventListener('click', () => {
+  if (!currentDetailMSHV) return;
+  // Dùng COMPOSE_BASE đã detect sẵn
+  location.href = `${COMPOSE_BASE}?mshv=${encodeURIComponent(currentDetailMSHV)}&action=edit`;
+});
+
+// Nút In A5 / A4 (reuse logic hiện tại)
+detailPrintA5Btn?.addEventListener('click', async () => {
+  if (!currentDetailMSHV) return;
+  await journalTrack({
+    action: 'PRINT_IN',
+    detail: { scope:'SINGLE', filters:{ mshv: currentDetailMSHV }, name_mode:'A5', count:1 }
+  });
+  await openPdfOrAlert(`/print/a5/${encodeURIComponent(currentDetailMSHV)}`);
+});
+
+detailPrintA4Btn?.addEventListener('click', async () => {
+  if (!currentDetailMSHV) return;
+  await journalTrack({
+    action: 'PRINT_IN',
+    detail: { scope:'SINGLE', filters:{ mshv: currentDetailMSHV }, name_mode:'A4', count:1 }
+  });
+  await openPdfOrAlert(`/print/a4/${encodeURIComponent(currentDetailMSHV)}`);
+});
+
+function showLoading(msg = "Đang tải dữ liệu, vui lòng đợi...") {
+  const box = document.getElementById("globalLoading");
+  if (!box) return;
+  box.classList.remove("hidden");
+  box.querySelector("div div:last-child").textContent = msg;
+}
+
+function hideLoading() {
+  const box = document.getElementById("globalLoading");
+  if (!box) return;
+  box.classList.add("hidden");
+}
 
 </script>
 </body>

@@ -293,11 +293,8 @@ def send_email_generic(
     missing_list = [d["name"] for d in docs_email if int(d.get("so_luong") or 0) <= 0]
     has_missing = bool(missing_list)
 
-
     if tpl == "confirmation" and attach_receipt:
-        # >>> thêm chuẩn hoá:
         docs_for_pdf = _normalize_docs_for_pdf(docs_ctx)
-
         pdf_path = pdf_service.save_receipt_pdf_file(
             a=a, items=items, docs=docs_for_pdf, a5=a5, out_dir=settings.RECEIPTS_DIR
         )
@@ -317,9 +314,9 @@ def send_email_generic(
                 "nganh": getattr(a, "nganh_nhap_hoc", None) or getattr(a, "nganh", None),
             },
             "org_name": "Viện Hợp tác và Phát triển Đào tạo",
-            "docs": docs_email,   # <<<<<< CHÍNH
-            "has_missing": has_missing,       # <<< THÊM
-            "missing_list": missing_list,     # <<< THÊM
+            "docs": docs_email,
+            "has_missing": has_missing,
+            "missing_list": missing_list,
         },
     )
 
@@ -351,7 +348,17 @@ def send_email_generic(
             session.close()
 
     bg.add_task(_task, a.ma_so_hv, to_email, subj, html, att_paths)
-    return {"ok": True, "ma_so_hv": a.ma_so_hv, "template": tpl}
+
+    # 🔵 THÊM ĐOẠN NÀY: cập nhật trạng thái đã gửi email
+    a.status = "emailed"          # hoặc "email_sent" tuỳ anh thích
+    db.commit()
+
+    return {
+        "ok": True,
+        "ma_so_hv": a.ma_so_hv,
+        "template": tpl,
+        "status": a.status,       # trả về cho FE nếu muốn xài luôn
+    }
 
 # ---------- Batch ----------
 @router.post("/send-email-batch")
@@ -392,9 +399,9 @@ def send_email_batch(
                             "nganh": getattr(a, "nganh_nhap_hoc", None) or getattr(a, "nganh", None),
                         },
                         "org_name": "Viện Hợp tác và Phát triển Đào tạo",
-                        "docs": docs_email,  # <<<<<< CHÍNH
-                        "has_missing": has_missing,       # <<< THÊM
-                        "missing_list": missing_list,     # <<< THÊM
+                        "docs": docs_email,
+                        "has_missing": has_missing,
+                        "missing_list": missing_list,
                     },
                 )
 
@@ -407,6 +414,11 @@ def send_email_batch(
                     subject=subj,
                     success=True,
                 ))
+
+                # 🔵 THÊM: set trạng thái đã gửi email cho từng hồ sơ
+                a.status = "emailed"
+                session.add(a)
+
                 session.commit()
         finally:
             session.close()

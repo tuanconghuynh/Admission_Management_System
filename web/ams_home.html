@@ -42,7 +42,7 @@
         <button id="userMenuBtn"
           class="w-full justify-between text-sm text-gray-700 bg-white hover:bg-slate-50 px-3 py-2 rounded-lg shadow border flex items-center gap-2"
           aria-haspopup="true" aria-expanded="false" aria-controls="userMenu">
-          <span>Hi, <b id="helloName">—</b>
+          <span><b id="helloName">—</b>
             <span class="text-gray-500">(<span id="helloRole">—</span>)</span>
           </span>
           <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" class="text-gray-500" aria-hidden="true">
@@ -85,14 +85,17 @@
     <section class="flex-1 flex items-start justify-center">
       <div class="max-w-7xl mx-auto px-6 py-6 w-full" id="pageContent">
         <!-- Chào -->
-        <section>
-          <h2 class="text-2xl font-bold text-gray-800">
-            Xin chào, <span id="dashName" class="text-blue-700 font-extrabold">—</span> 👋
+        <div class="aurora-small">
+          <!-- Sticker vẩy vẩy -->
+          <span class="aurora-sticker">👋</span>
+
+          <h2 class="aurora-title">
+            Xin chào, <span id="dashName"></span> 
           </h2>
-          <p class="text-gray-600 mt-1">
+          <p class="aurora-sub">
             Chúc bạn một ngày làm việc hiệu quả.
           </p>
-        </section>
+        </div>
 
         <!-- Thống kê tổng quan -->
         <section class="mt-6">
@@ -680,18 +683,23 @@
   // Gọi dashboard
   loadDashboardStats();
 
-  /* ===== Session hết hạn -> toast/alert ===== */
+    /* ===== Login thành công -> toast ===== */
   (function () {
-    const params = new URLSearchParams(location.search);
-    const byQuery = params.get('expired') === '1';
-    const byCookie = document.cookie.split(';').some(c => c.trim().startsWith('__session_expired=1'));
-    if (byQuery || byCookie) {
-      if (typeof showToast === 'function') showToast('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.','warn',4500);
-      else alert('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
-      document.cookie = '__session_expired=; Max-Age=0; Path=/; SameSite=Lax';
+    // kiểm tra cookie báo login thành công
+    const hasLoginCookie = document.cookie
+      .split(';')
+      .some(c => c.trim().startsWith('__login_success=1'));
+
+    if (hasLoginCookie) {
+      if (typeof showToast === 'function') {
+        showToast('Đăng nhập thành công ✅', 'success', 3500);
+      }
+
+      // xoá cookie để chỉ hiện 1 lần
+      document.cookie = '__login_success=; Max-Age=0; Path=/; SameSite=Lax';
     }
   })();
-</script>
 
+</script>
 </body>
 </html>

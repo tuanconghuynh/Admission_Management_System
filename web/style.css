@@ -386,7 +386,7 @@ select.input::-ms-expand{display:none;}
   100%{ transform:translateX(100%); }
 }
 
-/* ====== Dropdown menu (Hi, user…) ======================================= */
+/* ====== Dropdown menu base (hiện/ẩn) ==================================== */
 .menu{
   opacity:0;
   transform:translateY(-4px);
@@ -601,4 +601,433 @@ select.input::-ms-expand{display:none;}
 .quick-desc{
   font-size:.875rem;
   color:#6b7280;
+}
+
+/* Khung aurora ôm sát chữ */
+.aurora-small {
+  position: relative;
+  display: inline-block;
+  padding: 14px 22px;
+  border-radius: 16px;
+  z-index: 0;
+
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  overflow: hidden;
+}
+
+/* Viền neon chạy */
+.aurora-small::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 18px;
+  background: linear-gradient(
+    135deg,
+    #ff0080,
+    #ff66cc,
+    #66ccff,
+    #0099ff,
+    #8a2be2,
+    #ff0080
+  );
+  background-size: 300%;
+  animation: auroraBorder 6s linear infinite;
+  z-index: -1;
+}
+
+/* Lớp nền trắng bên trong */
+.aurora-small::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 14px;
+  z-index: -1;
+}
+
+/* Animation chạy viền */
+@keyframes auroraBorder {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position:   0% 50%; }
+}
+
+/* Tiêu đề gradient */
+.aurora-title {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin: 0;
+
+  background: linear-gradient(135deg, #2563eb, #ff0080);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* Sub text */
+.aurora-sub {
+  font-size: 0.9rem;
+  margin-top: 4px;
+  color: #555;
+}
+
+/* Sticker cute vẩy vẩy ở góc khung */
+.aurora-sticker {
+  position: absolute;
+  top: -10px;
+  right: -6px;
+
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 1.4rem;
+
+  background: radial-gradient(circle at 30% 20%, #ffffff, #ffe4f7 45%, #dbeafe 90%);
+  box-shadow:
+    0 8px 20px rgba(15, 23, 42, 0.25),
+    0 0 18px rgba(248, 113, 113, 0.5);
+
+  transform-origin: 30% 50%;
+  animation: stickerWiggle 1.2s ease-in-out infinite;
+}
+
+/* Animation vẩy vẩy */
+@keyframes stickerWiggle {
+  0%   { transform: translateY(0) rotate(0deg); }
+  15%  { transform: translateY(-1px) rotate(-10deg); }
+  30%  { transform: translateY(1px) rotate(8deg); }
+  45%  { transform: translateY(-1px) rotate(-6deg); }
+  60%  { transform: translateY(0) rotate(4deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+/* ==== User box + dropdown (sidebar) ===================================== */
+
+#userMenuBtn {
+  position: relative;
+  overflow: hidden;
+  background: transparent !important;
+  border-radius: 14px !important;
+  border: 1px solid transparent !important;
+  padding: .5rem .7rem;
+  box-shadow:
+    0 8px 22px rgba(15, 23, 42, 0.12),
+    0 0 0 2px rgba(59, 130, 246, 0.12);
+  font-weight: 600;
+  color: #0f172a;
+  backdrop-filter: blur(6px);
+  transition: all .18s ease;
+  justify-content: space-between; 
+}
+
+#userMenuBtn::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 14px;
+  background: linear-gradient(
+    135deg,
+    #60a5fa,
+    #a78bfa,
+    #fb7185,
+    #60a5fa
+  );
+  background-size: 300%;
+  animation: userAurora 6s linear infinite;
+  z-index: -1;
+}
+
+#userMenuBtn::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(8px);
+  z-index: -1;
+}
+
+/* Hover hiệu ứng nổi rõ hơn */
+#userMenuBtn:hover {
+  box-shadow:
+    0 10px 26px rgba(15, 23, 42, 0.16),
+    0 0 0 3px rgba(37, 99, 235, 0.25);
+  transform: translateY(-1px);
+}
+
+/* Layout tên + role: 2 dòng */
+#userMenuBtn > span {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;   /* căn giữa theo trục ngang */
+  justify-content: center;
+  text-align: center;    /* chữ nằm giữa */
+  line-height: 1.15;
+}
+
+/* Username nổi bật */
+#helloName {
+  color: #1d4ed8;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+/* Role nhỏ, nhẹ */
+#helloRole {
+  font-size: 0.78rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+/* Icon mũi tên xoay khi mở dropdown */
+#userMenuBtn svg {
+  opacity: .7;
+  transition: transform .2s ease, opacity .2s ease;
+}
+#userMenuBtn:hover svg {
+  opacity: 1;
+}
+#userMenuBtn[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+/* Dropdown user – glass, bo tròn, đổ bóng */
+#userMenu {
+  margin-top: 0.4rem;
+  padding: 0.35rem 0;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 14px 35px rgba(15, 23, 42, 0.22);
+}
+
+/* Item trong dropdown */
+#userMenu a,
+#userMenu button {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  color: #111827;
+  border: 0;
+  background: transparent;
+}
+
+/* Viền mảnh giữa các dòng */
+#userMenu a + a,
+#userMenu a + button,
+#userMenu button + button {
+  border-top: 1px dashed #e5e7eb;
+}
+
+/* Hover */
+#userMenu a:hover,
+#userMenu button:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+/* Đăng xuất – màu đỏ riêng */
+#btnMenuLogout {
+  color: #dc2626 !important;
+  font-weight: 600;
+}
+#btnMenuLogout:hover {
+  background: #fef2f2 !important;
+  color: #b91c1c !important;
+}
+
+@keyframes userAurora {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ==== FLATPICKR GALAXY THEME (PINK → PURPLE → BLUE) ==== */
+
+/* Header calendar */
+.flatpickr-months {
+  background: linear-gradient(135deg,
+    #ec4899 0%,   /* Pink */
+    #a855f7 45%,  /* Purple */
+    #3b82f6 100%  /* Blue */
+  );
+  color: white;
+  border-radius: 12px 12px 0 0;
+  padding-bottom: 6px;
+}
+
+/* Month dropdown */
+.flatpickr-monthDropdown-months,
+.flatpickr-current-month input.cur-year {
+  color: white !important;
+  font-weight: 600;
+}
+
+/* Arrows */
+.flatpickr-prev-month,
+.flatpickr-next-month {
+  fill: white !important;
+  color: white !important;
+  opacity: 0.9;
+}
+
+.flatpickr-prev-month:hover,
+.flatpickr-next-month:hover {
+  opacity: 1;
+}
+
+/* Weekdays */
+.flatpickr-weekdays {
+  background: rgba(0,0,0,0.03);
+}
+
+.flatpickr-weekday {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Calendar container */
+.flatpickr-calendar {
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.15);
+  border-radius: 12px;
+}
+
+/* Day cells */
+.flatpickr-day {
+  border-radius: 8px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.flatpickr-day:hover {
+  background: rgba(168, 85, 247, 0.2);  /* Purple glow */
+  color: #6d28d9;
+}
+
+/* Selected date */
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange {
+  background: linear-gradient(135deg,
+    #ec4899,
+    #a855f7,
+    #3b82f6
+  ) !important;
+  color: white !important;
+  border: none !important;
+}
+
+/* Today highlight */
+.flatpickr-day.today {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6 !important;
+  color: #010713 !important;
+  font-weight: 700;
+}
+
+/* Footer */
+.flatpickr-calendar .flatpickr-footer {
+  background: #fafafa;
+  padding: 8px 10px;
+}
+
+.flatpickr-clear,
+.flatpickr-today {
+  color: #a855f7 !important;
+  font-weight: 600;
+}
+
+.flatpickr-clear:hover,
+.flatpickr-today:hover {
+  text-decoration: underline;
+}
+
+/* Lock animation (fade nhẹ) */
+.animate-fade {
+  animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Loader spin */
+.loader {
+  width: 18px;
+  height: 18px;
+  border: 3px solid #e5e7eb;      /* xám nhạt */
+  border-top-color: #2563eb;      /* xanh HUTECH/tailwind blue-600 */
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Wrapper cho dòng đang tải */
+.msg-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;        /* text-sm */
+  color: #2563eb;             /* xanh */
+}
+
+/* Ẩn nút cập nhật cũ, chỉ dùng nút chính giữa form */
+#btnUpdateApplicant {
+  display: none;
+}
+
+/* Nút XÓA pastel đỏ mịn */
+.btn-delete {
+  background: linear-gradient(135deg, #fecaca, #f87171);
+  color: #7f1d1d;
+  border: 1px solid #fca5a5;
+  border-radius: 12px;
+  padding: .6rem 1rem;
+  font-weight: 600;
+  box-shadow: 0 8px 20px rgba(244,63,94,0.18);
+  transition: .18s ease;
+}
+
+.btn-delete:hover {
+  background: linear-gradient(135deg, #fca5a5, #ef4444);
+  color: white;
+  box-shadow: 0 10px 25px rgba(239,68,68,0.28);
+  transform: translateY(-1px);
+}
+
+/* Nút IN pastel xanh tím */
+.btn-print {
+  background: linear-gradient(135deg, #bfdbfe, #c4b5fd);
+  color: #1e3a8a;
+  border: 1px solid #a5b4fc;
+  padding: .45rem 1rem;
+  border-radius: 12px;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(59,130,246,0.15);
+  transition: .18s ease;
+}
+
+.btn-print:hover {
+  background: linear-gradient(135deg, #93c5fd, #a78bfa);
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(99,102,241,0.28);
+  transform: translateY(-1px);
 }
