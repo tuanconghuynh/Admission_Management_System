@@ -1,547 +1,180 @@
-<!doctype html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Thông tin tài khoản | AMS</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="icon" href="hutech.png" type="image/png" />
-  <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
-</head>
- <style>
-    /* Hover nhẹ logo */
-    a:hover img { transform: scale(1.05); transition: transform 0.2s ease; }
-  </style>
+{% extends "layout_ams.html" %}
 
-<body class="min-h-screen flex flex-col">
-  <!-- HEADER AMS (giống trang chủ) -->
-  <header class="w-full bg-white/85 backdrop-blur-sm border-b border-slate-200">
-    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center gap-3">
-      <a href="/ams_home.html"
-         class="flex items-center gap-3 hover:opacity-90 transition"
-         title="Về trang chủ">
-        <img src="hutech.png" class="h-10 w-10" alt="HUTECH" />
-        <div>
-          <h1 class="text-2xl sm:text-3xl font-extrabold text-blue-700 leading-tight">
-            ADMISSION MANAGEMENT SYSTEM - AMS
-          </h1>
-          <p class="text-sm sm:text-base text-gray-600 font-medium tracking-wide">
-            V-HT.PTĐT - Hệ Thống Quản Lý Hồ Sơ Nhập Học (AMS)
-          </p>
-        </div>
-      </a>
-    </div>
-  </header>
+{% block title %}Thông tin tài khoản | AMS{% endblock %}
+{% set active_page = 'account' %}
 
-  <main class="flex-1 flex">
-    <!-- SIDEBAR (giống trang chủ, chỉ đổi nav-item-active) -->
-    <aside class="hidden md:flex md:flex-col w-64 bg-white/85 border-r border-slate-200 backdrop-blur-sm">
+{% block content %}
+  <section class="flex-1 flex items-start justify-center">
+    <div class="max-w-4xl mx-auto w-full space-y-6 px-6 py-6" id="pageContent">
 
-      <!-- Khối user + dropdown -->
-      <div class="px-4 pt-4 pb-3 border-b border-slate-200 relative">
-        <button id="userMenuBtn"
-          class="w-full justify-between text-sm text-gray-700 bg-white hover:bg-slate-50 px-3 py-2 rounded-lg shadow border flex items-center gap-2"
-          aria-haspopup="true" aria-expanded="false" aria-controls="userMenu">
-          <span><b id="helloName">—</b>
-            <span class="text-gray-500">(<span id="helloRole">—</span>)</span>
-          </span>
-          <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" class="text-gray-500" aria-hidden="true">
-            <path fill-rule="evenodd"
-              d="M5.23 7.21a.75.75 0 011.06.02L10 11.187l3.71-3.956a.75.75 0 011.08 1.04l-4.24 4.52a.75.75 0 01-1.08 0l-4.24-4.52a.75.75 0 01.02-1.06z"
-              clip-rule="evenodd"/>
-          </svg>
-        </button>
+      <!-- Flash từ BE -->
+      {% if flash %}
+      <div id="flash-data"
+           data-level="{{ flash.level or 'info' }}"
+           data-message="{{ flash.message | replace('"','&quot;') }}"></div>
+      {% endif %}
 
-        <div id="userMenu"
-             class="menu absolute right-0 top-[calc(100%+4px)] w-48 md:w-56
-            bg-white border rounded-lg shadow-md overflow-hidden z-20 text-xs"
-             role="menu">
-          <a href="/account" class="block px-4 py-2 hover:bg-gray-50" role="menuitem">🔎 Thông tin tài khoản</a>
-          <a href="/account" class="block px-4 py-2 hover:bg-gray-50" role="menuitem">🔐 Đổi mật khẩu</a>
-          <button id="btnMenuLogout"
-                  class="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-600"
-                  role="menuitem">
-            ↩️ Đăng xuất
-          </button>
-        </div>
+      <!-- cờ từ BE -->
+      <div id="acct-flags"
+           data-first="{{ '1' if first_login else '0' }}"
+           data-must-change="{{ '1' if (me.must_change_password or not me.password_changed_at) else '0' }}">
       </div>
 
-      <!-- Menu chính -->
-      <nav class="py-4 text-sm flex-1">
-        <div class="px-4 pb-3 text-xs font-semibold text-gray-500 uppercase">
-          Menu chính
-        </div>
-        <a href="/ams_home.html"        class="nav-item">🏠 Trang chủ</a>
-        <a href="/compilation.html"     class="nav-item">📝 Nhập hồ sơ mới</a>
-        <a href="/students_list.html"   class="nav-item">📋 Danh sách hồ sơ</a>
-        <a href="/import_students.html" class="nav-item">⬇️ Import học viên</a>
-        <a href="/journal.html"         class="nav-item">🕓 Nhật ký hệ thống</a>
-        <a href="/checklist_admin.html" class="nav-item">📑 Quản lý danh mục hồ sơ</a>
-        <a href="/account"              class="nav-item nav-item-active">👤 Thông tin tài khoản</a>
-      </nav>
-    </aside>
+      <!-- Title trang -->
+      <header class="flex items-center justify-between">
+        <h1 class="text-2xl md:text-3xl font-bold text-gray-800">
+          Thông tin tài khoản
+        </h1>
+      </header>
 
-    <!-- NỘI DUNG TRANG ACCOUNT -->
-    <section class="flex-1 flex items-start justify-center">
-      <div class="max-w-4xl mx-auto w-full space-y-6 px-6 py-6" id="pageContent">
-
-        <!-- Flash từ BE -->
-        {% if flash %}
-        <div id="flash-data"
-             data-level="{{ flash.level or 'info' }}"
-             data-message="{{ flash.message | replace('"','&quot;') }}"></div>
-        {% endif %}
-
-        <!-- cờ từ BE -->
-        <div id="acct-flags"
-             data-first="{{ '1' if first_login else '0' }}"
-             data-must-change="{{ '1' if (me.must_change_password or not me.password_changed_at) else '0' }}">
+      <!-- Thông tin -->
+      <section class="card" aria-labelledby="info-title">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <h2 id="info-title" class="section-title">Thông tin của tôi</h2>
+          <div class="flex items-center gap-2">
+            <button id="btnToggleProfile" type="button" class="btn btn-outline"
+                    aria-controls="profileForm" aria-expanded="false">
+              Chỉnh sửa hồ sơ
+            </button>
+            <button id="btnTogglePw" type="button" class="btn btn-primary"
+                    aria-controls="pwForm" aria-expanded="false">
+              Đổi mật khẩu
+            </button>
+          </div>
         </div>
 
-        <!-- Title trang -->
-        <header class="flex items-center justify-between">
-          <h1 class="text-2xl md:text-3xl font-bold text-gray-800">
-            Thông tin tài khoản
-          </h1>
-        </header>
-
-        <!-- Thông tin -->
-        <section class="card" aria-labelledby="info-title">
-          <div class="flex items-center justify-between gap-3 flex-wrap">
-            <h2 id="info-title" class="section-title">Thông tin của tôi</h2>
-            <div class="flex items-center gap-2">
-              <button id="btnToggleProfile" type="button" class="btn btn-outline"
-                      aria-controls="profileForm" aria-expanded="false">
-                Chỉnh sửa hồ sơ
-              </button>
-              <button id="btnTogglePw" type="button" class="btn btn-primary"
-                      aria-controls="pwForm" aria-expanded="false">
-                Đổi mật khẩu
-              </button>
-            </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <div class="label">Username</div>
+            <div class=" break-all">{{ me.username }}</div>
+          </div>
+          <div>
+            <div class="label">Họ tên</div>
+            <div>{{ me.full_name or '—' }}</div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <div>
-              <div class="label">Username</div>
-              <div class=" break-all">{{ me.username }}</div>
-            </div>
-            <div>
-              <div class="label">Họ tên</div>
-              <div>{{ me.full_name or '—' }}</div>
-            </div>
-
-            <div>
-              <div class="label">Ngày sinh</div>
-              <div data-dateonly>{{ me.dob or '—' }}</div>
-            </div>
-
-            <div>
-              <div class="label">Email</div>
-              <div class="break-all">{{ me.email or '—' }}</div>
-            </div>
-
-            <div>
-              <div class="label">Quyền</div>
-              <div>{{ me.role }}</div>
-            </div>
-            <div>
-              <div class="label">Trạng thái</div>
-              <div>{{ "Đang hoạt động" if me.is_active else "Đã khóa" }}</div>
-            </div>
-
-            <div>
-              <div class="label">Lần đổi mật khẩu</div>
-              <div data-datetime>{{ me.password_changed_at or '—' }}</div>
-            </div>
-            <div>
-              <div class="label">Lần đăng nhập gần nhất</div>
-              <div data-datetime>{{ me.last_login_at or '—' }}</div>
-            </div>
+          <div>
+            <div class="label">Ngày sinh</div>
+            <div data-dateonly>{{ me.dob or '—' }}</div>
           </div>
-        </section>
 
-        <!-- Cập nhật hồ sơ -->
-        <section id="profileForm" class="card hidden" aria-labelledby="profile-title">
-          <h2 id="profile-title" class="section-title">Cập nhật hồ sơ</h2>
-          <form method="post" action="/account/profile"
-                class="grid md:grid-cols-3 gap-3 mt-2"
-                onsubmit="return lockSubmit(this)">
-            {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token }}">{% endif %}
+          <div>
+            <div class="label">Email</div>
+            <div class="break-all">{{ me.email or '—' }}</div>
+          </div>
 
-            <div class="md:col-span-1">
-              <label class="label" for="pf-fullname">Họ và tên</label>
-              <input id="pf-fullname" class="input" name="full_name"
-                     value="{{ me.full_name or '' }}" maxlength="255" autocomplete="name">
-            </div>
-            <div class="md:col-span-1">
-              <label class="label" for="pf-email">Email</label>
-              <input id="pf-email" class="input" type="email" name="email"
-                     value="{{ me.email or '' }}" maxlength="255" autocomplete="email" inputmode="email">
-            </div>
-            <div class="md:col-span-1">
-              <label class="label" for="pf-dob">Ngày sinh</label>
-              <input id="pf-dob" class="input" type="date" name="dob"
-                     value="{{ (me.dob|string)[:10] if me.dob else '' }}" autocomplete="bday">
-            </div>
-            <div class="md:col-span-3 flex justify-end">
-              <button class="btn btn-primary" type="submit">Lưu thông tin</button>
-            </div>
-          </form>
-        </section>
+          <div>
+            <div class="label">Quyền</div>
+            <div>{{ me.role }}</div>
+          </div>
+          <div>
+            <div class="label">Trạng thái</div>
+            <div>{{ "Đang hoạt động" if me.is_active else "Đã khóa" }}</div>
+          </div>
 
-        <!-- Đổi mật khẩu -->
-        {% set force_change = first_login or me.must_change_password or (not me.password_changed_at) %}
-        <section id="pwForm" class="card hidden" aria-labelledby="pw-title">
-          <h2 id="pw-title" class="section-title">Đổi mật khẩu</h2>
-          <form id="pwChangeForm"
-                method="post"
-                action="/account/change-password"
-                class="grid gap-3 md:grid-cols-2 mt-2"
-                onsubmit="return validatePasswordForm ? validatePasswordForm(this) : true">
-            {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token }}">{% endif %}
-            {% if force_change %}
-              <input type="hidden" name="next" value="/ams_home.html">
-            {% endif %}
+          <div>
+            <div class="label">Lần đổi mật khẩu</div>
+            <div data-datetime>{{ me.password_changed_at or '—' }}</div>
+          </div>
+          <div>
+            <div class="label">Lần đăng nhập gần nhất</div>
+            <div data-datetime>{{ me.last_login_at or '—' }}</div>
+          </div>
+        </div>
+      </section>
 
-            <div class="md:col-span-2 relative">
-              <label class="label" for="old">Mật khẩu hiện tại</label>
-              <input id="old" name="old_password" type="password" class="input pr-10"
-                     required autocomplete="current-password" minlength="1" aria-required="true">
-              <button type="button" class="absolute right-2 top-9 text-gray-500"
-                      data-toggle-eye="#old"
-                      aria-label="Hiện/ẩn mật khẩu hiện tại">👁️</button>
-            </div>
+      <!-- Cập nhật hồ sơ -->
+      <section id="profileForm" class="card hidden" aria-labelledby="profile-title">
+        <h2 id="profile-title" class="section-title">Cập nhật hồ sơ</h2>
+        <form method="post" action="/account/profile"
+              class="grid md:grid-cols-3 gap-3 mt-2"
+              onsubmit="return lockSubmit(this)">
+          {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token }}">{% endif %}
 
-            <div class="relative">
-              <label class="label" for="new">Mật khẩu mới (≥6 ký tự)</label>
-              <input id="new" name="new_password" type="password" minlength="6"
-                     class="input pr-10" required autocomplete="new-password"
-                     aria-describedby="pwHelp pwStrength">
-              <button type="button" class="absolute right-2 top-9 text-gray-500"
-                      data-toggle-eye="#new"
-                      aria-label="Hiện/ẩn mật khẩu mới">👁️</button>
-              <small id="pwHelp" class="text-muted block mt-1">
-                Nên có chữ hoa, số và ký tự đặc biệt.
-              </small>
-              <div id="pwStrength" class="mt-1 text-xs font-medium text-gray-600"></div>
-            </div>
+          <div class="md:col-span-1">
+            <label class="label" for="pf-fullname">Họ và tên</label>
+            <input id="pf-fullname" class="input" name="full_name"
+                   value="{{ me.full_name or '' }}" maxlength="255" autocomplete="name">
+          </div>
+          <div class="md:col-span-1">
+            <label class="label" for="pf-email">Email</label>
+            <input id="pf-email" class="input" type="email" name="email"
+                   value="{{ me.email or '' }}" maxlength="255" autocomplete="email" inputmode="email">
+          </div>
+          <div class="md:col-span-1">
+            <label class="label" for="pf-dob">Ngày sinh</label>
+            <input id="pf-dob" class="input" type="date" name="dob"
+                   value="{{ (me.dob|string)[:10] if me.dob else '' }}" autocomplete="bday">
+          </div>
+          <div class="md:col-span-3 flex justify-end">
+            <button class="btn btn-primary" type="submit">Lưu thông tin</button>
+          </div>
+        </form>
+      </section>
 
-            <div class="relative">
-              <label class="label" for="cf">Xác nhận mật khẩu mới</label>
-              <input id="cf" name="confirm_password" type="password" minlength="6"
-                     class="input pr-10" required autocomplete="new-password">
-              <button type="button" class="absolute right-2 top-9 text-gray-500"
-                      data-toggle-eye="#cf"
-                      aria-label="Hiện/ẩn xác nhận mật khẩu">👁️</button>
-              <small id="pwMatchMsg" class="text-xs mt-1 block"></small>
-            </div>
+      <!-- Đổi mật khẩu -->
+      {% set force_change = first_login or me.must_change_password or (not me.password_changed_at) %}
+      <section id="pwForm" class="card hidden" aria-labelledby="pw-title">
+        <h2 id="pw-title" class="section-title">Đổi mật khẩu</h2>
+        <form id="pwChangeForm"
+              method="post"
+              action="/account/change-password"
+              class="grid gap-3 md:grid-cols-2 mt-2"
+              onsubmit="return validatePasswordForm ? validatePasswordForm(this) : true">
+          {% if csrf_token %}<input type="hidden" name="csrf_token" value="{{ csrf_token }}">{% endif %}
+          {% if force_change %}
+            <input type="hidden" name="next" value="/ams_home.html">
+          {% endif %}
 
-            <div class="md:col-span-2 flex items-start md:items-center justify-between gap-3">
-              <small class="text-muted">
-                Tip: Dùng mật khẩu mạnh, không trùng nơi khác.<br>
-                Quên mật khẩu? Liên hệ Admin để được reset.
-              </small>
-              <button id="btnSubmitPw" class="btn btn-primary" type="submit" disabled>
-                Đổi mật khẩu
-              </button>
-            </div>
-          </form>
-        </section>
+          <div class="md:col-span-2 relative">
+            <label class="label" for="old">Mật khẩu hiện tại</label>
+            <input id="old" name="old_password" type="password" class="input pr-10"
+                   required autocomplete="current-password" minlength="1" aria-required="true">
+            <button type="button" class="absolute right-2 top-9 text-gray-500"
+                    data-toggle-eye="#old"
+                    aria-label="Hiện/ẩn mật khẩu hiện tại">👁️</button>
+          </div>
 
-      </div>
-    </section>
-  </main>
+          <div class="relative">
+            <label class="label" for="new">Mật khẩu mới (≥6 ký tự)</label>
+            <input id="new" name="new_password" type="password" minlength="6"
+                   class="input pr-10" required autocomplete="new-password"
+                   aria-describedby="pwHelp pwStrength">
+            <button type="button" class="absolute right-2 top-9 text-gray-500"
+                    data-toggle-eye="#new"
+                    aria-label="Hiện/ẩn mật khẩu mới">👁️</button>
+            <small id="pwHelp" class="text-muted block mt-1">
+              Nên có chữ hoa, số và ký tự đặc biệt.
+            </small>
+            <div id="pwStrength" class="mt-1 text-xs font-medium text-gray-600"></div>
+          </div>
 
-  <!-- FOOTER (giống trang chủ) -->
-  <footer class="bg-[#1E50B4] text-white mt-auto">
-    <div class="max-w-7xl mx-auto px-6 py-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 text-sm">
-      <div>
-        <p class="font-semibold uppercase">VIỆN HỢP TÁC VÀ PHÁT TRIỂN ĐÀO TẠO</p>
-        <p class="uppercase">TRƯỜNG ĐẠI HỌC CÔNG NGHỆ TPHCM (HUTECH)</p>
-        <p><b>Sài Gòn Campus:</b> 475A Điện Biên Phủ, Phường Thạnh Mỹ Tây, TP. Hồ Chí Minh</p>
-        <p>
-          <b>ĐT:</b> (028) 6686 6465 ·
-          <b>Email:</b> <a href="mailto:daotaotructuyen@hutech.edu.vn" class="underline hover:text-yellow-300">daotaotructuyen@hutech.edu.vn</a>
-        </p>
-      </div>
-      <p class="text-xs">© V-HT.PTĐT HUTECH — Code by HC-Tuấn</p>
+          <div class="relative">
+            <label class="label" for="cf">Xác nhận mật khẩu mới</label>
+            <input id="cf" name="confirm_password" type="password" minlength="6"
+                   class="input pr-10" required autocomplete="new-password">
+            <button type="button" class="absolute right-2 top-9 text-gray-500"
+                    data-toggle-eye="#cf"
+                    aria-label="Hiện/ẩn xác nhận mật khẩu">👁️</button>
+            <small id="pwMatchMsg" class="text-xs mt-1 block"></small>
+          </div>
+
+          <div class="md:col-span-2 flex items-start md:items-center justify-between gap-3">
+            <small class="text-muted">
+              Tip: Dùng mật khẩu mạnh, không trùng nơi khác.<br>
+              Quên mật khẩu? Liên hệ Admin để được reset.
+            </small>
+            <button id="btnSubmitPw" class="btn btn-primary" type="submit" disabled>
+              Đổi mật khẩu
+            </button>
+          </div>
+        </form>
+      </section>
+
     </div>
-  </footer>
+  </section>
+{% endblock %}
 
-  <!-- Toast + Modal logout (dùng chung với trang chủ) -->
-  <div id="toast-wrap"></div>
-
-  <div class="overlay" id="logoutModal" role="dialog" aria-modal="true" aria-labelledby="lgTitle">
-    <div class="modal" role="document" aria-describedby="lgDesc" tabindex="-1" id="logoutBox">
-      <div class="px-6 py-4 border-b flex items-center justify-between">
-        <div id="lgTitle" class="font-semibold text-gray-800">Xác nhận</div>
-        <button class="btn btn-outline btn-xs" id="lgClose" aria-label="Đóng">✕</button>
-      </div>
-      <div class="px-6 py-5" id="lgDesc">
-        <p class="text-gray-700">Bạn có chắc chắn muốn đăng xuất không?</p>
-      </div>
-      <div class="px-6 py-4 border-t flex justify-end gap-2 bg-gray-50 rounded-b-2xl">
-        <button class="btn btn-outline" id="lgCancel">Hủy</button>
-        <button class="btn btn-primary" id="lgOK">Đăng xuất</button>
-      </div>
-    </div>
-  </div>
-
-<script>
-  /* ===== Helpers chung (giống trang chủ, bỏ phần dashboard) ===== */
-  async function api(path, opt = {}) {
-    try {
-      return await fetch('/api' + path, { credentials: 'include', ...opt });
-    } catch (e) {
-      console.error('API error:', e);
-      return null;
-    }
-  }
-
-  function showToast(msg,type='info',ms=3200){
-    const wrap=document.getElementById('toast-wrap'); if(!wrap) return alert(msg);
-    const el=document.createElement('div'); el.className=`toast ${type}`; el.textContent=String(msg);
-    wrap.appendChild(el); requestAnimationFrame(()=>el.classList.add('show'));
-    const close=()=>{ el.classList.remove('show'); el.addEventListener('transitionend',()=>el.remove(),{once:true}); };
-    const t=setTimeout(close,ms); el.addEventListener('click',()=>{clearTimeout(t); close();});
-  }
-
-  /* Dropdown menu user */
-  (function menuSetup(){
-    const btn = document.getElementById('userMenuBtn');
-    const menu = document.getElementById('userMenu');
-    if(!btn || !menu) return;
-    function openMenu(on){ menu.classList.toggle('show', on); btn.setAttribute('aria-expanded', String(on)); }
-    btn.addEventListener('click', (e)=>{ e.stopPropagation(); openMenu(!menu.classList.contains('show')); });
-    document.addEventListener('click', ()=> menu.classList.contains('show') && openMenu(false));
-    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') openMenu(false); });
-    document.getElementById('btnMenuLogout')?.addEventListener('click', ()=>{ openMenu(false); openLogout(); });
-  })();
-
-  /* Modal logout (dùng chung) */
-  (function(){
-    const wrap = document.getElementById('logoutModal');
-    const box  = document.getElementById('logoutBox');
-    const ok   = document.getElementById('lgOK');
-    const cxl  = document.getElementById('lgCancel');
-    const x    = document.getElementById('lgClose');
-    let last=null;
-    function open(){ last=document.activeElement; wrap.classList.add('show'); requestAnimationFrame(()=>box.focus()); document.body.classList.add('overflow-hidden'); }
-    function close(){ wrap.classList.remove('show'); document.body.classList.remove('overflow-hidden'); last?.focus?.(); }
-    function trap(e){
-      if(e.key!=='Tab') return;
-      const f=box.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
-      if(!f.length) return;
-      const first=f[0], last=f[f.length-1];
-      if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
-      else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
-    }
-    window.openLogout=open;
-    ok.addEventListener('click', async ()=>{ try{ await api('/logout',{method:'POST'});}catch{} location.href='/auth_login.html'; });
-    cxl.addEventListener('click', close); x.addEventListener('click', close);
-    wrap.addEventListener('click', e=>{ if(e.target===wrap) close(); });
-    box.addEventListener('keydown', trap);
-  })();
-
-  /* Boot: load /me cho header sidebar */
-  async function boot(){
-    const r = await api('/me');
-    if (!r || !r.ok) { location.href = '/auth_login.html'; return; }
-    const me = await r.json();
-    const name = me.full_name || me.username || 'Người dùng';
-    (document.getElementById('helloName')||{}).textContent = name;
-    (document.getElementById('helloRole')||{}).textContent = me.role || '';
-
-    if (me.must_change_password) {
-      // với trang account, vẫn cho vào đây, phần dưới sẽ bật form đổi mật khẩu
-      console.log('must_change_password flag from /me');
-    }
-  }
-  boot();
-
-  /* ====== Định dạng thời gian VN cho account ====== */
-  function parseToDate(raw) {
-    if (!raw) return null;
-    let s = String(raw).trim();
-    if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/.test(s)) s = s.replace(' ', 'T');
-
-    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+\-]\d{2}:?\d{2})?$/);
-    if (m) {
-      const [, Y, M, D, h, mi, sec, ms, tz] = m;
-      if (!tz) return new Date(Date.UTC(+Y, +M - 1, +D, +h, +mi, +sec, +(ms || 0)));
-      return new Date(s);
-    }
-    const d = new Date(s);
-    return isNaN(d) ? null : d;
-  }
-
-  function formatVNTime(selector) {
-    document.querySelectorAll(selector).forEach(el => {
-      const raw = (el.textContent || '').trim();
-      if (!raw || raw === '—') return;
-      const d = parseToDate(raw);
-      if (!d) return;
-      el.textContent = new Intl.DateTimeFormat('vi-VN', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        day: '2-digit', month: '2-digit', year: 'numeric'
-      }).format(d).replace(',', '');
-    });
-  }
-
-  function formatVNDate(selector) {
-    document.querySelectorAll(selector).forEach(el => {
-      const raw = (el.textContent || '').trim();
-      if (!raw || raw === '—') return;
-      if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) return;
-      const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      let d = m ? new Date(Date.UTC(+m[1], +m[2]-1, +m[3])) : parseToDate(raw);
-      if (!d) return;
-      el.textContent = new Intl.DateTimeFormat('vi-VN', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-        day: '2-digit', month: '2-digit', year: 'numeric'
-      }).format(d);
-    });
-  }
-
-  /* Eye toggle cho password */
-  document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('[data-toggle-eye]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const input=document.querySelector(btn.getAttribute('data-toggle-eye'));
-        if(!input) return;
-        const isPw = input.type==='password';
-        input.type = isPw?'text':'password';
-        btn.setAttribute('aria-pressed', String(isPw));
-        btn.textContent = isPw ? '🙈' : '👁️';
-      });
-    });
-  });
-
-  /* Chống double submit */
-  function lockSubmit(form){
-    const btn=form.querySelector('button[type=submit]');
-    if(btn){
-      btn.disabled=true;
-      btn.dataset.origText = btn.textContent;
-      btn.textContent='Đang lưu...';
-      btn.classList.add('opacity-60', 'cursor-not-allowed');
-    }
-    form.querySelectorAll('input,select,textarea,button').forEach(el=>{
-      if(el.tagName === 'BUTTON') return;
-      el.readOnly = true;
-    });
-    return true;
-  }
-
-  /* Mật khẩu: strength + match */
-  (function bindPasswordHelpers(){
-    const newPw = document.getElementById('new');
-    const cfPw  = document.getElementById('cf');
-    const msg   = document.getElementById('pwMatchMsg');
-    const strength = document.getElementById('pwStrength');
-    const submit = document.getElementById('btnSubmitPw');
-
-    if(!newPw || !cfPw) return;
-
-    function zxcvbnLiteScore(pw){
-      let score = 0;
-      if (pw.length >= 6) score++;
-      if (/[A-Z]/.test(pw)) score++;
-      if (/\d/.test(pw)) score++;
-      if (/[^A-Za-z0-9]/.test(pw)) score++;
-      if (pw.length >= 12) score++;
-      return Math.min(score, 4);
-    }
-
-    function renderStrength(pw){
-      const s = zxcvbnLiteScore(pw);
-      const label = ['Rất yếu','Yếu','Trung bình','Khá','Mạnh'][s] || '';
-      strength.textContent = pw ? `Độ mạnh: ${label}` : '';
-      strength.className = 'mt-1 text-xs font-medium ' + (s<=1?'text-red-600':s===2?'text-yellow-600':'text-green-600');
-      return s;
-    }
-
-    function sync(){
-      const s = renderStrength(newPw.value);
-      const okMatch = !!newPw.value && newPw.value === cfPw.value;
-      msg.textContent = cfPw.value ? (okMatch ? 'Khớp mật khẩu ✅' : 'Chưa khớp mật khẩu ❌') : '';
-      msg.className = 'text-xs mt-1 ' + (okMatch ? 'text-green-600' : 'text-red-600');
-      submit.disabled = !(okMatch && s >= 2);
-    }
-
-    newPw.addEventListener('input', sync);
-    cfPw.addEventListener('input', sync);
-    cfPw.addEventListener('paste', e => e.preventDefault());
-    sync();
-  })();
-
-  /* Toggle form hồ sơ / đổi mật khẩu */
-  function showSection(id,on=true){
-    const el=document.getElementById(id);
-    if(!el) return;
-    el.classList.toggle('hidden', !on);
-    const trigger = id==='profileForm' ? document.getElementById('btnToggleProfile') : document.getElementById('btnTogglePw');
-    trigger?.setAttribute('aria-expanded', String(on));
-    if(on) el.scrollIntoView({behavior:'smooth', block:'start'});
-  }
-
-  (function bindAccountToggles(){
-    const btnProfile=document.getElementById('btnToggleProfile');
-    const btnPw=document.getElementById('btnTogglePw');
-
-    btnProfile?.addEventListener('click', ()=>{
-      const on = document.getElementById('profileForm').classList.contains('hidden');
-      showSection('profileForm', on);
-    });
-
-    btnPw?.addEventListener('click', ()=>{
-      const on = document.getElementById('pwForm').classList.contains('hidden');
-      showSection('pwForm', on);
-      if(on) document.getElementById('old')?.focus();
-    });
-  })();
-
-  /* Boot cho riêng trang account: định dạng ngày + xử lý flash & bắt buộc đổi mật khẩu */
-  window.addEventListener('DOMContentLoaded', ()=>{
-    formatVNTime('[data-datetime]');
-    formatVNDate('[data-dateonly]');
-
-    const flashEl=document.getElementById('flash-data');
-    if(flashEl){
-      const lvl=flashEl.dataset.level||'info';
-      const msg=flashEl.dataset.message||'';
-      const type = lvl==='success'?'success':lvl==='error'?'error':lvl==='warn'?'warn':'info';
-      showToast(msg, type, 4500);
-      flashEl.remove();
-    }
-
-    const url=new URL(window.location.href);
-    const qFirst = url.searchParams.get('first')==='1';
-    const flagsEl=document.getElementById('acct-flags');
-    const mustChange = qFirst ||
-      (flagsEl && (flagsEl.dataset.mustChange==='1' || flagsEl.dataset.first==='1'));
-
-    if(mustChange){
-      showSection('pwForm', true);
-      document.getElementById('old')?.focus();
-      showToast('Lần đầu đăng nhập hoặc vừa được reset mật khẩu. Vui lòng đổi mật khẩu!','warn',5000);
-    }
-  });
-
-  /* Thông báo hết hạn phiên (query/cookie flag) */
-  (function () {
-    const params = new URLSearchParams(location.search);
-    const byQuery = params.get('expired') === '1';
-    const byCookie = document.cookie.split(';').some(c => c.trim().startsWith('__session_expired=1'));
-    if (byQuery || byCookie) {
-      if (typeof showToast === 'function') showToast('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.','warn',4500);
-      else alert('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
-      document.cookie = '__session_expired=; Max-Age=0; Path=/; SameSite=Lax';
-    }
-  })();
-</script>
-</body>
-</html>
+{% block scripts %}
+  <script src="account.js"></script>
+{% endblock %}
