@@ -5,7 +5,7 @@ import re
 from datetime import date, datetime
 from typing import Optional, List, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict, field_serializer
 
 
 # ========= Docs (tài liệu kèm hồ sơ) =========
@@ -198,13 +198,11 @@ class ApplicantDetailOut(BaseModel):
     printed: bool
     docs: List[ApplicantDocOut] = Field(default_factory=list)
 
-    class Config:
-        # Pydantic v2: dùng from_attributes thay cho orm_mode
-        from_attributes = True
-        json_encoders = {
-            date: lambda v: v.strftime("%d/%m/%Y") if v else None,
-            datetime: lambda v: v.strftime("%d/%m/%Y") if v else None,
-        }
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("ngay_nhan_hs", "ngay_sinh", when_used="json")
+    def serialize_date(self, value):
+        return value.strftime("%d/%m/%Y") if value else None
 
 
 class ApplicantListItem(BaseModel):
@@ -226,5 +224,4 @@ class ApplicantListItem(BaseModel):
     gioi_tinh: Optional[str] = None
     dan_toc: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

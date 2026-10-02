@@ -1,3 +1,4 @@
+function escapeDashboardHtml(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
  /* ===== Helpers chung ===== */
   async function api(path, opt = {}) {
     try {
@@ -101,7 +102,7 @@
       <div class="max-h-72 overflow-auto space-y-1">
         ${entries.map(([name, count]) => `
           <div class="flex items-center justify-between gap-2">
-            <span class="truncate" title="${name}">${name}</span>
+            <span class="truncate" title="${escapeDashboardHtml(name)}">${escapeDashboardHtml(name)}</span>
             <span class="font-semibold tabular-nums">${count}</span>
           </div>
         `).join('')}
@@ -135,7 +136,7 @@
           return `
             <div class="flex flex-col gap-0.5">
               <div class="flex items-center justify-between gap-2">
-                <span class="truncate" title="${name}">${name}</span>
+                <span class="truncate" title="${escapeDashboardHtml(name)}">${escapeDashboardHtml(name)}</span>
                 <span class="font-semibold tabular-nums">${done}/${total}</span>
               </div>
               <div class="text-[11px] text-gray-500 text-right">
@@ -175,7 +176,7 @@
         <tr class="${idx % 2 ? 'bg-slate-50/60' : ''}">
           <td class="px-3 py-2 border-b text-gray-500 text-center">${idx + 1}</td>
           <td class="px-3 py-2 border-b text-gray-800 text-left">
-            <span title="${name}">${name}</span>
+            <span title="${escapeDashboardHtml(name)}">${escapeDashboardHtml(name)}</span>
           </td>
           <td class="px-3 py-2 border-b text-center tabular-nums">${total}</td>
           <td class="px-3 py-2 border-b text-center tabular-nums text-green-700 font-semibold">${done}</td>
@@ -191,7 +192,7 @@
 
   /* ================= DASHBOARD + FILTER ================= */
 
-  // Lưu toàn bộ applicants để filter lại theo khoá/đợt trên client
+  // Only aggregated groups are transferred; personal applicant rows stay on the server.
   let ALL_APPLICANTS = [];
 
   function uniqueSorted(arr) {
@@ -205,7 +206,7 @@
   function fillSelectOptions(selectEl, values, labelAll) {
     if (!selectEl) return;
     const opts = ['<option value="">' + (labelAll || 'Tất cả') + '</option>']
-      .concat(values.map(v => `<option value="${v}">${v}</option>`));
+      .concat(values.map(v => `<option value="${escapeDashboardHtml(v)}">${escapeDashboardHtml(v)}</option>`));
     selectEl.innerHTML = opts.join('');
   }
 
@@ -290,16 +291,12 @@
       if (!statsByMajor[m]) {
         statsByMajor[m] = { total: 0, done: 0 };
       }
-      statsByMajor[m].total++;
+      statsByMajor[m].total += Number(a.total || 0);
 
-      const hasCode = a.ma_ho_so && String(a.ma_ho_so).trim() !== "";
-      if (hasCode) {
-        statsByMajor[m].done++;
-        totalDone++;
-      }
+      statsByMajor[m].done += Number(a.done || 0);
+      totalDone += Number(a.done || 0);
     }
-
-    const total   = list.length;
+    const total = list.reduce((sum, row) => sum + Number(row.total || 0), 0);
     const pending = total - totalDone;
     const majorsCount = Object.keys(statsByMajor).filter(k => k !== "Chưa chọn ngành").length;
 
@@ -351,32 +348,9 @@
 
   async function loadDashboardStats() {
     try {
-      const PAGE_SIZE = 500;
-      let page = 1;
-      let all = [];
-
-      while (true) {
-        const res = await api(`/applicants/search?page=${page}&size=${PAGE_SIZE}`);
-        if (!res || !res.ok) {
-          console.warn('Stop fetching at page', page, 'status =', res && res.status);
-          break;
-        }
-
-        const js = await res.json();
-        const items = Array.isArray(js.items) ? js.items
-                     : Array.isArray(js.results) ? js.results
-                     : Array.isArray(js.data) ? js.data
-                     : Array.isArray(js) ? js
-                     : [];
-        if (!items.length) break;
-
-        all = all.concat(items);
-        if (items.length < PAGE_SIZE) break;
-        page++;
-      }
-
-      console.log('Dashboard applicants loaded:', all.length);
-      ALL_APPLICANTS = all;
+      const response = await api('/dashboard/stats');
+      if (!response || !response.ok) throw new Error('Không tải được thống kê');
+      ALL_APPLICANTS = (await response.json()).groups || [];
 
       if (!ALL_APPLICANTS.length) {
         updateTopCards(0, 0, 0, 0);

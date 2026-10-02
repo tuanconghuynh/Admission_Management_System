@@ -1,5 +1,6 @@
 # app/routers/batch.py
 from __future__ import annotations
+from app.services.report_limits import report_rows
 
 from datetime import datetime, timedelta, date
 import io
@@ -18,6 +19,7 @@ from app.utils.soft_delete import exclude_deleted, ensure_not_deleted
 # Audit + Auth
 from app.routers.auth import require_roles
 from app.services.audit import write_audit
+from app.services.print_confirmation import print_headers
 
 router = APIRouter(prefix="/batch", tags=["Batch"])
 
@@ -37,6 +39,8 @@ def _audit_print_or_export(
     target_type: str = "ApplicantBatch",
     target_id: str | None = None
 ):
+    if action == 'PRINT':
+        return  # Opening a PDF does not confirm physical printing.
     payload = {
         "scope": scope,
         "filters": filters or {},
@@ -165,7 +169,7 @@ def batch_print(
 ):
 
     print_type = (print_type or "A4").upper()
-    if print_type not in {"A4", "A5", "POSTAL"}:
+    if print_type not in {"A4", "A5", "COVER", "POSTAL"}:
         print_type = "A4"
 
     raw = date_q or day
@@ -194,11 +198,11 @@ def batch_print(
 
     q = db.query(Applicant).filter(Applicant.ngay_nhan_hs >= d1, Applicant.ngay_nhan_hs < d2)
     q = exclude_deleted(Applicant, q)
-    apps = q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()).all()
+    apps = report_rows(q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()))
 
     if not apps:
         q = exclude_deleted(Applicant, db.query(Applicant).filter(Applicant.ngay_nhan_hs == d))
-        apps = q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()).all()
+        apps = report_rows(q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()))
 
     apps = [a for a in apps if _is_not_deleted(a) and ensure_not_deleted(a, raise_http_exception=False)]
     apps = _dedup_latest_by_mssv(apps)
@@ -251,7 +255,7 @@ def batch_print(
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename=\"{filename}\"'},
+        headers={**print_headers(request, [a.ma_so_hv for a in apps], print_type), "Content-Disposition": f'inline; filename=\"{filename}\"'},
     )
 
 # ------------------- Print By Dot -------------------
@@ -266,7 +270,7 @@ def batch_print_dot(
 ):
 
     print_type = (print_type or "A4").upper()
-    if print_type not in {"A4", "A5", "POSTAL"}:
+    if print_type not in {"A4", "A5", "COVER", "POSTAL"}:
         print_type = "A4"
 
     dot_norm = (dot or "").strip()
@@ -288,7 +292,7 @@ def batch_print_dot(
     q = (
         db.query(Applicant)
         .filter(Applicant.dot.isnot(None))
-        .filter(Applicant.dot.ilike(f"%{dot_norm}%"))
+        .filter(func.trim(Applicant.dot) == dot_norm)
     )
 
     if (khoa or "").strip():
@@ -296,7 +300,7 @@ def batch_print_dot(
         q = q.filter(Applicant.khoa.isnot(None)).filter(func.lower(func.trim(Applicant.khoa)) == k)
 
     q = exclude_deleted(Applicant, q)
-    apps = q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()).all()
+    apps = report_rows(q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()))
 
     apps = [a for a in apps if _is_not_deleted(a) and ensure_not_deleted(a, raise_http_exception=False)]
     apps = _dedup_latest_by_mssv(apps)
@@ -353,7 +357,7 @@ def batch_print_dot(
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename=\"{filename}\"'},
+        headers={**print_headers(request, [a.ma_so_hv for a in apps], print_type), "Content-Disposition": f'inline; filename=\"{filename}\"'},
     )
 
 # ------------------- Compatible Router -------------------

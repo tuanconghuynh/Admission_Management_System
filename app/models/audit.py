@@ -1,9 +1,14 @@
 # app/models/audit.py
-from sqlalchemy import Column, Integer, String, DateTime, JSON, Text, func, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, JSON, Text, func, ForeignKey, Index
 from app.db.base import Base
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
+    __table_args__ = (
+        Index("ix_audit_occurred_id", "occurred_at", "id"),
+        Index("ix_audit_target", "target_type", "target_id", "action"),
+        Index("ix_audit_actor_time", "actor_id", "occurred_at"),
+    )
 
     id = Column(Integer, primary_key=True)
     occurred_at = Column(DateTime, server_default=func.now(), nullable=False)

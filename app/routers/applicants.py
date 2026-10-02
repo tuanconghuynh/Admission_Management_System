@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 import io, re, os, hmac, json, hashlib
-from datetime import datetime, date
+from datetime import timezone, datetime, date
 import tempfile
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, status, Request, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy import literal, or_, and_, func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, raiseload
 from sqlalchemy.exc import IntegrityError
 
 from app.db.session import get_db
@@ -17,9 +17,11 @@ from app.models.applicant import Applicant, ApplicantDoc
 from app.models.checklist import ChecklistItem, ChecklistVersion
 from app.routers.auth import require_roles
 from app.services.audit import write_audit
+from app.services.print_confirmation import print_headers
 import re
 
 from app.utils.soft_delete import exclude_deleted
+from app.services.input_validation import validate_applicant_payload
 
 try:
     from app.schemas.applicant import ApplicantIn, ApplicantOut
@@ -27,7 +29,7 @@ except Exception:
     ApplicantIn = dict  # type: ignore
     ApplicantOut = dict  # type: ignore
 
-router = APIRouter(prefix="/applicants", tags=["Applicants"])
+router = APIRouter(prefix="/applicants", tags=["Applicants"], dependencies=[Depends(require_roles("Admin", "NhanVien", "CongTacVien", "Manager"))])
 
 # 🆕 Tạo tên file PDF an toàn
 import re
@@ -97,27 +99,19 @@ def _validate_update_reason(data) -> str:
 # 🆕 Regex lấy số thứ tự 4 chữ số cuối mã hồ sơ
 SEQ4_RE = re.compile(r"(\d{4})$")
 
-def _next_seq4(db: Session, khoa: Optional[str], dot: Optional[str]) -> str:
-    q = db.query(Applicant)
-    if khoa: q = q.filter(Applicant.khoa == str(khoa).strip())
-    if dot:  q = q.filter(Applicant.dot  == str(dot).strip())
+from app.services.receipt_sequence import next_receipt_number, next_major_receipt, reserve_imported_major_receipt
+from app.services.majors import resolve_major
+from app.core.config import settings
 
-    maxn = 0
-    for a in q.all():
-        m = SEQ4_RE.search(str(getattr(a, "ma_ho_so", "") or ""))
-        if m:
-            try:
-                n = int(m.group(1))
-                if n > maxn: maxn = n
-            except: pass
-    return f"{(maxn + 1):04d}"
+def _next_seq4(db, khoa, dot):
+    return next_receipt_number(db, khoa, dot)
 
 # ================= Helpers =================
 DATE_DMY = re.compile(r"^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$")
 DATE_YMD = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 MSSV_REGEX = re.compile(r"^\d{10}$")
 
-DELETE_KEY_SECRET = os.getenv("DELETE_KEY_SECRET", "delete-dev")
+DELETE_KEY_SECRET = settings.DELETE_KEY_SECRET or "delete-dev"
 
 def verify_delete_key(key: str) -> bool:
     """
@@ -244,10 +238,28 @@ def _display_name(ho_dem: Optional[str], ten: Optional[str], fallback_full: Opti
     return (fallback_full or "").strip()
 
 # ================= GET by code =================
+def _lookup_receipt(db, key, khoa=None, dot=None, partial=False):
+    query = db.query(Applicant)
+    if (khoa or '').strip():
+        query = query.filter(func.lower(func.trim(Applicant.khoa)) == khoa.strip().lower())
+    if (dot or '').strip():
+        query = query.filter(func.lower(func.trim(Applicant.dot)) == dot.strip().lower())
+    if partial:
+        query = query.filter(Applicant.ma_ho_so.ilike(f'%{key}%'))
+    else:
+        query = query.filter(or_(Applicant.ma_ho_so == key, func.lower(Applicant.ma_ho_so) == key.lower()))
+    rows = query.order_by(Applicant.created_at.desc()).limit(2).all()
+    if len(rows) > 1:
+        raise HTTPException(409, 'Mã hồ sơ có ở nhiều khóa/đợt. Chọn khóa và đợt hoặc tra bằng mã số học viên.')
+    return rows[0] if rows else None
+
+
 @router.get("/by-code/{key}")
 def get_by_code(
     key: str,
     request: Request,
+    khoa: str | None = Query(None),
+    dot: str | None = Query(None),
     db: Session = Depends(get_db),
     me=Depends(require_roles("Admin", "NhanVien", "CongTacVien", "Manager")),
 ):
@@ -265,21 +277,11 @@ def get_by_code(
         db.commit()
         raise HTTPException(400, "Thiếu mã tra cứu")
 
-    a = (
-        db.query(Applicant)
-        .filter(func.lower(Applicant.ma_ho_so) == k.lower())
-        .order_by(Applicant.created_at.desc())
-        .first()
-    )
-    if not a and MSSV_REGEX.fullmatch(k):
-        a = db.query(Applicant).filter(Applicant.ma_so_hv == k).first()
+    a = db.get(Applicant, k) if MSSV_REGEX.fullmatch(k) else None
     if not a:
-        a = (
-            db.query(Applicant)
-            .filter(Applicant.ma_ho_so.ilike(f"%{k}%"))
-            .order_by(Applicant.created_at.desc())
-            .first()
-        )
+        a = _lookup_receipt(db, k, khoa, dot)
+    if not a:
+        a = _lookup_receipt(db, k, khoa, dot, partial=True)
 
     if not a:
         write_audit(db, action="READ", target_type="Applicant", target_id=k,
@@ -495,6 +497,14 @@ def create_applicant(
     db: Session = Depends(get_db),
     me=Depends(require_roles("Admin", "NhanVien", "CongTacVien", "Manager")),
 ):
+    validate_applicant_payload(payload)
+    if 'import_archived' in payload and not isinstance(payload['import_archived'], bool):
+        raise HTTPException(422, 'Chế độ import hồ sơ lưu trữ không hợp lệ')
+    archived = payload.get('import_archived', False)
+    if 'auto_assign_ma_ho_so' in payload and not isinstance(payload['auto_assign_ma_ho_so'], bool):
+        raise HTTPException(422, 'Yêu cầu cấp mã hồ sơ không hợp lệ')
+    if archived and getattr(me, 'role', None) not in ('Admin', 'NhanVien', 'Manager'):
+        raise HTTPException(403, 'Không có quyền import hồ sơ lưu trữ')
     version_name = (payload.get("checklist_version_name") or "").strip() or "v1"
     v = db.query(ChecklistVersion).filter(
         ChecklistVersion.version_name == version_name
@@ -511,6 +521,15 @@ def create_applicant(
         )
         db.commit()
         raise HTTPException(400, "Checklist version không tồn tại")
+
+    checklist_items = {item.code: item for item in db.query(ChecklistItem).filter(ChecklistItem.version_id == v.id).all()}
+    if archived:
+        docs_input = payload.get('docs') or []
+        codes = [item['code'] for item in docs_input]
+        if not codes or len(codes) != len(set(codes)) or any(code not in checklist_items for code in codes):
+            raise HTTPException(422, 'Danh sách giấy tờ phải thuộc danh mục đã chọn, không rỗng và không trùng mã')
+        if any(not isinstance(item.get('so_luong'), int) for item in docs_input):
+            raise HTTPException(422, 'Cần số lượng cho từng giấy tờ')
 
       # ✅ MSSV vẫn bắt buộc 10 số
     ma_so_hv = (payload.get("ma_so_hv") or "").strip()
@@ -545,6 +564,13 @@ def create_applicant(
         raise HTTPException(409, "Mã số học viên đã tồn tại!")
 
     _nganh_val = (payload.get("nganh_nhap_hoc") or payload.get("nganh") or None)
+    resolved_major = resolve_major(_nganh_val)
+    if resolved_major:
+        _nganh_val = resolved_major[0]
+    if payload.get('auto_assign_ma_ho_so') and not ma_ho_so:
+        ma_ho_so = next_major_receipt(db, _nganh_val, payload.get('khoa'), payload.get('dot'))
+    elif ma_ho_so:
+        ma_ho_so = reserve_imported_major_receipt(db, ma_ho_so, payload.get('khoa'), payload.get('dot'))
 
     a = Applicant(
         ma_so_hv=ma_so_hv,
@@ -562,7 +588,7 @@ def create_applicant(
         khoa=payload.get("khoa"),
         da_tn_truoc_do=payload.get("da_tn_truoc_do"),
         ghi_chu=payload.get("ghi_chu"),
-        nguoi_nhan_ky_ten=(getattr(me, "full_name", None) or getattr(me, "username", None)),
+        nguoi_nhan_ky_ten=((payload.get('nguoi_nhan_ky_ten') or '').strip() if archived else '') or (getattr(me, "full_name", None) or getattr(me, "username", None)),
         checklist_version_id=v.id,
         status="saved",
         printed=False,
@@ -598,9 +624,11 @@ def create_applicant(
         sl = d.get("so_luong") if isinstance(d, dict) else getattr(d, "so_luong", None)
         if sl in (None, ""):
             continue
-        db.add(ApplicantDoc(applicant_ma_so_hv=a.ma_so_hv, code=code, so_luong=int(sl)))
+        item = checklist_items.get(code)
+        db.add(ApplicantDoc(applicant_ma_so_hv=a.ma_so_hv, code=code, so_luong=int(sl),
+            display_name=item.display_name if item else None, order_no=item.order_no if item else None))
 
-    db.commit()
+    db.flush()
 
     # 🆕 Audit CREATE kèm danh mục hồ sơ
     docs_after = _docs_map(db, a.ma_so_hv)
@@ -610,7 +638,7 @@ def create_applicant(
         target_type="Applicant",
         target_id=a.ma_so_hv,
         prev_values=prev_snapshot,
-        new_values={**snapshot_applicant(a), "docs_after": docs_after},
+        new_values={**snapshot_applicant(a), "docs_after": docs_after, "import_archived": archived},
         status="SUCCESS",
         request=request,
     )
@@ -628,7 +656,11 @@ def create_applicant(
 def search_applicants(
     q: Optional[str] = Query(None, description="Để trống = lấy tất cả"),
     page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=1000),
+    size: int = Query(20, ge=1, le=100),
+    khoa: Optional[str] = Query(None, max_length=64),
+    dot: Optional[str] = Query(None, max_length=64),
+    sort_by: Optional[str] = Query(None, max_length=32),
+    sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db),
     me=Depends(require_roles("Admin", "NhanVien", "CongTacVien", "Manager")),
 ):
@@ -639,15 +671,23 @@ def search_applicants(
 
     # Ẩn toàn bộ hồ sơ đã bị xoá mềm (tự động nhận diện cột)
     query = exclude_deleted(Applicant, query)
+    if khoa:
+        query = query.filter(Applicant.khoa == khoa)
+    if dot:
+        query = query.filter(Applicant.dot == dot)
+    allowed_sort = {"ho_dem": Applicant.ho_dem, "ten": Applicant.ten, "ma_so_hv": Applicant.ma_so_hv,
+        "ma_ho_so": Applicant.ma_ho_so, "ngay_nhan_hs": Applicant.ngay_nhan_hs,
+        "nganh": Applicant.nganh_nhap_hoc, "dot": Applicant.dot, "khoa": Applicant.khoa,
+        "nguoi_nhan": Applicant.nguoi_nhan_ky_ten}
+    if sort_by and sort_by not in allowed_sort:
+        raise HTTPException(422, "Trường sắp xếp không hợp lệ")
+    ordering = (allowed_sort[sort_by].desc() if sort_dir == "desc" else allowed_sort[sort_by].asc()) if sort_by else Applicant.created_at.desc()
 
     # Nếu có từ khoá tìm kiếm
     if qn:
         like = f"%{qn}%"
         # concat tên tách đôi (an toàn nếu cột chưa tồn tại trên DB cũ: dùng getattr)
-        name_expr = func.concat(
-            func.coalesce(Applicant.ho_dem, ""), literal(" "),  # Sửa ở đây
-            func.coalesce(Applicant.ten, "")
-        )
+        name_expr = func.coalesce(Applicant.ho_dem, "") + literal(" ") + func.coalesce(Applicant.ten, "")
         query = query.filter(
             or_(
                 Applicant.ho_ten.ilike(like),         # tương thích
@@ -659,7 +699,7 @@ def search_applicants(
 
     total = query.count()
     rows = (
-        query.order_by(Applicant.created_at.desc())
+        query.options(raiseload(Applicant.docs)).order_by(ordering, Applicant.ma_so_hv.asc())
         .offset((page - 1) * size)
         .limit(size)
         .all()
@@ -698,16 +738,13 @@ def search_applicants(
 @router.get("/find/")
 def find_by_ma_ho_so(
     ma_ho_so: str = Query(...),
+    khoa: str | None = Query(None),
+    dot: str | None = Query(None),
     db: Session = Depends(get_db),
     me=Depends(require_roles("Admin", "NhanVien", "CongTacVien", "Manager")),
 ):
     code = (ma_ho_so or "").strip()
-    a = (
-        db.query(Applicant)
-        .filter(Applicant.ma_ho_so == code)
-        .order_by(Applicant.created_at.desc())   # chọn bản mới nhất nếu trùng
-        .first()
-    )
+    a = _lookup_receipt(db, code, khoa, dot)
     if not a:
         raise HTTPException(
             404,
@@ -762,6 +799,7 @@ def update_applicant(
     db: Session = Depends(get_db),
     me=Depends(require_roles("Admin", "NhanVien", "CongTacVien", "Manager")),
 ):
+    validate_applicant_payload(body)
     ensure_mssv(ma_so_hv)
 
     # helpers cục bộ cho tên
@@ -781,7 +819,7 @@ def update_applicant(
             return (ln + " " + fn).strip()
         return (fallback_full or "").strip()
 
-    a = db.query(Applicant).filter(Applicant.ma_so_hv == ma_so_hv).first()
+    a = db.query(Applicant).filter(Applicant.ma_so_hv == ma_so_hv).with_for_update().first()
     if not a:
         raise HTTPException(404, "Applicant not found")
 
@@ -815,6 +853,7 @@ def update_applicant(
             existed = db.query(Applicant).filter(Applicant.ma_so_hv == new_mssv).first()
             if existed:
                 raise HTTPException(409, "MSSV mới đã tồn tại.")
+            ensure_mssv(new_mssv)
             a.ma_so_hv = new_mssv
             for d in db.query(ApplicantDoc).filter_by(applicant_ma_so_hv=ma_so_hv).all():
                 d.applicant_ma_so_hv = new_mssv
@@ -823,6 +862,8 @@ def update_applicant(
     # Nếu FE gửi ma_ho_so trong body thì không cho để trống
     if has("ma_ho_so"):
         new_code = str(get("ma_ho_so") or "").strip()
+        if a.ma_ho_so and new_code != a.ma_ho_so:
+            raise HTTPException(422, 'Mã hồ sơ đã cấp được giữ cố định')
         if not new_code:
             raise HTTPException(400, "Mã HS không được trống.")
         a.ma_ho_so = new_code
@@ -841,6 +882,9 @@ def update_applicant(
     # ✅ Ngành học: nhận cả 'nganh_nhap_hoc' hoặc 'nganh', ghi đúng cột hiện có
     if has("nganh_nhap_hoc") or has("nganh"):
         _nganh_val = str_or_none(get("nganh_nhap_hoc", get("nganh")))
+        resolved = resolve_major(_nganh_val)
+        if resolved:
+            _nganh_val = resolved[0]
         if hasattr(Applicant, "nganh_nhap_hoc"):
             a.nganh_nhap_hoc = _nganh_val
         elif hasattr(Applicant, "nganh"):
@@ -878,11 +922,13 @@ def update_applicant(
     # 🟦===== HẾT phần tên =====🟦
 
     # 🆕 TỰ CẤP MÃ HS: khi hồ sơ CHƯA có mã và FE yêu cầu
-    auto_assign = bool(body.get("auto_assign_ma_ho_so", False))
+    if 'auto_assign_ma_ho_so' in body and not isinstance(body['auto_assign_ma_ho_so'], bool):
+        raise HTTPException(422, 'Yêu cầu cấp mã hồ sơ không hợp lệ')
+    auto_assign = body.get("auto_assign_ma_ho_so", False)
     if auto_assign and not (a.ma_ho_so and str(a.ma_ho_so).strip()):
         _khoa = (body.get("khoa") if "khoa" in body else a.khoa)
         _dot  = (body.get("dot")  if "dot"  in body else a.dot)
-        a.ma_ho_so = _next_seq4(db, _khoa, _dot)
+        a.ma_ho_so = next_major_receipt(db, getattr(a, 'nganh_nhap_hoc', None), _khoa, _dot)
 
     # Lưu người cập nhật gần nhất
     a.nguoi_nhan_ky_ten = getattr(me, "full_name", None) or getattr(me, "username", None)
@@ -912,7 +958,7 @@ def update_applicant(
                 else:
                     db.add(ApplicantDoc(applicant_ma_so_hv=a.ma_so_hv, code=code, so_luong=n))
 
-    db.commit()
+    db.flush()
 
     # tạo diff docs
     docs_after = _docs_map(db, a.ma_so_hv)
@@ -983,7 +1029,7 @@ def delete_applicant(
     reason = str(reason).strip()[:1000]
 
     # Idempotent: nếu đã có deleted_at thì chỉ cập nhật lý do/người xoá
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if not getattr(a, "deleted_at", None):
         a.deleted_at = now
 
@@ -997,7 +1043,7 @@ def delete_applicant(
     a.deleted_reason = reason
 
     db.add(a)
-    db.commit()
+    db.flush()
 
     # 🧾 Ghi audit đầy đủ (kèm docs_before)
     write_audit(
@@ -1042,28 +1088,14 @@ def _do_print(ma_so_hv: str, mark_printed: bool, db: Session, request: Request):
     pdf_bytes = render_single_pdf(a, items, docs)
 
     if mark_printed:
-        a.printed = True
-        a.status = "printed"
-        db.commit()
-        # log đánh dấu in
-        write_audit(
-            db,
-            action="PRINT",
-            target_type="Applicant",
-            target_id=a.ma_so_hv,
-            prev_values={},
-            new_values={"printed": True, "paper": "A4"},
-            status="SUCCESS",
-            request=request,
-        )
-        db.commit()
+        raise HTTPException(422, 'Dùng màn hình xem bản in và xác nhận đã in thành công')
 
     filename = _pdf_filename(a, "A4")
 
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        headers={**print_headers(request, [a.ma_so_hv], "A4"), "Content-Disposition": f'inline; filename="{filename}"'},
     )
 
 
@@ -1074,9 +1106,12 @@ def print_applicant_now(
     mark_printed: bool = Query(False),
     db: Session = Depends(get_db),
 ):
+    if mark_printed and request.method == "GET":
+        raise HTTPException(405, "Dùng POST để ghi nhận đã in")
     return _do_print(ma_so_hv, mark_printed, db, request=request)
 
 @router.get("/{ma_so_hv}/print-a5")
+@router.get("/print/a5/{ma_so_hv}")
 def print_applicant_a5(
     ma_so_hv: str,
     request: Request,
@@ -1105,29 +1140,21 @@ def print_applicant_a5(
     docs_for_pdf = [
         type("obj", (), {
             "code": d.code,
-            "name": d.code,
+            "name": d.display_name or d.code,
             "so_luong": int(d.so_luong or 0)
         }) for d in docs
     ]
 
     # ===== Gọi PDF service =====
 
-    pdf_path = render_student_receipt_pdf_a5(
-        a=a,
-        docs=docs_for_pdf,
-        out_dir=tempfile.gettempdir()
-    )
-
-    # đọc để stream ra browser
-    with open(pdf_path, "rb") as f:
-        pdf_bytes = f.read()
+    pdf_bytes = render_student_receipt_pdf_a5(a=a, docs=docs_for_pdf)
 
     filename = _pdf_filename(a, "A5")
 
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        headers={**print_headers(request, [a.ma_so_hv], "A5"), "Content-Disposition": f'inline; filename="{filename}"'},
     )
 
 
@@ -1135,12 +1162,15 @@ def print_applicant_a5(
 def print_applicant_now_post(
     ma_so_hv: str,
     request: Request,
-    mark_printed: bool = Query(True),
+    mark_printed: bool = Query(False),
     db: Session = Depends(get_db),
 ):
+    if mark_printed and request.method == "GET":
+        raise HTTPException(405, "Dùng POST để ghi nhận đã in")
     return _do_print(ma_so_hv, mark_printed, db, request=request)
 
 @router.get("/{ma_so_hv}/postal-print")
+@router.get("/{ma_so_hv}/folder-cover")
 def print_postal(
     ma_so_hv: str,
     request: Request,
@@ -1168,12 +1198,12 @@ def print_postal(
 
     pdf_bytes = render_postal_pdf(a, items, docs)
 
-    filename = _pdf_filename(a, "POSTAL")
+    filename = _pdf_filename(a, "BIA_HO_SO")
 
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        headers={**print_headers(request, [a.ma_so_hv], "COVER"), "Content-Disposition": f'inline; filename="{filename}"'},
     )
 
 @router.get("/print/email-receipt/{ma_so_hv}")
@@ -1202,7 +1232,7 @@ def print_email_receipt(
     docs_for_pdf = [
         type("obj", (), {
             "code": d.code,
-            "name": d.code,
+            "name": d.display_name or d.code,
             "so_luong": int(d.so_luong or 0)
         }) for d in docs
     ]
@@ -1214,13 +1244,13 @@ def print_email_receipt(
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        headers={**print_headers(request, [a.ma_so_hv], "EMAILA5"), "Content-Disposition": f'inline; filename="{filename}"'},
     )
 
 # ================= Recent =================
 @router.get("/recent")
-def get_recent_applicants(db: Session = Depends(get_db), limit: int = 50):
-    rows = db.query(Applicant).order_by(Applicant.created_at.desc()).limit(limit).all()
+def get_recent_applicants(db: Session = Depends(get_db), limit: int = Query(50, ge=1, le=100)):
+    rows = exclude_deleted(Applicant, db.query(Applicant)).order_by(Applicant.created_at.desc(), Applicant.ma_so_hv).limit(limit).all()
     return [{
         "ma_so_hv": a.ma_so_hv,
         "ma_ho_so": a.ma_ho_so,

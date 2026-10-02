@@ -40,7 +40,8 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="label">Mã hồ sơ</label>
-            <input class="input" id="ma_ho_so" placeholder="0000" readonly />
+            <input class="input" id="ma_ho_so" placeholder="Chọn ngành, khóa và đợt" readonly />
+            <p class="text-xs text-gray-500 mt-1">Mã ngành - đợt - STT (CNTT-01-0001), cấp khi lưu. STT bắt đầu lại theo từng ngành/khóa/đợt.</p>
           </div>
           <div>
             <label class="label">Ngày nhận HS</label>
@@ -60,8 +61,6 @@
               <option value="">-- Chọn đợt --</option>
               <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
               <option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
-              <option>11</option><option>12</option><option>13</option><option>14</option><option>15</option>
-              <option>16</option><option>17</option><option>18</option><option>19</option><option>20</option>
             </select>
           </div>
         </div>
@@ -115,17 +114,9 @@
             <label class="label">Ngành nhập học</label>
             <select class="input" id="nganh_nhap_hoc">
               <option value="">-- Chọn ngành --</option>
-              <option>Tâm lý học</option>
-              <option>Ngôn ngữ Anh</option>
-              <option>Công nghệ thông tin</option>
-              <option>Quản trị kinh doanh</option>
-              <option>Kế toán</option>
-              <option>Luật kinh tế</option>
-              <option>Quản lý xây dựng</option>
-              <option>Tài chính - Ngân hàng</option>
-              <option>Marketing</option>
-              <option>Quản trị khách sạn</option>
-              <option>Quản trị dịch vụ du lịch và lữ hành</option>
+              {% for major_name, major_code in major_catalog %}
+              <option value="{{ major_name }}" data-code="{{ major_code }}">{{ major_name }} ({{ major_code }})</option>
+              {% endfor %}
             </select>
           </div>
           <div>
@@ -285,5 +276,5 @@
 {% endblock %}
 
 {% block scripts %}
-  <script src="/js/compilation.js"></script>
+  <script src="/js/compilation.js?v=20261002-search-print-6"></script>
 {% endblock %}

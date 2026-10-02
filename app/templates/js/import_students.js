@@ -1,3 +1,4 @@
+function escapeImportHtml(value) { return String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch])); }
 /*JS code for import_students.html*/
 /* ===== Toast (Tailwind) ===== */
 function showToast(msg, type='info', ms=4000) {
@@ -8,7 +9,7 @@ function showToast(msg, type='info', ms=4000) {
     box.className = `${color} text-white text-sm px-4 py-3 rounded-xl shadow-xl ring-1 ring-black/5 transition transform pointer-events-auto`;
     box.style.opacity = '0';
     box.style.translate = '0 -6px';
-    box.innerHTML = msg;
+    box.textContent = msg;
     wrap.appendChild(box);
     requestAnimationFrame(() => { box.style.opacity='1'; box.style.translate='0 0'; });
     box.addEventListener('click', () => dismiss());
@@ -120,6 +121,7 @@ async function apiFetch(path, init = {}){
 
 /* ===== Log & progress (nguyên khối từ file import cũ) ===== */
 let parsedRows = [];
+let parsedHeaders = [];
 let stopFlag = false;
 const results = [];
 
@@ -185,9 +187,12 @@ function renderResults(){
     tbody.innerHTML = results.map(r => `
     <tr class="${rowClass(r.type)}">
         <td class="text-center border-b">${r.idx}</td>
-        <td class="text-center border-b whitespace-nowrap font-medium">${r.data?.ma_ho_so || '—'}</td>
+        <td class="text-center border-b whitespace-nowrap font-medium">${escapeImportHtml(r.data?.ma_ho_so || '—')}</td>
         <td class="text-center border-b">${badge(r.type)}</td>
-        <td class="text-left border-b whitespace-normal break-words">${translateMessage(r.msg || '')}</td>
+        <td class="text-left border-b whitespace-normal break-words">${escapeImportHtml(translateMessage(r.msg || ''))}</td>
+        <td class="text-center border-b whitespace-nowrap">${r.type === 'OK' && r.data?.ma_so_hv ? `
+            <a class="text-blue-600 hover:underline" target="_blank" rel="noopener" href="${escapeImportHtml(makeUrl('/applicants/' + encodeURIComponent(r.data.ma_so_hv) + '/print'))}">In A4</a>
+            · <a class="text-blue-600 hover:underline" target="_blank" rel="noopener" href="${escapeImportHtml(makeUrl('/applicants/' + encodeURIComponent(r.data.ma_so_hv) + '/print-a5'))}">In A5</a>` : '—'}</td>
     </tr>
     `).join('');
 
@@ -209,6 +214,7 @@ function setBar(done, total){
 /* ===== Field defs, mapping, file parsing, preview, date helpers, gender, split name ===== */
 const FIELD_DEFS = [
     {key:"ma_ho_so",       label:"Mã hồ sơ",        aliases:["ma ho so","ma_hs","ma_hoso","hoso","code"]},
+    {key:"ho_ten", label:"Họ và Tên", aliases:["ho ten", "họ tên", "ho_ten", "fullname"]},
     {key:"ho_dem",         label:"Họ đệm",          aliases:["ho dem","hodem","last name","ho"]},
     {key:"ten",            label:"Tên",             aliases:["ten goi","first name","tên gọi"]},
     {key:"ma_so_hv",       label:"Mã số HV",        aliases:["mshv","ma so","ma hoc vien","ma_hv","mahv","mssv"]},
@@ -222,15 +228,24 @@ const FIELD_DEFS = [
     {key:"khoa",           label:"Khóa",            aliases:["nien khoa","khoa hoc","nk"]},
     {key:"da_tn_truoc_do", label:"Đối tượng TN",    aliases:["doi tuong","doi tuong tn","doi tuong tot nghiep","da tn","trinh do"]},
     {key:"ghi_chu",        label:"Ghi chú",         aliases:["note","ghi chu"]},
+    {key:"ngay_nhan_hs", label:"Ngày nhận hồ sơ", aliases:["ngay nhan hs", "ngay nhan", "ngay_nhan_hs"]},
+    {key:"nguoi_nhan_ky_ten", label:"Người nhận hồ sơ", aliases:["nguoi nhan", "nguoi tiep nhan", "nguoi_nhan_ky_ten"]},
 ];
 const LABEL_BY_KEY = Object.fromEntries(FIELD_DEFS.map(f=>[f.key,f.label]));
 const KEY_BY_LABEL = Object.fromEntries(FIELD_DEFS.map(f=>[f.label,f.key]));
-const norm = s => String(s||"").toLowerCase().trim().replace(/\s+/g,' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const norm = s => String(s||"").toLowerCase().trim().replace(/\s+/g,' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g, 'd');
+const archivedImport = () => $('importArchived').checked;
+function mappingFields() {
+    return archivedImport() ? [...FIELD_DEFS, ...(ACTIVE_CHECKLIST?.items || []).map(item => ({
+        key: `doc:${item.code}`, label: `SL - ${item.display_name || item.code} [${item.code}]`,
+        aliases: [item.code, item.display_name || item.code, `SL - ${item.display_name || item.code}`, `sl_${item.code}`]
+    }))] : FIELD_DEFS.filter(field => !['ngay_nhan_hs', 'nguoi_nhan_ky_ten'].includes(field.key));
+}
 
 function guessMappings(headers){
     const hNorm = headers.map(h=>norm(h));
     const map = {};
-    FIELD_DEFS.forEach(f=>{
+    mappingFields().forEach(f=>{
     const idxExact = hNorm.findIndex(hn => hn === norm(f.key) || hn === norm(f.label));
     if (idxExact >= 0) { map[f.key] = headers[idxExact]; return; }
     if (f.aliases?.length){
@@ -241,16 +256,17 @@ function guessMappings(headers){
     return map;
 }
 function renderMappingUI(headers) {
+    parsedHeaders = headers;
     const container = $('mappings');
     container.innerHTML = "";
     const guess = guessMappings(headers);
-    FIELD_DEFS.forEach(f => {
+    mappingFields().forEach(f => {
     const wrap = document.createElement('div');
     wrap.innerHTML = `
-        <label class="text-xs text-gray-600">${LABEL_BY_KEY[f.key]}</label>
-        <select class="input mt-1" data-field="${f.key}">
+        <label class="text-xs text-gray-600">${escapeImportHtml(f.label)}</label>
+        <select class="input mt-1" data-field="${escapeImportHtml(f.key)}">
         <option value="">— Chọn cột —</option>
-        ${headers.map(h => `<option ${guess[f.key] === h ? 'selected' : ''}>${h}</option>`).join("")}
+        ${headers.map(h => `<option ${guess[f.key] === h ? 'selected' : ''}>${escapeImportHtml(h)}</option>`).join("")}
         </select>`;
     container.appendChild(wrap);
     });
@@ -262,6 +278,10 @@ function getMappingFromUI(){
     return m;
 }
 $('btnResetMap').onclick = ()=>{ document.querySelectorAll('#mappings select').forEach(s=> s.selectedIndex = 0); };
+$('importArchived').addEventListener('change', async () => {
+    if (archivedImport() && !ACTIVE_CHECKLIST?.items?.length) await fetchActiveChecklist();
+    if (parsedHeaders.length) renderMappingUI(parsedHeaders);
+});
 
 function toArrayBuffer(file) {
     return new Promise((res, rej)=>{
@@ -272,14 +292,17 @@ function toArrayBuffer(file) {
     });
 }
 function parseCSV(text){
-    const lines = text.replace(/\r\n/g,"\n").split("\n").filter(x=>x.trim().length>0);
-    const headers = lines[0].split(",").map(s=>s.trim());
-    const rows = lines.slice(1).map(ln=>{ 
-    const cols = ln.split(",");
-    const theObj = {}; headers.forEach((h,i)=> theObj[h]= (cols[i] ?? "").trim());
-    return theObj;
-    });
+    const workbook = XLSX.read(text.replace(/^\uFEFF/, ''), {type: 'string', raw: true});
+    const records = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1, defval: ''});
+    const headers = (records[0] || []).map(value => String(value).trim());
+    validateHeaders(headers);
+    const rows = records.slice(1).filter(record => record.some(value => String(value).trim())).map(record =>
+        Object.fromEntries(headers.map((header, index) => [header, String(record[index] ?? '').trim()])));
     return {headers, rows};
+}
+function validateHeaders(headers) {
+    if (!headers.length || headers.some(header => !header) || new Set(headers.map(norm)).size !== headers.length)
+        throw new Error('Tên cột phải có nội dung và không trùng nhau. Vui lòng dùng file mẫu.');
 }
 
 const dz = $('drop'), fileInput = $('file');
@@ -295,6 +318,7 @@ fileInput.addEventListener("change", async (e) => {
     if(!f) return;
 
     parsedRows = []; 
+    parsedHeaders = [];
     $('thead').innerHTML=""; 
     $('tbody').innerHTML="";
 
@@ -311,6 +335,7 @@ fileInput.addEventListener("change", async (e) => {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
         const headers = (rows[0] || []).map(x => String(x).trim());
+        validateHeaders(headers);
         const objs = rows.slice(1)
         .filter(r => r.some(c => String(c).trim() !== ""))
         .map(r => {
@@ -333,11 +358,11 @@ function labelForPreview(h){
 }
 function preview(headers, rows) {
   // Hiển thị tiêu đề bảng
-  $('thead').innerHTML = `<tr>${headers.map(h => `<th class="text-left">${labelForPreview(h)}</th>`).join("")}</tr>`;
+  $('thead').innerHTML = `<tr>${headers.map(h => `<th class="text-left">${escapeImportHtml(labelForPreview(h))}</th>`).join("")}</tr>`;
 
   // Hiển thị tất cả các dòng
   $('tbody').innerHTML = rows.map(r => 
-    `<tr>${headers.map(h => `<td>${(r[h] ?? "")}</td>`).join("")}</tr>`
+    `<tr>${headers.map(h => `<td>${escapeImportHtml(r[h])}</td>`).join("")}</tr>`
   ).join("");
 
   // Hiển thị số dòng dữ liệu
@@ -406,7 +431,6 @@ function _split_vn(fullname) {
     return [parts.slice(0, -1).join(" "), parts[parts.length - 1]];
 }
 
-function extractSeq4(code){ const m = String(code||'').match(/(\d{4})$/); return m?m[1]:''; }
 
 let ACTIVE_CHECKLIST = null;
 
@@ -414,10 +438,10 @@ async function makeApplicantPayload(src, map){
     const pick = (key, d="") => (map[key] ? String(src[map[key]] ?? "").trim() : d);
 
     const ho_ten_raw = pick("ho_ten") || [pick("ho_dem"), pick("ten")].filter(Boolean).join(" ").trim();
-    const seq4 = extractSeq4(pick("ma_ho_so", ""));
+    const receiptCode = pick("ma_ho_so", "");
 
     const ngay_nhan_form = $('defaultNgayNhan').value;
-    const ngay_nhan_iso  = parseDateFlexible(ngay_nhan_form) || ngay_nhan_form;
+    const ngay_nhan_iso = archivedImport() ? ArchiveImport.date(pick('ngay_nhan_hs') || ngay_nhan_form) : (parseDateFlexible(ngay_nhan_form) || ngay_nhan_form);
     const ngay_sinh_iso  = parseDateFlexible(pick("ngay_sinh")) || null;
     const gioi_tinh      = normalizeGender(pick("gioi_tinh")) || null;
 
@@ -435,12 +459,13 @@ async function makeApplicantPayload(src, map){
     khoa: pick("khoa") || null,
     da_tn_truoc_do: pick("da_tn_truoc_do") || null,
     ghi_chu: pick("ghi_chu") || null,
-    nguoi_nhan_ky_ten: $('nguoiNhan').value.trim() || null,
-    docs: [],
+    nguoi_nhan_ky_ten: (archivedImport() ? pick('nguoi_nhan_ky_ten') : '') || $('nguoiNhan').value.trim() || null,
+    docs: archivedImport() ? ArchiveImport.documents(src, map, ACTIVE_CHECKLIST?.items) : [],
+    import_archived: archivedImport(),
     checklist_version_name: ACTIVE_CHECKLIST?.version_name || "v1",
     };
 
-    if (seq4) payload.ma_ho_so = seq4;
+    if (receiptCode) payload.ma_ho_so = receiptCode;
     return payload;
 }
 
@@ -450,19 +475,31 @@ function requireMappings(m){
     const need = [];
     if (!(hasFull || hasSplit)) need.push("Họ và Tên (hoặc Họ đệm + Tên)");
     if (!m["ma_so_hv"]) need.push("Mã số HV");
+    if (archivedImport() && !ACTIVE_CHECKLIST?.items?.length) need.push('Danh mục giấy tờ (tải lại trang)');
+    else if (archivedImport() && !ACTIVE_CHECKLIST.items.some(item => m[`doc:${item.code}`])) need.push('Ít nhất một cột số lượng giấy tờ');
+    const chosen = Object.values(m);
+    if (new Set(chosen).size !== chosen.length) need.push('Mỗi cột Excel chỉ được gán cho một trường');
     if (need.length){ alert("Thiếu map cột: " + need.join(", ")); return false; }
     return true;
 }
 
 $('btnPreview').onclick = async () => {
+    if (!parsedRows.length) { showToast('Chưa chọn file dữ liệu.', 'warn'); return; }
     const m = getMappingFromUI();
     if (!requireMappings(m)) return;
     const test = [];
-    for (let i=0;i<Math.min(5, parsedRows.length); i++){
-    test.push(await makeApplicantPayload(parsedRows[i], m));
+    for (let i=0;i<Math.min(50, parsedRows.length); i++) {
+        try {
+            const body = await makeApplicantPayload(parsedRows[i], m);
+            test.push({'Dòng Excel': i + 2, 'Mã số HV': body.ma_so_hv, 'Họ và Tên': body.ho_ten,
+                'Mã hồ sơ': body.ma_ho_so || '', 'Ngày nhận': body.ngay_nhan_hs, 'Người nhận': body.nguoi_nhan_ky_ten,
+                ...Object.fromEntries(body.docs.map(doc => [ACTIVE_CHECKLIST.items.find(item => item.code === doc.code)?.display_name || doc.code, doc.so_luong])),
+                'Kiểm tra': 'Sẵn sàng gửi; server sẽ kiểm tra trùng'});
+        } catch (error) { test.push({'Dòng Excel': i + 2, 'Kiểm tra': error.message}); }
     }
-    console.log("Preview payloads (5 dòng đầu):", test);
-    alert("Đã log 5 payload xem trước (F12 → Console).");
+    const headers = [...new Set(test.flatMap(row => Object.keys(row)))];
+    preview(headers, test);
+    $('dataCount').textContent = `Xem trước ${test.length}/${parsedRows.length} dòng đã chuyển đổi; chưa lưu dữ liệu.`;
 };
 
 $('btnUpload').onclick = async ()=> {
@@ -475,13 +512,23 @@ $('btnUpload').onclick = async ()=> {
 
     const m = getMappingFromUI();
     if (!requireMappings(m)) { $('btnUpload').disabled=false; return; }
+    const lockedControls = ['importArchived', 'file', 'defaultNgayNhan', 'apiBase', 'btnResetMap', 'btnPreview', 'btnTemplateEmpty', 'btnTemplateSample'].map($)
+        .concat(Array.from(document.querySelectorAll('#mappings select')));
+    lockedControls.forEach(control => { if (control) control.disabled = true; });
 
     const total = parsedRows.length; let done=0;
     setBar(0,total);
 
     for (let i=0;i<parsedRows.length;i++){
     if (stopFlag) break;
-    const body = await makeApplicantPayload(parsedRows[i], m);
+    let body = {ma_so_hv: m.ma_so_hv ? parsedRows[i][m.ma_so_hv] : ''};
+    try {
+        body = await makeApplicantPayload(parsedRows[i], m);
+    } catch (error) {
+        done++; setBar(done, total);
+        addResult('ERR', i+1, body, error.message);
+        continue;
+    }
     if (body.ma_ho_so === "") delete body.ma_ho_so;
     if (!body.ho_ten || !body.ma_so_hv){
         done++; setBar(done,total);
@@ -499,7 +546,8 @@ $('btnUpload').onclick = async ()=> {
         } else {
         const j = await r.json();
         if (j?.ma_so_hv) body.ma_so_hv = j.ma_so_hv;
-        addResult('OK', i+1, body, `Tạo thành công (MSSV: ${j.ma_so_hv || j.id || body.ma_so_hv})`);
+        body.ma_ho_so = j.ma_ho_so || '';
+        addResult('OK', i+1, body, `Đã lưu ${body.docs.length ? 'hồ sơ và giấy tờ' : 'học viên'} (MSSV: ${j.ma_so_hv || j.id || body.ma_so_hv}). Có thể in biên nhận từ Danh sách học viên.`);
         }
     }catch(e){
         addResult('ERR', i+1, body, e.message);
@@ -512,7 +560,7 @@ $('btnUpload').onclick = async ()=> {
     const okC   = results.filter(r=>r.type==='OK').length;
     const errC  = results.filter(r=>r.type==='ERR').length;
     const skipC = results.filter(r=>r.type==='SKIP').length;
-    const summary = `Xong import: <b>${okC}</b> thành công • <b>${errC}</b> lỗi • <b>${skipC}</b> bỏ qua.`;
+    const summary = `Xong import: ${okC} thành công • ${errC} lỗi • ${skipC} bỏ qua.`;
     showToast(summary, errC ? (okC ? 'warn' : 'error') : 'success', 7000);
 
     if (errC > 0) {
@@ -524,6 +572,7 @@ $('btnUpload').onclick = async ()=> {
     document.getElementById('resultsTable')?.scrollIntoView({ behavior:'smooth', block:'start' });
     $('btnStop').classList.add('hidden');
     $('btnUpload').disabled = false;
+    lockedControls.forEach(control => { if (control) control.disabled = false; });
 };
 $('btnStop').onclick = ()=>{ stopFlag = true; };
 
@@ -548,7 +597,7 @@ async function ensureNguoiNhanFromSession(){
         $('btnUpload').disabled = false;
         $('btnPreview').disabled = false;
     } else {
-        $('meStatus').innerHTML = `Tài khoản <b>${name}</b> (${me.role}) không có quyền import.`;
+        $('meStatus').innerHTML = `Tài khoản <b>${escapeImportHtml(name)}</b> (${me.role}) không có quyền import.`;
         $('btnUpload').disabled = true;
         $('btnPreview').disabled = true;
     }
@@ -572,13 +621,15 @@ async function fetchActiveChecklist() {
     const r = await apiFetch("/checklist/active");
     if (r.ok) {
         ACTIVE_CHECKLIST = await r.json();
-        console.log("✅ Checklist active:", ACTIVE_CHECKLIST.version_name);
     } else {
         ACTIVE_CHECKLIST = { version_name: "v1" };
     }
     } catch {
     ACTIVE_CHECKLIST = { version_name: "v1" };
     }
+    $('checklistStatus').textContent = ACTIVE_CHECKLIST?.items?.length
+        ? `Danh mục ${ACTIVE_CHECKLIST.version_name}: ${ACTIVE_CHECKLIST.items.length} loại giấy tờ.`
+        : 'Chưa có danh mục giấy tờ. Cần tải được danh mục trước khi import hồ sơ lưu trữ.';
 }
 
 function isoToVN(iso){
@@ -645,11 +696,7 @@ function exportResults(onlyErrors=false){
 
 /* ===== Template headers & sample rows cho file mẫu ===== */
 function buildTemplateHeaders(){
-    return [
-        "Mã hồ sơ", "Họ đệm", "Tên", "Mã số HV", "Giới tính", "Dân tộc", 
-        "Ngày sinh", "Số ĐT", "Email học viên", "Ngành nhập học", "Đợt", "Khóa", "Đối tượng TN", 
-        "Ghi chú"
-    ];
+    return mappingFields().filter(field => field.key !== 'ho_ten').map(field => field.label);
 }
 
 function sampleRows(){
@@ -668,7 +715,12 @@ function sampleRows(){
 }
 
 /* ===== Template Excel mẫu ===== */
-function exportTemplate(withSample = false) {
+async function exportTemplate(withSample = false) {
+    if (archivedImport() && !ACTIVE_CHECKLIST?.items?.length) await fetchActiveChecklist();
+    if (archivedImport() && !ACTIVE_CHECKLIST?.items?.length) {
+        showToast('Chưa tải được danh mục giấy tờ để tạo mẫu.', 'error');
+        return;
+    }
     const headers = buildTemplateHeaders();
     const aoa = [headers];
 
@@ -676,7 +728,10 @@ function exportTemplate(withSample = false) {
         const samples = sampleRows();
         for (const row of samples) {
             const line = headers.map(h => {
-                const key = KEY_BY_LABEL[h] || null;  // dùng map label → key có sẵn
+                const key = mappingFields().find(field => field.label === h)?.key;
+                if (key?.startsWith('doc:')) return aoa.length === 1 ? 1 : 0;
+                if (key === 'ngay_nhan_hs') return '15/09/2025';
+                if (key === 'nguoi_nhan_ky_ten') return 'Nguyễn Thị Người Nhận';
                 return key ? (row[key] ?? "") : "";
             });
             aoa.push(line);
@@ -705,8 +760,26 @@ function exportTemplate(withSample = false) {
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, "Template");
+    if (archivedImport()) {
+        ws['!cols'] = headers.map(header => ({wch: header.startsWith('SL - ') ? 30 : 20}));
+        const instructions = XLSX.utils.aoa_to_sheet([
+            ['HƯỚNG DẪN IMPORT HỒ SƠ ĐÃ LƯU TRỮ'],
+            ['Bật Import hồ sơ đã lưu trữ trước khi tải mẫu và khi nhập file.'],
+            ['Mỗi học viên một dòng. Giữ Mã số HV, Mã hồ sơ và số điện thoại ở dạng Text để không mất số 0 đầu.'],
+            ['Các cột SL: nhập số nguyên 0–1000. Ô trống/0 hoặc cột không gán = chưa nộp.'],
+            ['Ngày nhận hồ sơ: dd/MM/yyyy, yyyy-MM-dd hoặc ô ngày Excel. Trống lấy ngày mặc định trên màn hình.'],
+            ['Người nhận hồ sơ trống: lấy tên tài khoản đang nhập. Nhật ký vẫn ghi đúng người thực hiện import.'],
+            ['Mã hồ sơ cũ được giữ nguyên; bỏ trống để cấp mã ngành + STT khi tiếp nhận. STT riêng theo ngành/khóa/đợt.'],
+            ['Học viên/mã hồ sơ trùng sẽ báo lỗi, không cập nhật hoặc ghi đè hồ sơ có sẵn.'],
+            ['Danh mục giấy tờ: ' + ACTIVE_CHECKLIST.version_name],
+            ['Bấm Xem trước để kiểm tra số lượng, sau đó Bắt đầu import.'],
+            ['Sau khi lưu: Danh sách học viên → chọn học viên → in biên nhận A4/A5.']
+        ]);
+        instructions['!cols'] = [{wch: 110}];
+        XLSX.utils.book_append_sheet(wb, instructions, 'HuongDan');
+    }
 
-    const fname = withSample
+    const fname = archivedImport() ? (withSample ? 'template_ho_so_luu_tru_sample.xlsx' : 'template_ho_so_luu_tru.xlsx') : withSample
         ? "template_import_hoc_vien_sample.xlsx"
         : "template_import_hoc_vien.xlsx";
 

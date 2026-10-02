@@ -53,6 +53,7 @@
     DELETE_REQUEST:"Yêu cầu xóa",
     RESTORE:"Khôi phục",
     PRINT_IN:"In",     // ✅ thêm
+    PRINT:"Đã xác nhận in",
     EXPORT:"Xuất Excel", // ✅ thêm
     EMAIL_SENT: "Gửi email",
     EXCEPTION:"Lỗi hệ thống",
@@ -303,7 +304,7 @@
         <td class="text-center whitespace-nowrap">${when ? formatVNDateTime(when) : ''}</td>
         <td class="text-center">${escapeHtml(displayActor(row))}</td>
         <td class="text-center"><span class="chip ${escapeHtml(actionCls)}">${escapeHtml(actionLabel)}</span></td>
-        <td class="text-center whitespace-nowrap">${escapeHtml(row.target_id ?? '—')}</td>
+        <td class="text-center whitespace-nowrap">${escapeHtml(row.target_type === 'PrintJob' ? (row.new_values?.mshv?.length === 1 ? row.new_values.mshv[0] : `${row.new_values?.count || 0} hồ sơ`) : (row.target_id ?? '—'))}</td>
         <td class="text-center">
           ${row.status === 'SUCCESS' ? '<span class="status-ok">OK</span>' : '<span class="status-fail">FAIL</span>'}
         </td>
@@ -533,9 +534,9 @@
   /* ====== Batch (PRINT/EXPORT) detail ====== */
   function renderBatchActionDetail(d){
     const nv = (d?.new_values || {});
-    const scope = nv.scope || '—';
+    const scope = ({SINGLE:'Một hồ sơ', MULTIPLE:'Nhiều hồ sơ', day:'Theo ngày', dot:'Theo đợt'})[nv.scope] || nv.scope || '—';
     const filters = nv.filters || {};
-    const nameMode = nv.name_mode || '—';
+    const nameMode = ({A4:'Biên nhận hồ sơ',A5:'Biên nhận email',EMAILA5:'Biên nhận email',COVER:'Bìa hồ sơ',POSTAL:'Bìa hồ sơ'})[nv.name_mode] || nv.name_mode || '—';
     const count = (typeof nv.count === 'number') ? nv.count : (d?.count ?? '—');
     
 
@@ -554,11 +555,12 @@
         <div class="bg-slate-50 font-semibold p-2">Hành động</div>     <div class="p-2">${escapeHtml(actionVi(d.action))}</div>
         <div class="bg-slate-50 font-semibold p-2">Trạng thái</div>    <div class="p-2">${escapeHtml(d.status || '')}</div>
         <div class="bg-slate-50 font-semibold p-2">Đường dẫn</div>     <div class="p-2">${escapeHtml(d.path || '')}</div>
-        <div class="bg-slate-50 font-semibold p-2">Scope</div>         <div class="p-2">${escapeHtml(String(scope))}</div>
-        <div class="bg-slate-50 font-semibold p-2">Name mode</div>     <div class="p-2">${escapeHtml(String(nameMode))}</div>
+        <div class="bg-slate-50 font-semibold p-2">Phạm vi</div>         <div class="p-2">${escapeHtml(String(scope))}</div>
+        <div class="bg-slate-50 font-semibold p-2">Loại bản in/xuất</div>     <div class="p-2">${escapeHtml(String(nameMode))}</div>
         <div class="bg-slate-50 font-semibold p-2">Số bản ghi</div>    <div class="p-2">${escapeHtml(String(count))}</div>
       </div>
 
+      ${Array.isArray(nv.mshv) ? `<h4 class="mt-6 mb-2 font-bold text-blue-800">Mã số học viên đã xác nhận in</h4><div class="p-3 border rounded-xl">${nv.mshv.map(id=>escapeHtml(String(id))).join(', ')}</div>` : ''}
       <h4 class="mt-6 mb-2 font-bold text-blue-800">Bộ lọc</h4>
       <div class="grid grid-cols-[220px_1fr] border border-gray-200 rounded-xl overflow-hidden">
         ${filterRows}

@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, String, Date, Integer, Boolean, ForeignKey, Text, DateTime, text, func
+    Column, String, Date, Integer, Boolean, ForeignKey, Text, DateTime, text, func, Index, UniqueConstraint, event
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -26,8 +26,8 @@ class Applicant(Base):
     so_dt = Column(String(32), nullable=True)
 
     nganh_nhap_hoc = Column(String(255), nullable=True)
-    dot = Column(String(64), nullable=True)
-    khoa = Column(String(64), nullable=True)
+    dot = Column(String(64), nullable=False, default="", server_default="")
+    khoa = Column(String(64), nullable=False, default="", server_default="")
     da_tn_truoc_do = Column(String(64), nullable=True)
 
     ghi_chu = Column(Text, nullable=True)
@@ -35,13 +35,22 @@ class Applicant(Base):
 
     status  = Column(String(32), nullable=False, server_default="saved")
     printed = Column(Boolean, nullable=False, server_default=text("0"))
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by = Column(String(255), nullable=True)
+    deleted_reason = Column(Text, nullable=True)
+    __table_args__ = (
+        UniqueConstraint("khoa", "dot", "ma_ho_so", name="uq_applicant_receipt_scope"),
+        Index("ix_applicants_scope_created", "khoa", "dot", "created_at"),
+        Index("ix_applicants_received_status", "ngay_nhan_hs", "status"),
+        Index("ix_applicants_created", "created_at", "ma_so_hv"),
+    )
 
     checklist_version_id = Column(Integer, ForeignKey("checklist_versions.id"), nullable=True)
 
     created_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
     updated_at = Column(
         DateTime,
-        server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+        server_default=text("CURRENT_TIMESTAMP"), onupdate=func.now()
     )
 
     # Quan hệ
@@ -94,3 +103,11 @@ class ApplicantDoc(Base):
         primaryjoin="Applicant.ma_so_hv==ApplicantDoc.applicant_ma_so_hv",
         foreign_keys=[applicant_ma_so_hv],
     )
+
+
+@event.listens_for(Applicant, "before_insert")
+@event.listens_for(Applicant, "before_update")
+def normalize_receipt_scope(mapper, connection, target):
+    target.khoa = (target.khoa or "").strip()
+    target.dot = (target.dot or "").strip()
+    target.ma_ho_so = (target.ma_ho_so or "").strip() or None

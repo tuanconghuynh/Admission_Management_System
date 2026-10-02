@@ -104,31 +104,6 @@ def _normalize_text(s: Optional[str]) -> str:
     s = re.sub(r"[^a-z0-9]", "", s)
     return s
 
-# ---------- Document allocation rules ----------
-# Use the exact column names you provided; normalization + fuzzy will handle variants
-SPECIAL_DOCS = [
-    "Bằng tốt nghiệp Đại học",
-    "Bảng điểm toàn khoá học Đại học",
-    "Bằng tốt nghiệp Cao đẳng",
-    "Bảng điểm toàn khóa học Cao đẳng",
-    "Bằng tốt nghiệp Trung Cấp",
-    "Bảng điểm toàn khóa Trung Cấp",
-]
-EXEMPT_DOC = "Đơn miễn giảm"
-
-_SPECIAL_DOCS_N = {_normalize_text(x) for x in SPECIAL_DOCS}
-_EXEMPT_DOC_N = _normalize_text(EXEMPT_DOC)
-
-def _is_special_item(it: Any) -> bool:
-    code = getattr(it, "code", None)
-    disp = getattr(it, "display_name", None)
-    return (_normalize_text(code) in _SPECIAL_DOCS_N) or (_normalize_text(disp) in _SPECIAL_DOCS_N)
-
-def _is_exempt_item(it: Any) -> bool:
-    code = getattr(it, "code", None)
-    disp = getattr(it, "display_name", None)
-    return (_normalize_text(code) == _EXEMPT_DOC_N) or (_normalize_text(disp) == _EXEMPT_DOC_N)
-
 def _get_item_qty_from_dm(dm: Dict[str, int], it: Any) -> int:
     """
     Robust lookup of qty for item `it` in dm (mapping keys -> qty).
@@ -165,7 +140,7 @@ def _get_item_qty_from_dm(dm: Dict[str, int], it: Any) -> int:
     except Exception:
         pass
 
-    # fuzzy: try match against any dm key normalized
+    # Exact normalization only: similar document names must not share quantities.
     try:
         # build normalized map of dm keys to qty (cache)
         for k, v in dm.items():
@@ -173,7 +148,7 @@ def _get_item_qty_from_dm(dm: Dict[str, int], it: Any) -> int:
             if not kn:
                 continue
             # if normalized dm key is substring of item normalized OR vice versa
-            if (code_n and (kn in code_n or code_n in kn)) or (disp_n and (kn in disp_n or disp_n in kn)):
+            if kn in {code_n, disp_n}:
                 return int(v or 0)
     except Exception:
         pass
@@ -181,36 +156,6 @@ def _get_item_qty_from_dm(dm: Dict[str, int], it: Any) -> int:
     # fallback 0
     return 0
 
-def split_doc_rows(dm: Dict[str, int], items_all: List[ChecklistItem]) -> Tuple[List[int], List[int]]: # type: ignore
-    """
-    For one applicant's dm (code->qty) and ordered items_all returns:
-      - main_row: numbers for 'Hồ sơ Nhập học'
-      - reduced_row: numbers for 'Hồ sơ miễn giảm'
-    Rules:
-      - SPECIAL_DOCS: main = 1 if qty>0 else 0; reduced = qty - main
-      - EXEMPT_DOC: main = 0; reduced = qty
-      - other: main = qty; reduced = 0
-    Keep zeros as integers.
-    """
-    main_row: List[int] = []
-    reduced_row: List[int] = []
-
-    for it in items_all or []:
-        qty = _get_item_qty_from_dm(dm or {}, it)
-        if _is_special_item(it):
-            main_qty = 1 if qty > 0 else 0
-            reduced_qty = qty - main_qty if qty > 0 else 0
-        elif _is_exempt_item(it):
-            main_qty = 0
-            reduced_qty = qty
-        else:
-            main_qty = qty
-            reduced_qty = 0
-
-        main_row.append(main_qty)
-        reduced_row.append(reduced_qty)
-
-    return main_row, reduced_row
 
 # ---------- Export builder ----------
 def build_excel_bytes_by_items(
@@ -220,24 +165,28 @@ def build_excel_bytes_by_items(
     *,
     split_name: bool = False,
 ) -> bytes:
-    """
-    Build Excel with two sheets:
-      - 'Hồ sơ Nhập học' (main_row)
-      - 'Hồ sơ miễn giảm' (reduced_row)
-    """
+    """Export one sheet with the exact quantities received."""
+    # Include received historical codes that no longer exist in the checklist.
+    from types import SimpleNamespace
+    items = list(items or [])
+    known_codes = {item.code for item in items}
+    for document in docs or []:
+        if document.code and document.code not in known_codes:
+            items.append(SimpleNamespace(code=document.code, display_name=document.display_name or document.code))
+            known_codes.add(document.code)
     # Build mapping applicant_ma_so_hv -> {key_variant -> qty}
     docs_by_mssv: Dict[str, Dict[str, int]] = {}
     for d in docs or []:
         m = docs_by_mssv.setdefault(d.applicant_ma_so_hv, {})
         key = d.code
         # store original key
-        m[key] = int(d.so_luong or 0)
+        m[key] = m.get(key, 0) + int(d.so_luong or 0)
         # store normalized key too for faster direct lookup
         key_n = _normalize_text(key)
         if key_n:
             # only set normalized key if not already present (preserve original if duplicate)
-            if key_n not in m:
-                m[key_n] = int(d.so_luong or 0)
+            if key_n != key:
+                m[key_n] = m[key]
 
     base_headers = [
         "STT", "Mã hồ sơ", "Ngày nhận", "Email học viên"
@@ -259,7 +208,7 @@ def build_excel_bytes_by_items(
 
     # Sheet 1: Hồ sơ Nhập học
     ws = wb.active
-    ws.title = "Hồ sơ Nhập học"
+    ws.title = "Hồ sơ"
     ws.append(headers)
 
     for idx, a in enumerate(apps or [], start=1):
@@ -292,52 +241,14 @@ def build_excel_bytes_by_items(
 
         dm = docs_by_mssv.get(a.ma_so_hv, {})
 
-        main_row, _reduced_row = split_doc_rows(dm, items or [])
+        received_row = [_get_item_qty_from_dm(dm, item) for item in items or []]
 
         # Keep zeros as integers
-        row = common_prefix + name_cells + common_suffix + main_row
+        row = common_prefix + name_cells + common_suffix + received_row
         ws.append(row)
 
-    # Sheet 2: Hồ sơ miễn giảm
-    ws2 = wb.create_sheet("Hồ sơ miễn giảm")
-    ws2.append(headers)
-
-    for idx, a in enumerate(apps or [], start=1):
-        common_prefix = [
-            idx,
-            a.ma_ho_so or "",
-            _parse_to_date(getattr(a, "ngay_nhan_hs", None)),
-            a.email_hoc_vien or "",
-        ]
-
-        if split_name:
-            full = _display_name_from_obj(a)
-            ln, fn = _split_name_cells(a)
-            name_cells = [full, ln, fn]
-        else:
-            name_cells = [_display_name_from_obj(a)]
-
-        common_suffix = [
-            a.ma_so_hv or "",
-            _parse_to_date(getattr(a, "ngay_sinh", None)),
-            a.so_dt or "",
-            getattr(a, "nganh_nhap_hoc", None) or getattr(a, "nganh", None) or "",
-            a.dot or "",
-            getattr(a, "khoa", "") or "",
-            a.da_tn_truoc_do or "",
-            a.ghi_chu or "",
-            a.nguoi_nhan_ky_ten or "",
-            getattr(a, "dan_toc", None) or "",
-        ]
-
-        dm = docs_by_mssv.get(a.ma_so_hv, {})
-        _main_row, reduced_row = split_doc_rows(dm, items or [])
-
-        row = common_prefix + name_cells + common_suffix + reduced_row
-        ws2.append(row)
-
     # Freeze & autosize both sheets
-    for ws_sheet in (ws, ws2):
+    for ws_sheet in (ws,):
         ws_sheet.freeze_panes = "A2"
         for col in range(1, len(headers) + 1):
             letter = get_column_letter(col)
@@ -350,9 +261,13 @@ def build_excel_bytes_by_items(
 
     # Set date formats for date columns
     _set_date_format_by_header(ws, headers, header_names=["Ngày nhận", "Ngày sinh"])
-    _set_date_format_by_header(ws2, headers, header_names=["Ngày nhận", "Ngày sinh"])
 
     buf = BytesIO()
+    for worksheet in wb.worksheets:
+        for row in worksheet.iter_rows():
+            for cell in row:
+                if cell.data_type == "f":
+                    cell.data_type = "s"
     wb.save(buf)
     buf.seek(0)
     return buf.getvalue()

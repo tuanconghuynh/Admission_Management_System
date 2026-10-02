@@ -8,12 +8,14 @@ import hashlib
 from typing import Optional, Any, Dict
 
 from fastapi import Request
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 from app.models.audit import AuditLog
+from app.core.config import settings
 
 # Bí mật ký HMAC cho audit (đặt biến môi trường ở production)
-AUDIT_HMAC_SECRET = os.getenv("AUDIT_HMAC_SECRET", "audit-dev")
+AUDIT_HMAC_SECRET = settings.AUDIT_HMAC_SECRET or "audit-dev"
 
 # Giới hạn dung lượng JSON lưu trong cột JSON (bytes sau khi dumps)
 AUDIT_JSON_MAX_BYTES = int(os.getenv("AUDIT_JSON_MAX_BYTES", "200000"))  # ~200 KB
@@ -189,11 +191,15 @@ def write_audit(
     prev_values: Optional[Dict[str, Any]] = None,
     new_values: Optional[Dict[str, Any]] = None,
     request: Optional[Request] = None,
+    correlation_id: Optional[str] = None,
 ) -> AuditLog:
     """
     Ghi 1 dòng audit. Không commit ở đây (để caller chủ động).
     Bắt buộc set được hmac_hash để phù hợp DB NOT NULL.
     """
+    # Routine viewing and dry-run previews do not change application data.
+    if (action == 'READ' and status == 'SUCCESS') or action == 'BATCH_UPDATE_PREVIEW':
+        return None
     # Lấy actor từ session (nếu có)
     actor_id = None
     actor_name = None
@@ -215,16 +221,16 @@ def write_audit(
             pass
 
     ip = request.client.host if (request and request.client) else None
-    path = request.url.path if request else None
-    cid = getattr(request.state, "correlation_id", None) if request else None
+    path = request.url.path[:255] if request else None
+    cid = correlation_id or (getattr(request.state, "correlation_id", None) if request else None)
     if not cid:
         # Không tự generate UUID để tránh lệch với middleware tracing,
         # chỉ để rỗng nếu upstream chưa set.
         cid = None
 
     # Chuẩn hoá + redact JSON cho cột JSON của DB
-    prev_j = _norm_json(prev_values)
-    new_j = _norm_json(new_values)
+    prev_j = _norm_json(jsonable_encoder(prev_values))
+    new_j = _norm_json(jsonable_encoder(new_values))
 
     # Giới hạn kích thước để tránh lỗi DB (payload quá lớn)
     prev_j = _compact_json_size(prev_j, AUDIT_JSON_MAX_BYTES)

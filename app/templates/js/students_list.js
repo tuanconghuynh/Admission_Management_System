@@ -1,4 +1,5 @@
 // app/templates/js/students_list.js
+function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     // Ẩn lúc kiểm tra login
     document.documentElement.style.visibility = 'hidden';
 
@@ -41,11 +42,6 @@
           const d = dayEl.value.trim();
           if (!d){ alert("Anh chọn ngày đã"); return; }
 
-          await journalTrack({
-            action: "PRINT_IN",
-            detail: { scope:"DAY", filters:{ day:d }, name_mode:type, count:null }
-          });
-
           const url = `/batch/print?day=${encodeURIComponent(d)}&type=${type}`;
           await openPdfOrAlert(url);
           return;
@@ -56,11 +52,6 @@
           const khoa = $("dotKhoa")?.value.trim() || "";
 
           if (!dot){ alert("Nhập tên đợt trước đã."); return; }
-
-          await journalTrack({
-            action: "PRINT_IN",
-            detail: { scope:"DOT", filters:{ dot, ...(khoa?{khoa}:{}) }, name_mode:type, count:null }
-          });
 
           let url = `/batch/print-dot?dot=${encodeURIComponent(dot)}&type=${type}`;
           if (khoa) url += `&khoa=${encodeURIComponent(khoa)}`;
@@ -113,16 +104,6 @@
       }
       return r;
     }
-    // --- Ghi log vào Journal (PRINT_IN / EXPORT)
-    async function journalTrack(payload){
-      try{
-        await apiFetch('/journal/track', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify(payload || {})
-        });
-      }catch(_){ /* im lặng, không chặn luồng in/xuất */ }
-    }
     // --- Định dạng ngày DMY ---
     function fmtDMY(s) {
       if (!s) return "";
@@ -140,7 +121,7 @@
       return t;
     }
 
-    const dash = (x)=> (x && String(x).trim()!=="") ? x : '<span class="text-muted">—</span>';
+    const dash = (x)=> (x && String(x).trim()!=="") ? esc(x) : '<span class="text-muted">—</span>';
 
     function setState({loading=false, empty=false}){
       $("loading").classList.toggle("hidden", !loading);
@@ -220,7 +201,7 @@
     }
 
     function renderRows(items){
-      const tbody = $("tbody"); 
+      const tbody = $("tbody");
       tbody.innerHTML = "";
       (items||[]).forEach((it) => {
         const mshv = it.ma_so_hv;
@@ -250,7 +231,7 @@
                     title="Xem chi tiết hồ sơ">
               ${dash(it.ho_dem || '')}
             </button>
-          </td> 
+          </td>
           <td class="border-b">
             <button class="text-blue-700 hover:underline link-detail"
                     data-mshv="${encodeURIComponent(mshv)}"
@@ -277,11 +258,11 @@
             <div class="inline-flex gap-2">
               <button class="btn btn-primary btn-xs btn-pill btn-print-a4"
                       data-mshv="${encodeURIComponent(mshv)}">
-                in BNhận
+                In biên nhận
               </button>
               <button class="btn btn-outline btn-xs btn-pill btn-postal"
                       data-mshv="${encodeURIComponent(mshv)}">
-                in BĐiện
+                In bìa hồ sơ
               </button>
             </div>
           </td>
@@ -504,7 +485,7 @@
                 ${ok ? '<span class="m-auto text-[10px] text-white">✓</span>' : ''}
               </span>
               <span class="${ok ? 'text-gray-800' : 'text-gray-600'}">
-                ${item.label || item.ten || item.name || ''}
+                ${esc(item.label || item.ten || item.name || '')}
               </span>`;
             checklistWrap.appendChild(li);
           });
@@ -670,26 +651,16 @@
           const mshv = decodeURIComponent(a4.dataset.mshv || '');
           if (!mshv) return;
 
-          await journalTrack({
-            action: 'PRINT_IN',
-            detail: { scope:'SINGLE', filters:{ mshv }, name_mode:'A4', count: 1 }
-          });
-
           await openPdfOrAlert(`/print/a4/${encodeURIComponent(mshv)}`);
           return;
         }
-        // In bưu điện
+        // In bìa hồ sơ
         const ps = e.target.closest('.btn-postal');
         if (ps) {
           const mshv = decodeURIComponent(ps.dataset.mshv || '');
           if (!mshv) return;
 
-          await journalTrack({
-            action: 'PRINT_IN',
-            detail: { scope:'SINGLE', filters:{ mshv }, name_mode:'POSTAL', count: 1 }
-          });
-
-          await openPdfOrAlert(`/applicants/${encodeURIComponent(mshv)}/postal-print`);
+          await openPdfOrAlert(`/applicants/${encodeURIComponent(mshv)}/folder-cover`);
           return;
         }
         // In A5 biên nhận (không email)
@@ -697,11 +668,6 @@
         if (a5) {
           const mshv = decodeURIComponent(a5.dataset.mshv || '');
           if (!mshv) return;
-
-          await journalTrack({
-            action: 'PRINT_IN',
-            detail: { scope:'SINGLE', filters:{ mshv }, name_mode:'A5', count: 1 }
-          });
 
           await openPdfOrAlert(`/print/a5/${encodeURIComponent(mshv)}`);
           return;
@@ -886,7 +852,7 @@
     const normalizedQuery = vnNorm(query);
 
     // Nếu cả hai giống nhau (có dấu giống nhau)
-    if (normalizedName === normalizedQuery) return 100;  
+    if (normalizedName === normalizedQuery) return 100;
 
     // Nếu tên bắt đầu giống từ khóa (có dấu giống nhau)
     if (normalizedName.startsWith(normalizedQuery)) return 90;
@@ -904,82 +870,6 @@
       return matchScore(fullName, query) > 0;  // Kiểm tra xem có khớp không
     });
   }
-
-    // lấy 1 trang server
-    async function fetchPageServer(q, page, size){
-      for (const k of ["q","name","full_name"]) {
-        const j = await tryJson(`/applicants/search?${k}=${encodeURIComponent(q)}&page=${page}&size=${size}`);
-        if (j) {
-          const norm = normalizePaged(j);
-
-          // ✅ Gỡ MSHV khỏi blacklist nếu server đã trả về (và không còn soft-delete)
-          clearDeletedIfExists(norm.items);
-
-          // Sau đó mới lọc notDeleted
-          norm.items = (norm.items || []).filter(notDeleted);
-          return norm;
-        }
-      }
-
-      let j = await tryJson(`/applicants/search?page=${page}&size=${size}`);
-      if (j) {
-        const norm = normalizePaged(j);
-        clearDeletedIfExists(norm.items);
-        norm.items = (norm.items || []).filter(notDeleted);
-        return norm;
-      }
-
-      j = await tryJson(`/applicants?page=${page}&size=${size}`);
-      if (j) {
-        const norm = normalizePaged(j);
-        clearDeletedIfExists(norm.items);
-        norm.items = (norm.items || []).filter(notDeleted);
-        return norm;
-      }
-
-      return { items: [], total: 0, page: 1, size: size };
-    }
-
-    // lấy nhiều trang (để sort/loc client)
-    async function fetchUpTo(limit=5000){
-      const out = [];
-      let page = 1;
-      const size = 200;
-      for(;;){
-        const data = await fetchPageServer(state.q, page, size);
-        (data.items||[]).forEach(x => { if (notDeleted(x)) out.push(x); });
-        const total = data.total ?? out.length;
-        if (out.length >= total || out.length >= limit || (data.items||[]).length === 0 || (data.items||[]).length < size) break;
-        page += 1;
-      }
-      return out.slice(0, limit);
-    }
-
-    function applyClientFilters(list){
-      const dot  = $("filterDot").value.trim().toLowerCase();
-      const khoa = $("filterKhoa").value.trim().toLowerCase();
-      return (list||[]).filter(it=>{
-        const _dot  = String(it.dot ?? it.dot_tuyen ?? "").toLowerCase();
-        const _khoa = String(it.khoa ?? it.khoa_hoc ?? it.khoahoc ?? "").toLowerCase();
-        const okDot  = !dot  || _dot.includes(dot);
-        const okKhoa = !khoa || _khoa === khoa || _khoa.includes(khoa);
-        return okDot && okKhoa;
-      });
-    }
-
-    async function buildSourceFull(){
-      state.cacheAll = (await fetchUpTo(5000)).filter(notDeleted);
-
-      // 🔹 Lần đầu có dữ liệu thì build dropdown Đợt/Khóa
-      if (!filterOptionsBuilt) {
-        buildFilterOptions(state.cacheAll);
-      }
-
-      const wantFilter = $("filterDot").value.trim() !== "" || $("filterKhoa").value.trim() !== "";
-      let list = wantFilter ? applyClientFilters(state.cacheAll) : state.cacheAll.slice();
-      list = applySort(list);
-      return list;
-    }
 
     let filterOptionsBuilt = false;
 
@@ -1005,7 +895,7 @@
 
       const buildOpts = (arr, firstLabel) =>
         `<option value="">${firstLabel}</option>` +
-        arr.map(v => `<option value="${v}">${v}</option>`).join('');
+        arr.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
 
       if (filterDotSel)  filterDotSel.innerHTML  = buildOpts(dots,  'Tất cả đợt');
       if (dotSel)        dotSel.innerHTML        = buildOpts(dots,  '-- Chọn đợt --');
@@ -1016,23 +906,34 @@
       filterOptionsBuilt = true;
     }
 
+    let searchGeneration = 0;
     async function runSearch(){
+      const generation = ++searchGeneration;
       setState({loading:true});
-      try{
-        const full = await buildSourceFull(); // Lấy dữ liệu đã lọc
-        clearDeletedIfExists(full);
-        state.total = full.length;
-
+      try {
+        if (!filterOptionsBuilt) {
+          const optionResponse = await apiFetch('/applicants/filter-options');
+          if (optionResponse && optionResponse.ok) buildFilterOptions((await optionResponse.json()).items || []);
+        }
+        const params = new URLSearchParams({q: state.q, page: state.page, size: state.size});
+        if ($('filterDot').value) params.set('dot', $('filterDot').value);
+        if ($('filterKhoa').value) params.set('khoa', $('filterKhoa').value);
+        if (state.sort.key) { params.set('sort_by', state.sort.key); params.set('sort_dir', state.sort.dir); }
+        const response = await apiFetch('/applicants/search?' + params);
+        if (!response || !response.ok) throw new Error('Không tải được danh sách hồ sơ');
+        const data = await response.json();
+        if (generation !== searchGeneration) return;
+        state.total = data.total;
         const totalPages = Math.max(1, Math.ceil(state.total / state.size));
-        if (state.page > totalPages) state.page = totalPages;
-
-        const start = (state.page - 1) * state.size;
-        renderRows(full.slice(start, start + state.size)); // Hiển thị các kết quả
+        if (state.page > totalPages) { state.page = totalPages; return runSearch(); }
+        clearDeletedIfExists(data.items);
+        renderRows(data.items || []);
         updatePagerUI(state.total, state.page, state.size);
-        setState({loading:false, empty: state.total === 0});
-      }catch(e){
+        setState({loading:false, empty:state.total === 0});
+      } catch(e) {
+        if (generation !== searchGeneration) return;
         setState({loading:false, empty:true});
-        $("msg").textContent = e.message || "Lỗi không xác định";
+        $('msg').textContent = e.message || 'Lỗi không xác định';
       }
     }
 
@@ -1102,14 +1003,17 @@
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = filename;
-      document.body.appendChild(a); 
-      a.click(); 
+      document.body.appendChild(a);
+      a.click();
       a.remove();
       setTimeout(()=>URL.revokeObjectURL(a.href), 60000);
     }
 
   async function openPdfOrAlert(url){
-    window.open(makeUrl(url), "_blank");
+    const target = "/print-preview?source=" + encodeURIComponent(makeUrl(url));
+    const opened = window.open(target, "_blank");
+    if (opened) opened.opener = null;
+    else location.href = target;
   }
 
     // ===== Export/In ấn theo ngày/đợt =====
@@ -1136,23 +1040,13 @@
         }
         showLoading("Đang tải dữ liệu xuất, vui lòng đợi...");
 
-        await journalTrack({
-          action: "EXPORT",
-          detail: {
-            scope: "DAY",
-            filters: { day },
-            name_mode: "split",
-            count: null
-          }
-        });
-
         const url = `/export/excel?day=${encodeURIComponent(day)}&name=split`;
         await fetchFileOrAlert(
           url,
           `tong_ngay_${day}.xlsx`,
           "excel"
         );
-        hideLoading(); 
+        hideLoading();
       });
 
       // Nút In theo ngày
@@ -1174,12 +1068,10 @@
         const khoa = $("dotKhoa")?.value.trim() || "";
         if (!dot){ alert("Nhập tên đợt trước đã"); return; }
         showLoading("Đang tải dữ liệu in, vui lòng đợi...");
-
-        await journalTrack({ action:'EXPORT', detail:{ scope:'DOT', filters:{ dot, ...(khoa?{khoa}:{}) }, name_mode:'split', count:null }});
         let url = `/export/excel-dot?dot=${encodeURIComponent(dot)}&name=split`;
         if (khoa) url += `&khoa=${encodeURIComponent(khoa)}`;
         await fetchFileOrAlert(url, `tong_dot_${dot}${khoa?`_khoa_${khoa}`:""}.xlsx`, "excel");
-        hideLoading(); 
+        hideLoading();
       });
 
       $("btnPrintDot")?.addEventListener("click", async () => {
@@ -1207,7 +1099,7 @@
     $("q").addEventListener("keydown", e=>{ if(e.key==="Enter") $("btnSearch").click(); });
 
     $("pageSize").addEventListener("change", ()=>{
-      state.size = Number($("pageSize").value) || 10;
+      state.size = Math.min(100, Math.max(1, Number($("pageSize").value) || 10));
       localStorage.setItem("students.pageSize", String(state.size));
       state.page = 1; runSearch();
     });
@@ -1497,9 +1389,9 @@
         r.status === 'SOFT_DELETED' ? 'text-purple-700' :
         r.status === 'INVALID' ? 'text-red-700' : 'text-gray-700';
       tr.innerHTML = `
-        <td class="p-2 border-b font-medium">${r.ma_so_hv || ''}</td>
-        <td class="p-2 border-b ${statusClass}">${r.status}${r.errors ? ' • ' + (r.errors||[]).join('; ') : ''}</td>
-        <td class="p-2 border-b">${fields}</td>`;
+        <td class="p-2 border-b font-medium">${esc(r.ma_so_hv || '')}</td>
+        <td class="p-2 border-b ${statusClass}">${esc(r.status)}${r.errors ? ' • ' + esc((r.errors||[]).join('; ')) : ''}</td>
+        <td class="p-2 border-b">${esc(fields)}</td>`;
       body.appendChild(tr);
     });
     $('batchMsg').textContent =
@@ -1604,7 +1496,7 @@
     } catch(e){
       document.getElementById('batchMsg').textContent = e.message || 'Lỗi batch update';
       showToast(e.message || 'Lỗi batch update', 'error');
-    
+
     } finally {
       btnPrev?.removeAttribute('disabled');
       btnApply?.removeAttribute('disabled');
@@ -1639,11 +1531,11 @@ function renderBatchPreview(resp){
     const errText = (r.errors||[]).map(prettifyError).join('; ');
 
     tr.innerHTML = `
-      <td class="p-2 border-b font-medium">${r.ma_so_hv || ''}</td>
+      <td class="p-2 border-b font-medium">${esc(r.ma_so_hv || '')}</td>
       <td class="p-2 border-b ${statusClass}">
-        ${r.status}${errText ? ' • ' + errText : ''}
+        ${esc(r.status)}${errText ? ' • ' + esc(errText) : ''}
       </td>
-      <td class="p-2 border-b">${fields}</td>`;
+      <td class="p-2 border-b">${esc(fields)}</td>`;
     body.appendChild(tr);
   });
 
@@ -1723,6 +1615,7 @@ function renderPreview(html) {
   const iframe = document.getElementById('email_preview');
   if (!iframe) return;
   const body = resolvePreviewCIDs(html);
+  iframe.setAttribute("sandbox", "");
   iframe.srcdoc = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
@@ -1876,16 +1769,12 @@ async function sendEmail(){
     }
 
     // Ghi journal đúng biến
-    await journalTrack({
-      action: 'EMAIL_SENT',
-      detail: { scope:'SINGLE', mshv, subject:subj, tpl: rawTpl, attach, a5: isHS, status:'OK' }
-    });
 
     // 🟢 2. Báo đã gửi thành công
     if (msgEl) {
-      msgEl.textContent = `✅ Đã gửi email tới ${to || 'học viên'} (MSHV ${mshv})`;
+      msgEl.textContent = `Đã đưa email vào hàng đợi tới ${to || 'học viên'} (MSHV ${mshv})`;
     }
-    showToast('✅ Đã gửi email thành công', 'success', 2600);
+    showToast('Email đang chờ gửi', 'success', 2600);
 
     closeEmailModal();
   } catch(e){
@@ -1909,6 +1798,7 @@ function renderBulkPreviewHTML(html) {
   const iframe = $('bulk_preview');
   if (!iframe) return;
   const body = resolvePreviewCIDs(html);
+  iframe.setAttribute("sandbox", "");
   iframe.srcdoc = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>body{font-family:Arial,Helvetica,sans-serif;padding:16px;background:#fff;color:#111}img{max-width:100%;height:auto}</style>
@@ -2002,16 +1892,11 @@ $('btnSendBulk')?.addEventListener('click', async ()=>{
           throw new Error(msg);
         }
 
-        await journalTrack({
-          action: 'EMAIL_SENT',
-          detail: { scope: 'BATCH', count: ids.length, sample: ids.slice(0, 10), subject, tpl: rawTpl, a5, status: 'OK' }
-        });
-
         // 🟢 2. Báo xong hàng loạt
         if (msgEl) {
-          msgEl.textContent = `✅ Đã gửi email cho ${ids.length} học viên.`;
+          msgEl.textContent = `Đã xếp lịch gửi email cho ${ids.length} học viên.`;
         }
-        showToast('✅ Đã gửi email hàng loạt thành công.', 'success', 2800);
+        showToast('Đã đưa email hàng loạt vào hàng đợi.', 'success', 2800);
         closeBulkModal();
       }catch(e){
         if (msgEl) {
@@ -2068,19 +1953,11 @@ detailOpenEditBtn?.addEventListener('click', () => {
 // Nút In A5 / A4 (reuse logic hiện tại)
 detailPrintA5Btn?.addEventListener('click', async () => {
   if (!currentDetailMSHV) return;
-  await journalTrack({
-    action: 'PRINT_IN',
-    detail: { scope:'SINGLE', filters:{ mshv: currentDetailMSHV }, name_mode:'A5', count:1 }
-  });
   await openPdfOrAlert(`/print/a5/${encodeURIComponent(currentDetailMSHV)}`);
 });
 
 detailPrintA4Btn?.addEventListener('click', async () => {
   if (!currentDetailMSHV) return;
-  await journalTrack({
-    action: 'PRINT_IN',
-    detail: { scope:'SINGLE', filters:{ mshv: currentDetailMSHV }, name_mode:'A4', count:1 }
-  });
   await openPdfOrAlert(`/print/a4/${encodeURIComponent(currentDetailMSHV)}`);
 });
 
@@ -2099,28 +1976,16 @@ function hideLoading() {
 // Nút In Email Receipt
 document.getElementById('detailPrintA4Btn')?.addEventListener('click', async () => {
   if (!currentDetailMSHV) return;
-  await journalTrack({
-    action: 'PRINT_IN',
-    detail: { scope:'SINGLE', filters:{ mshv: currentDetailMSHV }, name_mode:'A4', count:1 }
-  });
   await openPdfOrAlert(`/print/a4/${encodeURIComponent(currentDetailMSHV)}`);
 });
 // Nút In Email Receipt
 document.getElementById('detailPrintPostalBtn')?.addEventListener('click', async () => {
   if (!currentDetailMSHV) return;
-  await journalTrack({
-    action: 'PRINT_IN',
-    detail: { scope:'SINGLE', filters:{ mshv: currentDetailMSHV }, name_mode:'POSTAL', count:1 }
-  });
-  await openPdfOrAlert(`/applicants/${encodeURIComponent(currentDetailMSHV)}/postal-print`);
+  await openPdfOrAlert(`/applicants/${encodeURIComponent(currentDetailMSHV)}/folder-cover`);
 });
 // Nút In biên nhận Email (A5)
 document.getElementById('detailPrintEmailReceiptBtn')?.addEventListener('click', async () => {
   if (!currentDetailMSHV) return;
-  await journalTrack({
-    action: 'PRINT_IN',
-    detail: { scope:'SINGLE', filters:{ mshv: currentDetailMSHV }, name_mode:'EMAIL', count:1 }
-  });
   await openPdfOrAlert(`/applicants/print/email-receipt/${encodeURIComponent(currentDetailMSHV)}`);
 });
 

@@ -11,6 +11,7 @@ class User(Base):
 
     # Hash đang dùng để đăng nhập
     password_hash = Column(String(255), nullable=False)
+    session_version = Column(Integer, nullable=False, default=0, server_default="0")
 
     # Hash "mật khẩu mặc định" mỗi lần Admin reset
     reset_password_hash = Column(String(255), nullable=True)

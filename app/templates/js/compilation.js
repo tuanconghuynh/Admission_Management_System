@@ -30,15 +30,7 @@
   }
   const makeUrl = (path)=> apiBase() + (API_PREFIX || "") + path;
   async function apiFetch(path, init={}){ const opts={credentials:"include", ...init}; return await fetch(makeUrl(path), opts).catch(()=>null); }
-  async function journalTrack(payload){
-    try{
-      await apiFetch('/journal/track', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(payload || {})
-      });
-    }catch(_){}
-  }
+
 
   function handleAuth(r){
     if(r && (r.status===401||r.status===403)){
@@ -346,53 +338,18 @@
   }
   bindNameInputs();
 
-  // ===== Mã HS theo Nhóm (Khóa, Đợt) =====
-  function composeMaHoSoByGroup(khoa, dot, seq) { return `HS-${String(khoa).trim()}-${String(dot).trim()}-${String(seq).padStart(4,'0')}`; }
-  function extractSeq4(code) { const m = String(code || '').match(/(\d{4})$/); return m ? m[1] : ''; }
-
-  async function getMaxSeqInGroup(khoa, dot) {
-    const q = String(khoa).trim();
-    let page = 1, size = 500, max = 0;
-    for (;;) {
-      const r = await apiFetch(`/applicants/search?q=${encodeURIComponent(q)}&page=${page}&size=${size}`);
-      if (!r || !r.ok) break;
-      const j = await (r.json().catch(()=>({})));
-      const arr = Array.isArray(j?.items) ? j.items : [];
-      for (const it of arr) {
-        if (String(it.khoa).trim() !== String(khoa).trim()) continue;
-        if (String(it.dot).trim()  !== String(dot).trim())  continue;
-        const m = String(it.ma_ho_so || '').match(/(\d{4})$/);
-        if (m) {
-          const n = parseInt(m[1], 10);
-          if (Number.isFinite(n) && n > max) max = n;
-        }
-      }
-      if (arr.length < size) break;
-      page += 1;
-    }
-    return max;
-  }
-  async function generateNextSeq4(khoa, dot) { if (!khoa || !dot) return ""; const cur = await getMaxSeqInGroup(khoa, dot); return String(cur + 1).padStart(4,'0'); }
-  async function generateNextMaHoSoByGroup(khoa, dot) { const max = await getMaxSeqInGroup(khoa, dot); return composeMaHoSoByGroup(khoa, dot, max + 1); }
-
   async function payloadForCreate() {
     const k = ($('khoa')?.value || '').trim();
     const d = ($('dot')?.value  || '').trim();
     if (!k || !d) { showToast("Vui lòng chọn Niên khoá và Đợt trước khi lưu.", "warn"); return null; }
 
-    let seq4 = ($('ma_ho_so')?.value || '').trim();
-    if (!/^\d{4}$/.test(seq4)) {
-      const seq = await generateNextSeq4(k, d) || '0001';
-      $('ma_ho_so').value = seq;
-      $('ma_ho_so').placeholder = seq;
-      seq4 = seq;
-    }
+    if (!$('nganh_nhap_hoc').value.trim()) { showToast('Vui lòng chọn ngành để cấp mã hồ sơ.', 'warn'); return null; }
 
     const today = new Date().toISOString().slice(0,10);
     $('ngay_nhan_hs').value = today;
 
     const body = {
-      ma_ho_so: seq4,
+      auto_assign_ma_ho_so: true,
       ngay_nhan_hs: ymdKeep(today),
       ho_ten: '',
       gioi_tinh: $('gioi_tinh').value || null,
@@ -419,30 +376,32 @@
     return body;
   }
 
+  let receiptPreviewGeneration = 0;
   async function tryPreviewMaHoSo(force = false) {
-    if (!force && window.loadedApplicant?.ma_so_hv) return;
-    const k = ($('khoa')?.value || '').trim();
-    const d = ($('dot')?.value  || '').trim();
     const el = $('ma_ho_so'); if (!el) return;
-    if (!k || !d) { el.value = ''; el.placeholder = '0000'; return; }
-
+    const generation = ++receiptPreviewGeneration;
+    if (window.loadedApplicant?.ma_ho_so) { el.value = window.loadedApplicant.ma_ho_so; return; }
+    const khoa = ($('khoa')?.value || '').trim();
+    const dot = ($('dot')?.value || '').trim();
+    const major = ($('nganh_nhap_hoc')?.value || '').trim();
+    el.value = '';
+    el.placeholder = 'Chọn ngành, khóa và đợt';
+    if (!khoa || !dot || !major) return;
     try {
-      const full = await generateNextMaHoSoByGroup(k, d);
-      const m = /(\d{4})$/.exec(full);
-      const seq = (m ? m[1] : '0001');
-      el.value = seq;
-      el.placeholder = seq;
-    } catch {
-      el.value = ''; el.placeholder = '0000';
-    }
+      const params = new URLSearchParams({major, khoa, dot});
+      const response = await apiFetch('/applicants/receipt-code-preview?' + params);
+      const data = await safeJson(response);
+      if (generation !== receiptPreviewGeneration || window.loadedApplicant?.ma_ho_so) return;
+      if (!response?.ok) { el.placeholder = 'Chưa cấp mã'; return; }
+      el.placeholder = data.ma_ho_so + ' (cấp khi lưu)';
+    } catch { if (generation === receiptPreviewGeneration) el.placeholder = 'Cấp mã khi lưu'; }
   }
-
   $('khoa').addEventListener('change', () => tryPreviewMaHoSo(true));
   $('dot').addEventListener('change',  () => tryPreviewMaHoSo(true));
+  $('nganh_nhap_hoc').addEventListener('change', () => tryPreviewMaHoSo(true));
 
   function payloadForUpdate() {
     const currentDate = $("ngay_nhan_hs").value || new Date().toISOString().split("T")[0];
-    const seq4 = $("ma_ho_so").value.trim();
 
     const payload = {
       ngay_nhan_hs: ymdKeep(currentDate),
@@ -462,7 +421,7 @@
       docs: collectDocs(),
     };
 
-    if (/^\d{4}$/.test(seq4)) payload.ma_ho_so = seq4; else payload.auto_assign_ma_ho_so = true;
+    if (!window.loadedApplicant?.ma_ho_so) payload.auto_assign_ma_ho_so = true;
 
     const _ho_dem = $('ho_dem')?.value || '';
     const _ten    = $('ten')?.value    || '';
@@ -479,7 +438,7 @@
   }
 
   function populateFormFromApplicant(a={}, docs){
-    $('ma_ho_so').value = extractSeq4(a.ma_ho_so) || "";
+    $('ma_ho_so').value = a.ma_ho_so || "";
     $('ngay_nhan_hs').value = fmtDateToInput(a.ngay_nhan_hs);
     $('khoa').value = a.khoa || "";
 
@@ -495,7 +454,12 @@
     $('dan_toc').value = a.dan_toc || "";
     $('so_dt').value = a.so_dt || "";
     $('email_hoc_vien').value = a.email_hoc_vien || "";
-    $('nganh_nhap_hoc').value = a.nganh_nhap_hoc || "";
+    const majorSelect = $('nganh_nhap_hoc');
+    const majorName = a.nganh_nhap_hoc || '';
+    const normalizedMajor = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    let option = Array.from(majorSelect.options).find(item => normalizedMajor(item.value) === normalizedMajor(majorName) || normalizedMajor(item.dataset.code) === normalizedMajor(majorName));
+    if (!option && majorName) { option = new Option(majorName, majorName); majorSelect.add(option); }
+    majorSelect.value = option?.value || '';
     $('dot').value = a.dot || "";
     $('da_tn_truoc_do').value = a.da_tn_truoc_do || "";
     $('ghi_chu').value = a.ghi_chu || "";
@@ -532,7 +496,8 @@
         raw = (raw || []).filter(it => !isSoftDeleted(it));
         const hit = raw.find(x => (String(x.ma_so_hv||'').toLowerCase() === String(mshv).toLowerCase()));
         if (hit) {
-          const rd = await apiFetch(`/applicants/by-code/${encodeURIComponent(hit.ma_ho_so)}`);
+          const params = new URLSearchParams({khoa: hit.khoa || '', dot: hit.dot || ''});
+          const rd = await apiFetch(`/applicants/by-code/${encodeURIComponent(hit.ma_ho_so)}?${params}`);
           if (rd && rd.ok) {
             const d2 = await rd.json();
             const ap2 = (d2 && d2.applicant) ? { ...d2.applicant, docs: d2.docs || [] } : d2;
@@ -718,11 +683,6 @@
       body.ngay_nhan_hs = new Date().toISOString().slice(0,10);
       const ngayNhan = $('ngay_nhan_hs'); if (ngayNhan) ngayNhan.value = body.ngay_nhan_hs;
     }
-    if (!body.ma_ho_so) {
-      const seq = await generateNextSeq4(khoa, dot);
-      body.ma_ho_so = seq;
-      const mhs = $('ma_ho_so'); if (mhs) mhs.value = seq;
-    }
 
     const r = await apiFetch("/applicants", {
       method:"POST",
@@ -739,6 +699,7 @@
     }
 
     window.loadedApplicant = { ma_so_hv: j.ma_so_hv || body.ma_so_hv, ma_ho_so: j.ma_ho_so || body.ma_ho_so };
+    $('ma_ho_so').value = j.ma_ho_so || '';
     setPrintButtonsEnabled(true);
     return j;
   }
@@ -1009,7 +970,7 @@
 
   /* ===== In PDF ===== */
   function openPdf(url){
-    const w = window.open(url, "_blank", "noopener,noreferrer");
+    const w = window.open("/print-preview?source=" + encodeURIComponent(url), "_blank");
     if (!w) {
       showToast('Trình duyệt đang chặn pop-up. Hãy bật pop-up cho trang này rồi bấm lại.', 'warn', 4000);
     }
@@ -1018,11 +979,6 @@
       const cur = window.loadedApplicant;
       if (!cur?.ma_so_hv) { showToast("Chưa tải hồ sơ nào!", "warn"); return; }
       if (isSoftDeleted(cur)) { showToast("Hồ sơ đã bị xóa, không thể in!", "warn"); return; }
-
-      await journalTrack({
-        action: 'PRINT_IN',
-        detail: { scope: 'SINGLE', filters: { mshv: cur.ma_so_hv }, name_mode: 'A4', count: 1 }
-      });
 
       openPdf(makeUrl(`/applicants/${encodeURIComponent(cur.ma_so_hv)}/print`));
   };

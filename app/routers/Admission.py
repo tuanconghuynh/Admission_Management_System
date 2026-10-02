@@ -34,7 +34,7 @@ def import_page(
     request: Request,
     me: User = Depends(require_roles("Admin", "NhanVien", "Manager")),  # Chỉ cho phép Admin, NhanVien, Manager
 ):
-    return templates.TemplateResponse("import_students.html", {"request": request, "me": me, "msg": None})
+    return templates.TemplateResponse(request, "import_students.html", {"request": request, "me": me, "msg": None})
 
 @router.post("/import", response_class=HTMLResponse)
 def import_students(
@@ -130,6 +130,6 @@ def import_students(
 
     db.commit()
     msg = f"Tạo {created} học viên mới, bỏ qua {skipped} (đã tồn tại)."
-    return templates.TemplateResponse("import_students.html", {"request": request, "me": me, "msg": msg})
+    return templates.TemplateResponse(request, "import_students.html", {"request": request, "me": me, "msg": msg})
 
 # End of file

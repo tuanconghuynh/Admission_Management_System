@@ -1,0 +1,13 @@
+.git
+.env*
+.venv
+**/__pycache__
+**/*.pyc
+assets/receipts
+var
+backups
+tests
+*.pdf
+*.docx
+*.db
+.pytest_cache

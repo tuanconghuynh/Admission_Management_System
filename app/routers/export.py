@@ -1,5 +1,6 @@
 # app/routers/export.py
 from __future__ import annotations
+from app.services.report_limits import report_rows
 
 from datetime import datetime, timedelta, date
 import io
@@ -31,8 +32,16 @@ from app.utils.soft_delete import exclude_deleted, ensure_not_deleted
 
 # Audit
 from app.services.audit import write_audit
+from app.services.print_confirmation import print_headers
 
 router = APIRouter()  # không prefix; main sẽ mount /api
+
+
+@router.get("/print/a5/{ma_so_hv}")
+def print_a5_alias(ma_so_hv: str, request: Request, db: Session = Depends(get_db),
+    user=Depends(require_roles("Admin", "NhanVien", "CongTacVien", "Manager"))):
+    from app.routers.applicants import print_applicant_a5
+    return print_applicant_a5(ma_so_hv=ma_so_hv, request=request, db=db)
 
 # ------------------- Audit helper -------------------
 def _audit_print_or_export(
@@ -50,6 +59,8 @@ def _audit_print_or_export(
     target_type: str = "ApplicantBatch",
     target_id: str | None = None
 ):
+    if action == 'PRINT':
+        return  # Opening a PDF does not confirm physical printing.
     payload = {
         "scope": scope,
         "filters": filters or {},
@@ -174,10 +185,15 @@ def _build_excel_bytes(
 
 # helper: build Content-Disposition supporting UTF-8 filename*
 def _content_disposition(filename: str, inline: bool = False) -> str:
+    import re
+    import unicodedata
+    filename = filename.replace("\r", "").replace("\n", "")
+    ascii_name = unicodedata.normalize("NFKD", filename).encode("ascii", "ignore").decode()
+    ascii_name = re.sub(r'[^A-Za-z0-9._-]', '_', ascii_name) or 'report'
     disposition = "inline" if inline else "attachment"
     # quote for filename*
     quoted = quote(filename, safe='')
-    return f"{disposition}; filename=\"{filename}\"; filename*=UTF-8''{quoted}"
+    return f"{disposition}; filename=\"{ascii_name}\"; filename*=UTF-8''{quoted}"
 
 
 #==========================================================#
@@ -230,11 +246,11 @@ def export_excel(
 
     q = db.query(Applicant).filter(Applicant.ngay_nhan_hs >= d1, Applicant.ngay_nhan_hs < d2)
     q = exclude_deleted(Applicant, q)
-    apps = q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()).all()
+    apps = report_rows(q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()))
 
     if not apps:
         q = exclude_deleted(Applicant, db.query(Applicant).filter(Applicant.ngay_nhan_hs == d))
-        apps = q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()).all()
+        apps = report_rows(q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()))
 
     apps = [a for a in apps if ensure_not_deleted(a, raise_http_exception=False)]
     if not apps:
@@ -298,7 +314,7 @@ def export_excel_dot(
     q = (
         db.query(Applicant)
         .filter(Applicant.dot.isnot(None))
-        .filter(Applicant.dot.ilike(f"%{key}%"))
+        .filter(func.trim(Applicant.dot) == key)
     )
     if (khoa or "").strip():
         k = khoa.strip()
@@ -306,7 +322,7 @@ def export_excel_dot(
 
     q = exclude_deleted(Applicant, q)
 
-    apps = q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()).all()
+    apps = report_rows(q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()))
     apps = [a for a in apps if ensure_not_deleted(a, raise_http_exception=False)]
     if not apps:
         _audit_print_or_export(
@@ -373,7 +389,7 @@ def print_a4(
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={"Content-Disposition": _content_disposition(f"{app.ma_ho_so or ma_so_hv}_A4.pdf", inline=True)},
+            headers={**print_headers(request, [ma_so_hv], "A4"), "Content-Disposition": _content_disposition(f"{app.ma_ho_so or ma_so_hv}_A4.pdf", inline=True)},
         )
     except Exception as e:
         _audit_print_or_export(

@@ -70,11 +70,13 @@
       </div>
 
       {# Bulk actions #}
-      <div class="flex items-center justify-between mb-2">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div class="text-sm text-gray-600">
           Đã chọn: <span id="bulkCount" class="font-semibold">0</span> học viên
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="btnEditSelected" class="btn btn-outline" disabled>Sửa các hồ sơ đã chọn</button>
+          <button id="btnDeleteSelected" class="btn btn-outline" disabled>Xóa các hồ sơ đã chọn</button>
           <button id="btnSendBulk" class="btn btn-primary disabled:opacity-50 disabled:pointer-events-none" disabled>
             ✉️ Gửi email hàng loạt
           </button>
@@ -475,7 +477,7 @@
         </button>
         <div class="flex gap-2">
           <button id="detailPrintA4Btn" class="btn btn-primary btn-xs">🖨️ In Biên nhận</button>
-          <button id="detailPrintPostalBtn" class="btn btn-primary btn-xs">🖨️ In Bưu điện</button>
+          <button id="detailPrintPostalBtn" class="btn btn-primary btn-xs">🖨️ In bìa hồ sơ</button>
           <button id="detailPrintEmailReceiptBtn" class="btn btn-primary btn-xs">🖨️ In Biên nhận Email</button>
         </div>
       </div>
@@ -497,8 +499,8 @@
         In A5
       </button>
 
-      <button class="print-option btn btn-primary w-full" data-type="POSTAL">
-        In Postal
+      <button class="print-option btn btn-primary w-full" data-type="COVER">
+        In bìa hồ sơ
       </button>
 
       <button id="printTypeCancel"
@@ -520,5 +522,6 @@
 {% endblock %}
 
 {% block scripts %}
-  <script src="/js/students_list.js"></script>
+  <script src="/js/students_list.js?v=20261002-bulk-print-4"></script>
+  <script src="/js/selected_actions.js?v=20261002-1"></script>
 {% endblock %}

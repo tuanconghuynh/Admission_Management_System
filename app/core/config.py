@@ -2,10 +2,29 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional
+import secrets
 from pydantic import EmailStr
+from pydantic import model_validator, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    ENVIRONMENT: str = "development"
+    SESSION_SECRET: str = ""
+    COOKIE_SECURE: bool = False
+    ALLOWED_HOSTS: str = "localhost,127.0.0.1,testserver"
+    ALLOWED_ORIGINS: str = ""
+    AUTO_CREATE_TABLES: bool = True
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 5
+    DB_POOL_TIMEOUT: int = 30
+    MAX_REPORT_ROWS: int = 1000
+    MAX_EMAIL_BATCH: int = 100
+    MAX_REQUEST_BYTES: int = 10 * 1024 * 1024
+    LOGIN_RATE_LIMIT: int = 10
+    EMAIL_RATE_LIMIT: int = 20
+    EMAIL_MAX_ATTEMPTS: int = 3
+    PASSWORD_PEPPER: str = ""
+    BCRYPT_ROUNDS: int = 12
     # ======== App meta & server ========
     APP_NAME: str = "Admission Management System"
     APP_HOST: str = "0.0.0.0"
@@ -31,11 +50,11 @@ class Settings(BaseSettings):
     SMTP_USER: Optional[EmailStr] = None
     SMTP_PASS: Optional[str] = None
     SMTP_FROM: Optional[EmailStr] = None          # sẽ fallback = SMTP_USER nếu None
-    SMTP_FROM_NAME: str = "Viện Hợp tác và Phát triển Đào tạo (no-reply)"
+    SMTP_FROM_NAME: str = "Viện Đại học Mở HUTECH (no-reply)"
     REPLY_TO_EMAIL: Optional[EmailStr] = "no-reply@hutech.edu.vn"
 
     # Cờ TLS/SSL & timeout (giúp bắt lỗi kết nối rõ ràng)
-    SMTP_STARTTLS: bool = True                     # Gmail: True với port 587
+    SMTP_STARTTLS: bool = False                    # Gmail: True với port 587
     SMTP_SSL_TLS: bool = True                     # Gmail: False (SSL thuần là 465)
     SMTP_TIMEOUT: int = 20                         # giây
 
@@ -48,7 +67,40 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
     )
+
+    @field_validator("SMTP_USER", "SMTP_FROM", "REPLY_TO_EMAIL", mode="before")
+    @classmethod
+    def empty_email(cls, value):
+        return value or None
+
+    @model_validator(mode="after")
+    def validate_environment(self):
+        if self.ENVIRONMENT not in {"development", "test", "production"}:
+            raise ValueError("ENVIRONMENT must be development, test or production")
+        if self.ENVIRONMENT == "production":
+            for name in ("SESSION_SECRET", "AUDIT_HMAC_SECRET", "DELETE_KEY_SECRET"):
+                value = getattr(self, name) or ""
+                if len(value) < 32 or value in {"change-me-please", "audit-dev", "delete-dev"}:
+                    raise ValueError(f"Production requires a strong {name} (at least 32 characters)")
+            if not self.COOKIE_SECURE or self.AUTO_CREATE_TABLES:
+                raise ValueError("Production requires COOKIE_SECURE=true and AUTO_CREATE_TABLES=false")
+            if "*" in self.ALLOWED_HOSTS or "*" in self.ALLOWED_ORIGINS:
+                raise ValueError("Production requires explicit hosts and origins")
+            if self.SQLALCHEMY_DATABASE_URI.startswith("sqlite"):
+                raise ValueError("Production requires MySQL/MariaDB")
+        else:
+            self.SESSION_SECRET = self.SESSION_SECRET or secrets.token_urlsafe(48)
+        for name in ("DB_POOL_SIZE", "DB_POOL_TIMEOUT", "MAX_REPORT_ROWS", "MAX_EMAIL_BATCH", "MAX_REQUEST_BYTES", "LOGIN_RATE_LIMIT", "EMAIL_RATE_LIMIT", "EMAIL_MAX_ATTEMPTS"):
+            if getattr(self, name) <= 0:
+                raise ValueError(f"{name} must be positive")
+        if self.EMAIL_ENABLED and self.SMTP_STARTTLS and self.SMTP_SSL_TLS:
+            if self.ENVIRONMENT == "production":
+                raise ValueError("Choose either SMTP_STARTTLS or SMTP_SSL_TLS")
+            # Preserve legacy development settings, which already preferred SSL.
+            self.SMTP_STARTTLS = False
+        return self
 
     # ---------- Helpers ----------
     @property

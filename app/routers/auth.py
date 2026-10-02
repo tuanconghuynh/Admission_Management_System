@@ -12,6 +12,7 @@ from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
 from app.db.session import get_db
 from app.models.user import User
 from app.core.security import verify_password, hash_password, try_rehash_on_success
+from app.services.rate_limit import limit_login
 
 router = APIRouter()
 
@@ -31,7 +32,11 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optiona
     uid = sess.get("uid")
     if not uid:
         return None
-    return db.get(User, uid)
+    user = db.get(User, uid)
+    if user and sess.get("session_version", 0) != user.session_version:
+        sess.clear()
+        return None
+    return user
 
 def require_user(user: Optional[User] = Depends(get_current_user)) -> User:
     if not user:
@@ -46,8 +51,10 @@ def require_roles(*roles: str):
         user: User = Depends(require_user)
     ) -> User:
         # Kiểm tra nếu user có vai trò là Admin hoặc Manager
-        if roles and user.role not in roles and user.role != "Manager":  # Thêm kiểm tra vai trò 'Manager'
+        if roles and user.role not in roles:
             raise HTTPException(HTTP_403_FORBIDDEN, "Forbidden")
+        if user.must_change_password and request.url.path not in {"/account", "/account/change-password", "/api/account/change-password"}:
+            raise HTTPException(HTTP_403_FORBIDDEN, "Vui lòng đổi mật khẩu trước khi tiếp tục.")
 
         # Bơm đầy đủ thông tin vào session cho chắc
         s = request.session
@@ -72,8 +79,8 @@ def login_page():
     # Trang HTML login tĩnh
     return RedirectResponse(url="/auth_login.html", status_code=302)
 
-@router.post("/api/login")
-@router.post("/login")
+@router.post("/api/login", dependencies=[Depends(limit_login)])
+@router.post("/login", dependencies=[Depends(limit_login)])
 def login(
     request: Request,
     username: str = Form(...),
@@ -108,6 +115,7 @@ def login(
     # Lưu phiên + thông tin để audit dùng ngay
     request.session.clear()
     request.session["uid"] = user.id
+    request.session["session_version"] = user.session_version
     request.session["_last_seen"] = int(time.time())
     request.session["full_name"] = user.full_name or user.username or user.email
     request.session["username"]  = user.username
@@ -175,16 +183,4 @@ def me(user: User = Depends(require_user)):
 
 @router.post("/api/init-admin")
 def init_admin(db: Session = Depends(get_db)):
-    if db.query(User).count() > 0:
-        raise HTTPException(status_code=400, detail="Already initialized")
-    u = User(
-        username="vhtpt@hutech.edu.vn",
-        email="vhtpt@hutech.edu.vn",
-        full_name="V-HT.PTĐT",
-        role="Admin",
-        is_active=True,
-        password_hash=hash_password("VHTPT@hutech123"),
-        must_change_password=True,  # bắt đổi sau khi đăng nhập
-    )
-    db.add(u); db.commit(); db.refresh(u)
-    return {"ok": True, "created_user_id": u.id}
+    raise HTTPException(404, "Use python -m scripts.create_admin on the server")

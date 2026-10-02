@@ -50,6 +50,7 @@ def admin_index(
     # Tiến hành truy vấn danh sách người dùng nếu là Admin
     users = db.query(User).order_by(User.id.desc()).all()
     return templates.TemplateResponse(
+        request,
         "admin_ams.html",
         {
             "request": request,
@@ -84,8 +85,8 @@ def admin_create_user(
 
     if not username:
         raise HTTPException(400, "Username không được để trống")
-    if len(password) < 6:
-        raise HTTPException(400, "Mật khẩu tối thiểu 6 ký tự")
+    if len(password) < 12:
+        raise HTTPException(400, "Mật khẩu tối thiểu 12 ký tự")
     if role not in VALID_ROLES:
         raise HTTPException(400, f"Role không hợp lệ. Hợp lệ: {', '.join(sorted(VALID_ROLES))}")
 
@@ -237,8 +238,8 @@ def admin_reset_pass(
     if me.role == "Manager":
         raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Bạn không có quyền reset mật khẩu người dùng.")  # Manager không thể reset mật khẩu
 
-    if len(new_password) < 6:
-        raise HTTPException(400, "Mật khẩu tối thiểu 6 ký tự")
+    if len(new_password) < 12:
+        raise HTTPException(400, "Mật khẩu tối thiểu 12 ký tự")
     u = db.get(User, user_id)
     if not u:
         raise HTTPException(404, "User not found")
@@ -246,6 +247,7 @@ def admin_reset_pass(
         new_hash = hash_password(new_password)
         # Lưu cả password_hash và reset_password_hash để tránh người dùng đổi lại mật khẩu
         u.password_hash = new_hash
+        u.session_version += 1
         u.reset_password_hash = new_hash
         u.must_change_password = True
         u.password_changed_at = None

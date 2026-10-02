@@ -14,7 +14,7 @@
       Import danh sách học viên
     </h2>
     <p class="text-gray-600 mt-1 text-sm">
-      Nạp file Excel/CSV, map cột &amp; gửi tạo hồ sơ. Mặc định không gán checklist.
+      Nhập thông tin học viên hoặc hồ sơ cũ kèm số lượng giấy tờ đã nộp để in biên nhận.
     </p>
   </section>
 
@@ -34,6 +34,14 @@
 
       <!-- Template mẫu -->
       <section class="space-y-2">
+        <label class="flex items-center gap-2 font-semibold">
+          <input id="importArchived" type="checkbox"> Import hồ sơ đã lưu trữ
+        </label>
+        <p class="text-xs text-gray-500">Mỗi học viên một dòng; mỗi giấy tờ một cột số lượng nguyên 0–1000. Ô trống, 0 hoặc cột không chọn được tính là chưa nộp. Giữ nguyên mã hồ sơ cũ; học viên đã tồn tại sẽ báo trùng, không ghi đè.</p>
+        <p id="checklistStatus" class="text-xs text-gray-500"></p>
+      </section>
+
+      <section class="space-y-2">
         <div class="font-semibold">Template mẫu</div>
         <p class="text-xs text-gray-500">
           Tải file mẫu đúng cấu trúc cột hệ thống. Có thể dùng bản rỗng hoặc bản có sẵn vài dòng ví dụ.
@@ -51,7 +59,7 @@
       <!-- Defaults -->
       <section class="grid grid-cols-1 gap-3">
         <div>
-          <div class="font-semibold mb-1">Ngày nhận HS</div>
+          <div class="font-semibold mb-1">Ngày nhận HS mặc định</div>
           <input id="defaultNgayNhan" type="date" class="input" />
         </div>
       </section>
@@ -89,7 +97,8 @@
         <div id="mappings" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
         <p class="text-xs text-gray-500">
           Bắt buộc: <b>Họ và Tên</b> <i>hoặc</i> <b>Họ đệm + Tên</b>, và <b>Mã số HV</b>.<br>
-          <b>Mã hồ sơ</b> (nếu có): hệ thống dùng <b>4 số cuối</b>. Nếu không có, trường Mã HS sẽ để trống để cấp sau.
+          Hồ sơ lưu trữ dùng ngày nhận và người nhận trong Excel; ô trống lấy mặc định trên màn hình.<br>
+          <b>Mã hồ sơ</b>: giữ nguyên mã trong Excel, kể cả mã có tiền tố ngành. Để trống để cấp sau khi tiếp nhận.
         </p>
       </section>
 
@@ -160,6 +169,7 @@
                   <th class="text-center w-36">Mã Hồ sơ</th>
                   <th class="text-center w-40">Trạng thái</th>
                   <th class="text-center">Thông điệp</th>
+                  <th class="text-center w-36">Biên nhận</th>
                 </tr>
               </thead>
               <tbody id="resBody"></tbody>
@@ -172,5 +182,6 @@
 {% endblock %}
 
 {% block scripts %}
-  <script src="/js/import_students.js"></script>
+  <script src="/js/import_archive.js?v=20261002-archive-1"></script>
+  <script src="/js/import_students.js?v=20261002-major-codes-2"></script>
 {% endblock %}

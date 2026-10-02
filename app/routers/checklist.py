@@ -9,7 +9,7 @@ from app.db.session import get_db
 from app.models.checklist import ChecklistItem, ChecklistVersion
 from app.routers.auth import require_roles
 
-router = APIRouter(prefix="/checklist", tags=["Checklist"])
+router = APIRouter(prefix="/checklist", tags=["Checklist"], dependencies=[Depends(require_roles("Admin", "NhanVien", "CongTacVien", "Manager"))])
 
 # ==================== Helpers ====================
 DEFAULT_ITEMS = [

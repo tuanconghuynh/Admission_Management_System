@@ -1,18 +1,19 @@
 # app/routers/applicants_batch.py
 from __future__ import annotations
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import timezone, datetime
 import uuid
 import re
 
 from fastapi import APIRouter, Depends, Body, Query, Request, HTTPException
-from pydantic import BaseModel, Field, EmailStr, validator
+from pydantic import BaseModel, Field, EmailStr, field_validator
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.routers.auth import require_roles
 from app.models.applicant import Applicant
 from app.services.audit import write_audit
+from app.services.majors import resolve_major
 
 # ------------------------------------------------------------
 router = APIRouter(prefix="/applicants", tags=["Applicants (batch)"])
@@ -90,14 +91,14 @@ class BatchUpdateItem(BaseModel):
     khoa: Optional[str] = None
     ghi_chu: Optional[str] = None
 
-    @validator("ma_so_hv")
+    @field_validator("ma_so_hv")
     def _v_mssv(cls, v):
         s = re.sub(r"\D", "", (v or "").strip())
         if not re.match(r"^\d{10}$", s):
             raise ValueError("MSSV phải gồm đúng 10 chữ số.")
         return s
 
-    @validator("so_dt")
+    @field_validator("so_dt")
     def _v_phone(cls, v):
         if v is None or v == "":
             return v
@@ -106,7 +107,7 @@ class BatchUpdateItem(BaseModel):
             raise ValueError("Số điện thoại không hợp lệ")
         return v
 
-    @validator("gioi_tinh")
+    @field_validator("gioi_tinh")
     def _v_gender(cls, v):
         if not v:
             return v
@@ -115,7 +116,7 @@ class BatchUpdateItem(BaseModel):
             raise ValueError("gioi_tinh phải là Nam/Nữ/Khác")
         return v
 
-    @validator("ngay_sinh")
+    @field_validator("ngay_sinh")
     def _v_date(cls, v):
         if not v:
             return v
@@ -129,7 +130,7 @@ class BatchUpdateItem(BaseModel):
         raise ValueError("ngay_sinh phải dd/mm/yyyy hoặc yyyy-mm-dd")
 
 class BatchUpdateRequest(BaseModel):
-    items: List[BatchUpdateItem]
+    items: List[BatchUpdateItem] = Field(min_length=1, max_length=100)
     stop_on_error: bool = False
 
 class BatchUpdateRowResult(BaseModel):
@@ -158,6 +159,10 @@ def _diff_and_normalize(a: Applicant, data: Dict[str, Any]) -> Dict[str, Any]:
     # Chuẩn hoá input của 2 cột tách
     new_ho_dem = title_case_vi(ho_dem_in) if ho_dem_in is not None else norm_space(getattr(a, "ho_dem", "") or "")
     new_ten    = title_case_vi(ten_in)    if ten_in    is not None else norm_space(getattr(a, "ten", "") or "")
+    if ho_ten_in is not None and ho_dem_in is None and ten_in is None:
+        parts = title_case_vi(ho_ten_in).split()
+        new_ho_dem, new_ten = " ".join(parts[:-1]), parts[-1] if parts else ""
+        ho_dem_in, ten_in = new_ho_dem, new_ten
 
     norm: Dict[str, Any] = {}
 
@@ -166,7 +171,7 @@ def _diff_and_normalize(a: Applicant, data: Dict[str, Any]) -> Dict[str, Any]:
         if k in {"ho_dem", "ten", "ho_ten"}:
             continue
         if k in data and data[k] is not None:
-            norm[k] = norm_space(str(data[k]))
+            norm[k] = datetime.strptime(data[k], "%Y-%m-%d").date() if k == "ngay_sinh" else norm_space(str(data[k]))
 
     # Ghi lại 2 cột tách nếu có trong file
     if ho_dem_in is not None:
@@ -179,9 +184,13 @@ def _diff_and_normalize(a: Applicant, data: Dict[str, Any]) -> Dict[str, Any]:
     # - Nếu KHÔNG có cột ho_ten -> tự build từ (new_ho_dem, new_ten)
     if ho_ten_in is None and (ho_dem_in is not None or ten_in is not None):
         norm["ho_ten"] = title_case_vi(join_full_name(new_ho_dem, new_ten))
-    else:
-        # luôn sync để đảm bảo nhất quán dữ liệu
+    elif any(k in data for k in ('ho_dem', 'ten', 'ho_ten')):
         norm["ho_ten"] = title_case_vi(join_full_name(new_ho_dem, new_ten))
+
+    if 'nganh_nhap_hoc' in norm:
+        resolved = resolve_major(norm['nganh_nhap_hoc'])
+        if resolved:
+            norm['nganh_nhap_hoc'] = resolved[0]
 
     # So sánh với DB -> chỉ trả những field thực sự thay đổi
     changed: Dict[str, Any] = {}
@@ -205,6 +214,8 @@ def _safe_write_audit(
     dry_run: bool,
 ):
     """Ghi audit tương thích nhiều version (có/không correlation_id)."""
+    if dry_run:
+        return
     try:
         write_audit(
             db,
@@ -246,71 +257,75 @@ def _handle_batch_update(
     for item in payload.items:
         mshv = item.ma_so_hv.strip()
         try:
-            a: Applicant | None = db.get(Applicant, mshv)
-            if not a:
-                n_nf += 1
-                results.append(BatchUpdateRowResult(ma_so_hv=mshv, status="NOT_FOUND"))
-                if payload.stop_on_error:
-                    raise RuntimeError("stop_on_error")
-                continue
+            with db.begin_nested():
+                a: Applicant | None = db.query(Applicant).filter_by(ma_so_hv=mshv).with_for_update().first()
+                if not a:
+                    n_nf += 1
+                    results.append(BatchUpdateRowResult(ma_so_hv=mshv, status="NOT_FOUND"))
+                    if payload.stop_on_error:
+                        raise RuntimeError("stop_on_error")
+                    continue
 
-            if is_soft_deleted(a):
-                n_sd += 1
-                results.append(BatchUpdateRowResult(ma_so_hv=mshv, status="SOFT_DELETED"))
-                continue
+                if is_soft_deleted(a):
+                    n_sd += 1
+                    results.append(BatchUpdateRowResult(ma_so_hv=mshv, status="SOFT_DELETED"))
+                    continue
 
-            changes = _diff_and_normalize(a, item.dict(exclude_unset=True))
-            if not changes:
-                n_skip += 1
-                results.append(
-                    BatchUpdateRowResult(
-                        ma_so_hv=mshv, status="SKIPPED", changed_fields={}
+                changes = _diff_and_normalize(a, item.model_dump(exclude_unset=True))
+                if not changes:
+                    n_skip += 1
+                    results.append(
+                        BatchUpdateRowResult(
+                            ma_so_hv=mshv, status="SKIPPED", changed_fields={}
+                        )
                     )
+                    continue
+
+                prev = {k: getattr(a, k, None) for k in changes.keys()}
+
+                if not dry_run:
+                    for k, v in changes.items():
+                        setattr(a, k, v)
+                    if hasattr(a, "updated_at"):
+                        setattr(a, "updated_at", datetime.now(timezone.utc).replace(tzinfo=None))
+                    db.add(a)
+
+                # Audit dùng key raw
+                _safe_write_audit(
+                    db,
+                    request=request,
+                    corr=corr,
+                    target_id=mshv,
+                    prev=prev,
+                    changes=changes,
+                    dry_run=dry_run,
                 )
-                continue
 
-            prev = {k: getattr(a, k, None) for k in changes.keys()}
+                if not dry_run:
+                    db.flush()
 
-            if not dry_run:
-                for k, v in changes.items():
-                    setattr(a, k, v)
-                if hasattr(a, "updated_at"):
-                    setattr(a, "updated_at", datetime.utcnow())
-                db.add(a)
+                # FE hiển thị nhãn đẹp
+                readable_fields = {FIELD_LABELS.get(k, k): v for k, v in changes.items()}
 
-            # Audit dùng key raw
-            _safe_write_audit(
-                db,
-                request=request,
-                corr=corr,
-                target_id=mshv,
-                prev=prev,
-                changes=changes,
-                dry_run=dry_run,
-            )
-
-            # FE hiển thị nhãn đẹp
-            readable_fields = {FIELD_LABELS.get(k, k): v for k, v in changes.items()}
-
-            if dry_run:
-                results.append(
-                    BatchUpdateRowResult(
-                        ma_so_hv=mshv, status="UPDATED", changed_fields=readable_fields
+                if dry_run:
+                    results.append(
+                        BatchUpdateRowResult(
+                            ma_so_hv=mshv, status="UPDATED", changed_fields=readable_fields
+                        )
                     )
-                )
-            else:
-                n_up += 1
-                results.append(
-                    BatchUpdateRowResult(
-                        ma_so_hv=mshv, status="UPDATED", changed_fields=readable_fields
+                else:
+                    n_up += 1
+                    results.append(
+                        BatchUpdateRowResult(
+                            ma_so_hv=mshv, status="UPDATED", changed_fields=readable_fields
+                        )
                     )
-                )
 
         except Exception as e:
             n_inv += 1
             results.append(
                 BatchUpdateRowResult(
-                    ma_so_hv=item.ma_so_hv, status="INVALID", errors=[str(e)]
+                    ma_so_hv=item.ma_so_hv, status="INVALID", errors=["Dữ liệu không hợp lệ hoặc bị trùng"]
                 )
             )
             if payload.stop_on_error:
@@ -319,7 +334,7 @@ def _handle_batch_update(
                     ok=False,
                     correlation_id=corr,
                     total=len(payload.items),
-                    updated=n_up,
+                    updated=0,
                     skipped=n_skip,
                     not_found=n_nf,
                     soft_deleted=n_sd,
@@ -329,6 +344,8 @@ def _handle_batch_update(
 
     if not dry_run:
         db.commit()
+    else:
+        db.rollback()
 
     return BatchUpdateResponse(
         ok=True,

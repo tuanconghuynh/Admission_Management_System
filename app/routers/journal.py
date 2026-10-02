@@ -1,12 +1,12 @@
 # app/routers/journal.py
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Body
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import delete
+from sqlalchemy import delete, Date, DateTime, or_, and_, cast, String
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -21,7 +21,7 @@ from sqlalchemy import delete, not_
 # (liên quan hard-delete Applicant)
 from app.models.applicant import Applicant, ApplicantDoc
 
-router = APIRouter(prefix="/journal", tags=["Journal"])
+router = APIRouter(prefix="/journal", tags=["Journal"], dependencies=[Depends(require_roles("Admin", "NhanVien", "CongTacVien", "Manager"))])
 
 # Chỉ Admin, Nhân viên, Manager được phép thao tác với nhật ký
 RequireAdmin = Depends(require_roles("Admin", "NhanVien", "Manager"))
@@ -77,7 +77,8 @@ def list_logs(
     if target_type:
         qset = qset.filter(AuditLog.target_type == target_type)
     if target_id:
-        qset = qset.filter(AuditLog.target_id == target_id)
+        qset = qset.filter(or_(AuditLog.target_id == target_id,
+            and_(AuditLog.target_type == 'PrintJob', cast(AuditLog.new_values['mshv'], String).contains('"' + target_id.strip() + '"'))))
     # Keyword (nhiều cột)
     if q:
         like = f"%{q.strip()}%"
@@ -181,7 +182,7 @@ def list_logs(
 # ===================== DETAIL =====================
 @router.get("/detail/{log_id}", dependencies=[RequireAdmin])
 def log_detail(log_id: int, db: Session = Depends(get_db)):
-    row = db.query(AuditLog).get(log_id)
+    row = db.get(AuditLog, log_id)
     if not row:
         raise HTTPException(404, "Không tìm thấy log")
 
@@ -205,7 +206,7 @@ def restore_from_log(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    log = db.query(AuditLog).get(log_id)
+    log = db.get(AuditLog, log_id)
     if not log:
         raise HTTPException(404, "Không tìm thấy log")
     if not log.target_type or not log.target_id:
@@ -222,7 +223,7 @@ def restore_from_log(
     if log.target_type != "Applicant":
         raise HTTPException(400, f"Chưa hỗ trợ khôi phục cho {log.target_type}")
 
-    obj = db.query(Applicant).get(log.target_id)
+    obj = db.get(Applicant, log.target_id)
     if not obj:
         raise HTTPException(404, "Không tìm thấy dữ liệu để khôi phục")
 
@@ -240,29 +241,21 @@ def restore_from_log(
             apply_values["is_deleted"] = False
     # Áp lại giá trị
     for k, v in apply_values.items():
-        if hasattr(obj, k):
+        if k in Applicant.__table__.columns:
+            column = Applicant.__table__.columns[k]
+            if v and isinstance(column.type, DateTime) and isinstance(v, str):
+                v = datetime.fromisoformat(v)
+            elif v and isinstance(column.type, Date) and isinstance(v, str):
+                v = date.fromisoformat(v[:10])
             setattr(obj, k, v)
     # Đồng bộ lại ho_ten từ ho_dem + ten nếu có
     _sync_full_name(obj)
     db.add(obj)
-    db.commit()
-    db.refresh(obj)
-    # Huỷ DeletionRequest liên quan (nếu có)
-    try:
-        reqs = (
-            db.query(DeletionRequest)
-              .filter(
-                  DeletionRequest.target_type == log.target_type,
-                  DeletionRequest.target_id == str(log.target_id),
-                  DeletionRequest.status.in_(["PENDING", "REQUESTED"])
-              ).all()
-        )
-        if reqs:
-            for r in reqs:
-                r.status = "CANCELLED"
-            db.commit()
-    except Exception:
-        pass  # không chặn luồng nếu lỗi nhỏ
+    db.flush()
+    # Cancel related deletion requests in the same transaction.
+    db.query(DeletionRequest).filter(DeletionRequest.target_type == log.target_type,
+        DeletionRequest.target_id == str(log.target_id),
+        DeletionRequest.status.in_(["PENDING", "REQUESTED", "pending"])).update({"status": "CANCELLED"}, synchronize_session=False)
     # Ghi audit
     write_audit(
         db,
@@ -316,7 +309,7 @@ def list_deletion_requests(
     return {"total": total, "page": page, "size": size, "items": [to_dict(r) for r in rows]}
 
 # ===================== HARD DELETE (NO KEY) =====================
-@router.post("/hard-delete", dependencies=[RequireAdmin])
+@router.post("/hard-delete", dependencies=[Depends(require_roles("Admin"))])
 def hard_delete(
     request: Request,
     payload: dict = Body(...),
@@ -421,7 +414,7 @@ def hard_delete(
     # ----------- Xóa dữ liệu + chi tiết (nếu không có CASCADE) -----------
     db.execute(delete(ApplicantDoc).where(ApplicantDoc.applicant_ma_so_hv == a.ma_so_hv))
     db.delete(a)
-    db.commit()
+    db.flush()
 
     # ----------- Ghi audit với cấu trúc mới -----------
     new_values = {
@@ -484,46 +477,11 @@ def track_action(
     - detail: metadata (scope, name_mode, count, filters, target_type, target_id)
     """
     action = (payload.action or "").strip().upper()
-    if action not in {"PRINT_IN", "EXPORT", "PRINT_EXPORT"}:
-        # vẫn cho ghi, nhưng khuyến nghị hai giá trị chính
-        pass
-
-    d = payload.detail.dict() if payload.detail else {}
-
-    # ƯU TIÊN lấy từ top-level (FE đang gửi target_type/target_id ở đây)
-    target_type = (
-        (payload.target_type or "").strip()
-        or (d.get("target_type") or "").strip()
-        or "Batch"
-    )
-    target_id = (
-        (payload.target_id or "").strip()
-        or (d.get("target_id") or "").strip()
-        or (d.get("filters") or {}).get("mshv")
-        or None
-    )
-
-    # new_values lưu toàn bộ chi tiết để xem ở trang "Chi tiết"
-    new_values = {
-        "scope": d.get("scope"),
-        "name_mode": d.get("name_mode"),
-        "count": d.get("count"),
-        "filters": d.get("filters") or {},
-    }
-
-    write_audit(
-        db,
-        action=action,                   # <-- 'PRINT_IN' hoặc 'EXPORT'
-        target_type=target_type,         # 'Batch' hoặc 'Applicant'
-        target_id=str(target_id) if target_id else None,
-        prev_values=None,
-        new_values=new_values,
-        status="SUCCESS",
-        request=request,
-    )
-    db.commit()
-    # Không cần body, 204 cho gọn
-    return {"ok": True}
+    # Legacy browsers used to record a click before printing or exporting.
+    # Actual exports are logged by the server; printing requires a signed preview.
+    if action in {'PRINT_IN', 'EXPORT', 'PRINT_EXPORT'}:
+        return {'ok': True, 'recorded': False}
+    raise HTTPException(422, "Unsupported client audit action")
 
 # ====== Fallback GET /journal/track?action=...&mshv=... ======
 @router.get("/track")
@@ -536,16 +494,4 @@ def track_action_get(
     count: int | None = None,
     mshv: str | None = None,
 ):
-    new_values = {"scope": scope, "name_mode": name_mode, "count": count, "filters": {"mshv": mshv} if mshv else {}}
-    write_audit(
-        db,
-        action=(action or "").upper(),
-        target_type="Applicant" if mshv else "Batch",
-        target_id=mshv,
-        prev_values=None,
-        new_values=new_values,
-        status="SUCCESS",
-        request=request,
-    )
-    db.commit()
-    return {"ok": True}
+    raise HTTPException(405, "Use POST /journal/track")

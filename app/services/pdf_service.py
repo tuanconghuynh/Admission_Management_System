@@ -7,7 +7,7 @@ import re
 from datetime import datetime, date
 from typing import List, Optional, Dict, Tuple
 
-from PyPDF2 import PdfMerger
+from pypdf import PdfWriter
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.pagesizes import A5, landscape
@@ -24,7 +24,7 @@ from reportlab.lib.styles import ParagraphStyle
 
 
 def merge_pdfs(pdf_list: list[bytes]) -> bytes:
-    merger = PdfMerger()
+    merger = PdfWriter()
     for pdf_bytes in pdf_list:
         merger.append(io.BytesIO(pdf_bytes))
 
@@ -154,7 +154,7 @@ def _get_ghi_chu(app: Applicant) -> str:
     return (getattr(app, "ghi_chu", None) or getattr(app, "note", None) or "").strip()
 
 def _item_label(it: ChecklistItem) -> str:
-    for k in ("label", "ten", "name", "noi_dung", "ten_tai_lieu", "mo_ta", "title"):
+    for k in ("display_name", "label", "ten", "name", "noi_dung", "ten_tai_lieu", "mo_ta", "title"):
         v = getattr(it, k, None)
         if v:
             return str(v).strip()
@@ -163,49 +163,6 @@ def _get_khoa(app: Applicant) -> str:
     return (getattr(app, "khoa", None) or "").strip()
 
 # ==============================
-# Miễn giảm rules (theo yêu cầu anh)
-# ==============================
-MIEN_LABEL_KEYS = [
-    "đơn miễn giảm",
-    "bang diem trung cap",
-    "bảng điểm trung cấp",
-    "bang diem cao dang",
-    "bảng điểm cao đẳng",
-    "bang diem dai hoc",
-    "bảng điểm đại học",
-    "bang tot nghiep trung cap",
-    "bằng tốt nghiệp trung cấp",
-    "bang tot nghiep cao dang",
-    "bằng tốt nghiệp cao đẳng",
-    "bang tot nghiep dai hoc",
-    "bằng tốt nghiệp đại học",
-    "bằng trung cấp",
-    "bằng cao đẳng",
-    "bằng đại học",
-]
-
-MIEN_GIAM_CODES = {
-    "don_mien_giam",
-}
-
-MIEN_GIAM_CODES = {"don_mien_giam"}
-
-MIEN_MON_EXTRA_CODES = {
-    # Bằng
-    "bang_tot_nghiep_trung_cap",
-    "bang_tot_nghiep_cao_dang",
-    "bang_tot_nghiep_dai_hoc",
-    # Bảng điểm
-    "bang_diem_trung_cap",
-    "bang_diem_cao_dang",
-    "bang_diem_dai_hoc",
-}
-
-def _is_mien_by_label(label: str) -> bool:
-    t = _norm(label)
-    # match mềm: chỉ cần chứa cụm chính
-    return any(k in t for k in MIEN_LABEL_KEYS)
-
 def _build_code_to_label(items: List[ChecklistItem], docs: List[ApplicantDoc] | None = None) -> Dict[str, str]:
     out: Dict[str, str] = {}
 
@@ -227,7 +184,7 @@ def _build_code_to_label(items: List[ChecklistItem], docs: List[ApplicantDoc] | 
         code = (getattr(d, "code", None) or "").strip()
         if not code:
             continue
-        for k in ("ten_tai_lieu", "ten", "label", "name"):
+        for k in ("display_name", "ten_tai_lieu", "ten", "label", "name"):
             v = getattr(d, k, None)
             if v:
                 out.setdefault(code, str(v).strip())
@@ -235,77 +192,16 @@ def _build_code_to_label(items: List[ChecklistItem], docs: List[ApplicantDoc] | 
 
     return out
 
-def _is_doc_mien_giam(d: ApplicantDoc) -> bool:
-    """
-    Ưu tiên lấy theo flag/nhóm đã có trong DB (đúng logic export.py).
-    Fallback: nếu không có field thì chỉ coi don_mien_giam là miễn giảm.
-    """
-    # Các tên field hay gặp
-    for k in ("is_mien_giam", "mien_giam", "ho_so_mien_giam", "is_exempt", "exempt"):
-        v = getattr(d, k, None)
-        if isinstance(v, bool):
-            return v
-        if isinstance(v, (int, str)) and str(v).strip() in ("1", "true", "True", "YES", "yes"):
-            return True
 
-    # Một số hệ thống lưu dạng group/nhom
-    for k in ("group", "nhom", "category", "loai_ho_so", "sheet"):
-        v = (getattr(d, k, None) or "").strip().lower()
-        if v in ("mien_giam", "miễn giảm", "miengiam", "exempt", "free", "hoso_mien_giam"):
-            return True
-
-    # Fallback cuối: chỉ riêng đơn miễn giảm
-    code = (getattr(d, "code", None) or "").strip()
-    return code in MIEN_GIAM_CODES
-
-def _docs_map_by_type(
-    docs: List[ApplicantDoc],
-    code_to_label: Dict[str, str],
-) -> Tuple[Dict[str, int], Dict[str, int]]:
-    """
-    normal_map: hồ sơ nhập học
-    mien_map:   hồ sơ xét miễn môn
-
-    Rule theo anh:
-    - don_mien_giam: chỉ ở mien_map (không nằm normal_map)
-    - Bằng + bảng điểm TC/CD/ĐH:
-        + normal_map = 1 (nếu qty>0)
-        + mien_map   = qty - 1 (nếu >0)
-    - Các hồ sơ khác: normal_map = qty, mien_map = 0
-    """
-    normal: Dict[str, int] = {}
-    mien: Dict[str, int] = {}
-
-    for d in (docs or []):
-        code = (getattr(d, "code", None) or "").strip()
-        if not code:
-            continue
-
-        qty = int(getattr(d, "so_luong", 0) or 0)
-        if qty <= 0:
-            continue
-
-        label = code_to_label.get(code, code)
-
-        # 1) Đơn miễn giảm: chỉ hiện ở hồ sơ xét miễn môn
-        if code in MIEN_GIAM_CODES or _is_mien_by_label(label) and code == "don_mien_giam":
-            mien[code] = qty
-            continue
-
-        # 2) Nhóm bằng/bảng điểm: chia 1 vào nhập học, còn lại vào miễn môn
-        if code in MIEN_MON_EXTRA_CODES or _is_mien_by_label(label):
-            # nhập học luôn lấy 1 (nếu có)
-            normal[code] = 1
-            # phần còn lại qua miễn môn
-            remain = qty - 1
-            if remain > 0:
-                mien[code] = remain
-            continue
-
-        # 3) Còn lại: để hết ở hồ sơ nhập học
-        normal[code] = qty
-
-    return normal, mien
+def _document_quantities(docs):
+    """Keep every received quantity; never allocate to another document group."""
+    quantities = {}
+    for document in docs or []:
+        code = (getattr(document, 'code', None) or '').strip()
+        quantity = int(getattr(document, 'so_luong', 0) or 0)
+        if code and quantity > 0:
+            quantities[code] = quantities.get(code, 0) + quantity
+    return quantities
 
 def _build_rows_by_items(items: List[ChecklistItem], doc_map: Dict[str, int]) -> List[Tuple[int, int, str]]:
     """
@@ -453,9 +349,9 @@ def _draw_info_block(c: canvas.Canvas, page_w: float, y: float, *, app: Applican
 
     return y - 5 * mm
 
-def _draw_list_rows(c: canvas.Canvas, page_w: float, y: float, rows: List[Tuple[int, int, str]], *, limit: bool = False) -> float:
+def _draw_list_rows(c: canvas.Canvas, page_w: float, y: float, rows: List[Tuple[int, int, str]], *, limit: bool = False, min_y: float = BM + 30 * mm) -> float:
     if not rows:
-        rows = [(1, 1, "")]
+        rows = [(1, 0, "Chưa ghi nhận giấy tờ đã nộp")]
 
     y -= 0.5 * mm
     x_stt   = LM
@@ -471,9 +367,13 @@ def _draw_list_rows(c: canvas.Canvas, page_w: float, y: float, rows: List[Tuple[
 
     for stt, qty, label in rows:
 
-        # nếu không bật limit → giữ cắt trang ở block trên
-        if not limit and y < BM + 30 * mm:
-            break
+        # Long imported checklists must continue rather than silently lose rows.
+        if y < min_y:
+            c.showPage()
+            y = A4[1] - 15 * mm
+            c.setFont(FONT_BOLD, FONT_SIZE)
+            c.drawString(LM, y, 'Danh mục hồ sơ (tiếp theo)')
+            y -= 7 * mm
 
         c.setFont(FONT_NAME, FONT_SIZE)
         c.drawString(x_stt, y, f"{stt}")
@@ -527,288 +427,74 @@ def _draw_note(c: canvas.Canvas, y: float, note: str) -> float:
     c.drawString(LM + 22 * mm, y, note)  # có thì điền, không có thì trống
     return y - 4 * mm
 
-def _draw_mien_mon_block(
-    c: canvas.Canvas,
-    page_w: float,
-    page_h: float,
-    start_y: float,
-    *,
-    app: Applicant,
-    rows_normal: List[Tuple[int, int, str]],
-    rows_mien: List[Tuple[int, int, str]],
-):
-
-    # ===== TỌA ĐỘ =====
-    y = start_y - 13*mm
-
-    # ========= ĐƯỜNG CẮT NÉT ĐỨT =========
-    # vị trí đường cắt nét đứt
-    x1 = LM + 10*mm
-    x2 = page_w - RM - 10*mm
-
-    # icon kéo ✂
-    scissor = "✂"
-
-    # vẽ icon kéo bên trái
-    c.setFont(FONT_BOLD, FONT_SIZE + 2)      # tăng size cho dễ nhìn
-    c.drawString(x1 - 6*mm, y - 1*mm, scissor)
-
-    # vẽ icon kéo bên phải
-    c.drawRightString(x2 + 6*mm, y - 1*mm, scissor)
-
-    # vẽ đường nét đứt
-    _cut_line(c, x1, x2, y)
-
-    y -= 6*mm
-
-    # ========= HEADER =========
-    khoa = _get_khoa(app)
-    title = f"BIÊN NHẬN HỒ SƠ NHẬP HỌC CHƯƠNG TRÌNH ĐÀO TẠO TỪ XA KHÓA 20{khoa}"
-    received_date = _fmt_dmy(getattr(app, "ngay_nhan_hs", None)) or _fmt_dmy(getattr(app, "created_at", None))
-
-    c.setFont(FONT_BOLD, FONT_SIZE)
-    c.drawCentredString(page_w/2, y, title)
-
-    c.setFont(FONT_BOLD, FONT_SIZE)
-    c.drawRightString(page_w - RM, y - 5*mm, f"Ngày nhận HS: {received_date}")
-
-    subline = (
-        f"Viện Hợp tác và Phát triển Đào tạo HUTECH xác nhận đã nhận hồ sơ "
-        f"nhập học khóa 20{khoa} của Anh/Chị:"
-    )
-    c.setFont(FONT_BOLD, FONT_SIZE)
-    c.drawCentredString(page_w/2, y - 10*mm, subline)
-
-    # ========= THÔNG TIN HỌC VIÊN =========
-    y -= 18*mm
-    y = _draw_info_block(c, page_w, y, app=app)
-
-    # ========= HỒ SƠ NHẬP HỌC =========
-    c.setFont(FONT_BOLD, FONT_SIZE)
-    c.drawString(LM, y, "Hồ sơ gồm có :")
-
-    y -= 3*mm
-    y = _draw_list_rows(c, page_w, y, rows_normal)
-    ghi_chu = _get_ghi_chu(app)
-    y = _draw_note(c, y, ghi_chu)
-
-    # ========= ĐƯỜNG KẺ TRÊN =========
-    _hline(c, LM, page_w - RM, y + 2*mm, w=0.7)
-
-    # ========= TIÊU ĐỀ MIỄN MÔN =========
-    y -= 4*mm
-    c.setFont(FONT_BOLD, FONT_SIZE)
-    c.drawCentredString(page_w/2, y, "HỒ SƠ XÉT MIỄN MÔN")
-
-    # ========= SUBLINE MIỄN MÔN =========
-    # khoa = _get_khoa(app)
-    # sub_free = f"Viện Hợp tác và Phát triển Đào tạo HUTECH xác nhận đã nhận hồ sơ miễn môn 20{khoa} của Anh/Chị:"
-    # c.setFont(FONT_BOLD, FONT_SIZE)
-    # c.drawCentredString(page_w/2, y - 6*mm, sub_free)
-
-    # # hạ vị trí xuống trước list
-    # y -= 3.5*mm
-
-    # ========= THÔNG TIN HỌC VIÊN =========
-    y -= 5*mm
-    y = _draw_info_block(c, page_w, y, app=app)
-
-    y -= 0.5*mm
-    c.setFont(FONT_BOLD, FONT_SIZE)
-    c.drawString(LM, y, "Hồ sơ gồm có :")
-    y -= 3*mm
-    y = _draw_list_rows(c, page_w, y, rows_mien, limit=True)
-
-    ghi_chu = _get_ghi_chu(app)
-    y = _draw_note(c, y, ghi_chu)
-    # ký tên
-
-    nguoi_nop  = _get_full_name(app)
-    nguoi_nhan = (getattr(app, "nguoi_nhan_ky_ten", None) or "").strip()
-    _draw_signatures(c, page_w, y, nguoi_nop=nguoi_nop, nguoi_nhan=nguoi_nhan)
 
 # ==============================
 # Public API
 # ==============================
 def render_single_pdf(app: Applicant, items: List[ChecklistItem], docs: List[ApplicantDoc]) -> bytes:
-    """
-    A4 portrait - list style, no table borders.
-    Docs chia: nhập học vs miễn giảm theo 3 danh mục anh chốt.
-    """
+    """Two matching copies: one for the student and one retained by the institute."""
     _ensure_fonts()
-
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     page_w, page_h = A4
-
-    # Set PDF title
-    full_name = _get_full_name(app)
-    ma = getattr(app, "ma_so_hv", "") or ""
-    safe = f"{ma}_{full_name}".replace(" ", "_")
-    c.setTitle(safe)
-
+    c.setTitle(f"{getattr(app, 'ma_ho_so', None) or app.ma_so_hv}_bien_nhan")
     khoa = _get_khoa(app)
-    title = f"BIÊN NHẬN HỒ SƠ NHẬP HỌC CHƯƠNG TRÌNH ĐÀO TẠO TỪ XA KHÓA 20{khoa}"
-
-    received_date = _fmt_dmy(getattr(app, "ngay_nhan_hs", None)) or _fmt_dmy(getattr(app, "created_at", None))
-    khoa = _get_khoa(app)
-    subline = f"Viện Hợp tác và Phát triển Đào tạo HUTECH xác nhận đã nhận hồ sơ nhập học khóa 20{khoa} của Anh/Chị:"
-
-    y = _draw_header(c, page_w, page_h, title=title, received_date=received_date, subline=subline)
-
-    # Info
-    y = _draw_info_block(c, page_w, y, app=app)
-
-    code_to_label = _build_code_to_label(items, docs)
-    normal_map, mien_map = _docs_map_by_type(docs, code_to_label)
-
-    rows_normal = _build_rows_by_items(items, normal_map)
-    rows_mien = _build_rows_by_items(items, mien_map)
-
-    # Hồ sơ gồm có
-    y -= 1 * mm
-    c.setFont(FONT_BOLD, FONT_SIZE)
-    c.drawString(LM, y, "Hồ sơ gồm có :")
-    y -= 3.5 * mm
-    y = _draw_list_rows(c, page_w, y, rows_normal)
-
-    # Ghi chú (nếu có)
-    ghi_chu = _get_ghi_chu(app)
-    y = _draw_note(c, y, ghi_chu)
-
-    # Hồ sơ xét miễn môn
-    c.setFont(FONT_BOLD, FONT_SIZE)
-    c.drawCentredString(page_w / 2, y, "HỒ SƠ XÉT MIỄN MÔN")
-    y -= 3.5 * mm
-    y = _draw_list_rows(c, page_w, y, rows_mien)
-
-    ghi_chu = _get_ghi_chu(app)
-    y = _draw_note(c, y, ghi_chu)
-
-    # ký tên
-    nguoi_nop = _get_full_name(app)
-    nguoi_nhan = (getattr(app, "nguoi_nhan", None) or getattr(app, "nguoi_nhan_ky_ten", None) or "").strip()
-    _draw_signatures(c, page_w, y, nguoi_nop=nguoi_nop, nguoi_nhan=nguoi_nhan)
-
-    # đường cắt cách vùng ký trên ~5mm
-    cut_y = y - 5 * mm
-
-    _draw_mien_mon_block(
-        c, page_w, page_h,
-        start_y=cut_y,
-        app=app,
-        rows_normal=rows_normal,
-        rows_mien=rows_mien,
-    )
-
-    c.showPage()
-    c.save()
-    return buf.getvalue()
-
-def render_batch_pdf(
-    apps: List[Applicant],
-    items_all,
-    docs_all,
-    print_type: str = "A4"
-) -> bytes:
-    """
-    In gộp:
-    - A4: nhiều hồ sơ, mỗi hồ sơ 1 block (như hiện tại)
-    - A5 / POSTAL: chỉ in được 1 hồ sơ/lần (dùng layout riêng)
-      (các route đơn lẻ /print/a5/{mshv}, /postal-print vẫn hoạt động bình thường)
-    """
-    _ensure_fonts()
-    print_type = (print_type or "A4").upper()
-
-    # ===== A5: biên nhận A5=====
-    if print_type == "A5":
-        outputs = []
-        for a in apps:
-            docs = _docs_for_app(a, docs_all)
-            pdf = render_student_receipt_pdf_a5(a, docs)
-            outputs.append(pdf)
-
-        return merge_pdfs(outputs)
-
-    # ===== POSTAL: phiếu bưu điện (1 hồ sơ) =====
-    if print_type == "POSTAL":
-        outputs = []
-        for a in apps:
-            pdf = render_postal_pdf(a, items_all, docs_all)
-            outputs.append(pdf)
-
-        return merge_pdfs(outputs)
-
-    # ===== Mặc định: batch A4 =====
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=A4)
-    c.setTitle("Danh_sach_bien_nhan")
-    page_w, page_h = A4
-
-    for app in (apps or []):
-        # Lấy checklist & docs đúng cho từng hồ sơ
-        items = _items_for_app(app, items_all)
-        docs  = _docs_for_app(app, docs_all)
-
-        khoa = _get_khoa(app)
-        title = f"BIÊN NHẬN HỒ SƠ NHẬP HỌC CHƯƠNG TRÌNH ĐÀO TẠO TỪ XA KHÓA 20{khoa}"
-
-        received_date = _fmt_dmy(getattr(app, "ngay_nhan_hs", None)) or _fmt_dmy(getattr(app, "created_at", None))
-        subline = (
-            f"Viện Hợp tác và Phát triển Đào tạo HUTECH xác nhận đã nhận hồ sơ "
-            f"nhập học khóa 20{khoa} của Anh/Chị:"
-        )
-
-        y = _draw_header(c, page_w, page_h, title=title, received_date=received_date, subline=subline)
+    received_date = _fmt_dmy(getattr(app, 'ngay_nhan_hs', None)) or _fmt_dmy(getattr(app, 'created_at', None))
+    rows = _build_rows_by_items(items, _document_quantities(docs))
+    labels = _build_code_to_label(items, docs)
+    rows = [(index, quantity, labels.get(label, label)) for index, quantity, label in rows]
+    # A standard checklist fits two copies on one A4 sheet. Long imported lists
+    # use full pages per copy so neither signatures nor document rows are lost.
+    compact = len(rows) <= 12
+    for index in range(2):
+        if index and not compact:
+            c.showPage()
+        top = page_h if not compact or index == 0 else page_h / 2
+        y = _draw_header(c, page_w, top,
+            title=f'BIÊN NHẬN HỒ SƠ NHẬP HỌC CHƯƠNG TRÌNH ĐÀO TẠO TỪ XA KHÓA 20{khoa}',
+            received_date=received_date,
+            subline=f'Viện Đại học Mở HUTECH xác nhận đã nhận hồ sơ nhập học khóa 20{khoa} của Anh/Chị:')
+        c.setFont(FONT_BOLD, FONT_SIZE)
+        c.drawString(LM, y, f"Mã hồ sơ: {getattr(app, 'ma_ho_so', None) or ''}")
+        y -= 5 * mm
         y = _draw_info_block(c, page_w, y, app=app)
-
-        # Map code -> label theo checklist + docs của riêng hồ sơ này
-        code_to_label = _build_code_to_label(items, docs)
-        normal_map, mien_map = _docs_map_by_type(docs, code_to_label)
-
-        rows_normal = _build_rows_by_items(items, normal_map)
-        rows_mien   = _build_rows_by_items(items, mien_map)
-
-        # Hồ sơ gồm có
-        y -= 1 * mm
         c.setFont(FONT_BOLD, FONT_SIZE)
-        c.drawString(LM, y, "Hồ sơ gồm có :")
-        y -= 7 * mm
-        y = _draw_list_rows(c, page_w, y, rows_normal)
-
-        # Hồ sơ xét miễn môn
-        c.setFont(FONT_BOLD, FONT_SIZE)
-        c.drawCentredString(page_w / 2, y, "HỒ SƠ XÉT MIỄN MÔN")
-        y -= 9 * mm
-        y = _draw_list_rows(c, page_w, y, rows_mien)
-
-        # Ghi chú
-        ghi_chu = _get_ghi_chu(app)
-        y = _draw_note(c, y, ghi_chu)
-
-        # Ký tên
-        nguoi_nop = _get_full_name(app)
-        nguoi_nhan = (getattr(app, "nguoi_nhan", None) or getattr(app, "nguoi_nhan_ky_ten", None) or "").strip()
-        _draw_signatures(c, page_w, y, nguoi_nop=nguoi_nop, nguoi_nhan=nguoi_nhan)
-
-        # Khối thứ 2 “Hồ sơ nhập học / hồ sơ xét miễn môn” sau đường cắt
-        cut_y = y - 5 * mm
-        _draw_mien_mon_block(
-            c, page_w, page_h,
-            start_y=cut_y,
-            app=app,
-            rows_normal=rows_normal,
-            rows_mien=rows_mien,
-        )
-
-        c.showPage()
-
+        c.drawString(LM, y, 'Hồ sơ gồm có :')
+        y = _draw_list_rows(c, page_w, y - 3.5 * mm, rows,
+            min_y=(top - page_h / 2 + 22 * mm) if compact else BM + 30 * mm)
+        y = _draw_note(c, y, _get_ghi_chu(app))
+        _draw_signatures(c, page_w, y - 2 * mm, nguoi_nop=_get_full_name(app),
+            nguoi_nhan=(getattr(app, 'nguoi_nhan', None) or getattr(app, 'nguoi_nhan_ky_ten', None) or '').strip())
+        if compact and index == 0:
+            _cut_line(c, LM + 10 * mm, page_w - RM - 10 * mm, page_h / 2)
     c.save()
     return buf.getvalue()
+
+def render_batch_pdf(apps: List[Applicant], items_all, docs_all, print_type: str = 'A4') -> bytes:
+    """Render each applicant using its own checklist and received documents."""
+    print_type = (print_type or 'A4').upper()
+    outputs = []
+    for applicant in apps or []:
+        items = _items_for_app(applicant, items_all)
+        documents = _docs_for_app(applicant, docs_all)
+        if print_type == 'A5':
+            output = render_student_receipt_pdf_a5(applicant, documents)
+        elif print_type in ('COVER', 'POSTAL'):
+            output = render_folder_cover_pdf(applicant, items, documents)
+        elif print_type == 'A4':
+            output = render_single_pdf(applicant, items, documents)
+        else:
+            raise ValueError('Unsupported print type')
+        outputs.append(output)
+    return merge_pdfs(outputs)
 
 # ==============================
 # Postal PDF
 # ==============================
+def render_folder_cover_pdf(app, items, docs):
+    """Only the button label changes; retain the original postal print format."""
+    return render_postal_pdf(app, items, docs)
+
 fixed_labels = [
     "Sơ yếu lý lịch",
     "Bằng tốt nghiệp THPT (hoặc tương đương)",
@@ -898,7 +584,7 @@ def render_postal_pdf(app: Applicant, items: List[ChecklistItem], docs: List[App
     cx = box_x + box_w / 2
 
     # Dòng 1: MÃ HS (to hơn, nổi)
-    c.setFont(FONT_BOLD, FS_BOX + 1)
+    c.setFont(FONT_BOLD, min(FS_BOX + 1, (box_w - 4*mm) / max(pdfmetrics.stringWidth(f'MÃ HS : {ma_hs}', FONT_BOLD, 1), 1)))
     c.drawCentredString(
         cx,
         box_y + box_h - 11*mm,
@@ -938,7 +624,7 @@ def render_postal_pdf(app: Applicant, items: List[ChecklistItem], docs: List[App
     y -= 10*mm
 
     text = (
-        f"Viện Hợp tác và Phát triển Đào tạo HUTECH xác nhận đã nhận hồ sơ "
+        f"Viện Đại học Mở HUTECH xác nhận đã nhận hồ sơ "
         f"nhập học khóa 20{khoa} của Anh/Chị:"
     )
 
@@ -1118,7 +804,7 @@ def render_student_receipt_pdf_a5(a, docs) -> bytes:
 
     # SUB
     # subline = (
-    #     f"Viện Hợp tác và Phát triển Đào tạo HUTECH xác nhận đã nhận hồ sơ nhập học "
+    #     f"Viện Đại học Mở HUTECH xác nhận đã nhận hồ sơ nhập học "
     #     f"khóa 20{khoa} của Anh/Chị đã gửi theo hình thức BƯU ĐIỆN:"
     # )
     # c.setFont(FONT, SIZE)
@@ -1126,7 +812,7 @@ def render_student_receipt_pdf_a5(a, docs) -> bytes:
     # y -= 6 * mm
 
     c.setFont(FONT, SIZE)
-    normal_1 = f"Viện Hợp tác và Phát triển Đào tạo HUTECH xác nhận đã nhận hồ sơ nhập học khóa 20{khoa} của Anh/Chị đã gửi theo hình thức "
+    normal_1 = f"Viện Đại học Mở HUTECH xác nhận đã nhận hồ sơ nhập học khóa 20{khoa} của Anh/Chị đã gửi theo hình thức "
     normal_2 = ":"
     bold_text = "BƯU ĐIỆN"
 
@@ -1243,27 +929,36 @@ def render_student_receipt_pdf_a5(a, docs) -> bytes:
         "Đơn xin miễn giảm học phần",
     ]
 
-    # tạo mapping code -> qty từ docs thật
+    # Keep every imported document, including additions to the checklist.
     qty_map = {}
     for d in docs:
         code = (getattr(d, "code", "") or "").lower()
-        qty_map[code] = int(getattr(d, "so_luong", 0) or 0)
+        label = DOC_DISPLAY_NAME.get(code) or getattr(d, 'display_name', None) or getattr(d, 'name', None) or code
+        qty_map[label] = qty_map.get(label, 0) + int(getattr(d, "so_luong", 0) or 0)
+        if label not in fixed_labels:
+            fixed_labels.append(label)
 
     stt = 1
     c.setFont(FONT, SIZE)
     for name in fixed_labels:
 
-        if y < 35*mm:
-            break
+        if y < 45*mm:
+            c.showPage()
+            y = page_h - 15*mm
+            c.setFont(FONT_B, SIZE)
+            c.drawString(LM, y, f"Hồ sơ {ma} — danh mục tiếp theo")
+            y -= 7*mm
+            c.rect(LM, y - row_h, table_w, row_h)
+            c.rect(col_stt, y - row_h, col_stt_w, row_h)
+            c.rect(col_qty, y - row_h, col_qty_w, row_h)
+            c.drawCentredString(col_stt + col_stt_w/2, y - 4*mm, "STT")
+            c.drawCentredString(col_name + col_name_w/2, y - 4*mm, "Danh mục hồ sơ")
+            c.drawCentredString(col_qty + col_qty_w/2, y - 4*mm, "Số lượng")
+            y -= row_h
+            c.setFont(FONT, SIZE)
 
         # lấy qty nếu có, không có thì 0
-        qty = 0
-        for d in docs:
-            code = (getattr(d, "code", "") or "").lower()
-            label = DOC_DISPLAY_NAME.get(code, code)
-            if label == name:
-                qty = int(getattr(d, "so_luong", 0) or 0)
-                break
+        qty = qty_map.get(name, 0)
 
         # vẽ 1 row
         c.rect(LM, y - row_h, table_w, row_h)

@@ -1,0 +1,38 @@
+services:
+  db:
+    image: mysql:8.4
+    profiles: ["database"]
+    env_file: .env.database
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  web:
+    build: .
+    env_file: .env
+    environment:
+      FORWARDED_ALLOW_IPS: "*"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - receipts:/app/var/receipts
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,urllib.request; r=urllib.request.Request('http://127.0.0.1:8000/api/ready',headers={'Host':os.environ['ALLOWED_HOSTS'].split(',')[0]}); urllib.request.urlopen(r,timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  worker:
+    build: .
+    env_file: .env
+    command: ["python", "-m", "scripts.email_worker"]
+    volumes:
+      - receipts:/app/var/receipts
+    restart: unless-stopped
+volumes:
+  receipts:
+  mysql_data:

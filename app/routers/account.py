@@ -45,6 +45,7 @@ def account_view(
     first = request.query_params.get("first") == "1"
 
     return templates.TemplateResponse(
+        request,
         "account.html",
         {
             "request": request,
@@ -70,8 +71,8 @@ def account_change_password(
     must_change_flag = bool(getattr(me, "must_change_password", False))
     first_time_change = not bool(getattr(me, "password_changed_at", None))
 
-    if len(new_password) < 6:
-        _flash(request, "Mật khẩu mới tối thiểu 6 ký tự!", "error")
+    if len(new_password) < 12:
+        _flash(request, "Mật khẩu mới tối thiểu 12 ký tự!", "error")
         return RedirectResponse(url="/account", status_code=302)
     if new_password != confirm_password:
         _flash(request, "Xác nhận mật khẩu không khớp!", "error")
@@ -95,10 +96,12 @@ def account_change_password(
 
     try:
         me.password_hash = hash_password(new_password)
+        me.session_version += 1
         me.must_change_password = False
         me.password_changed_at = datetime.now(timezone.utc)
         db.commit()
         request.session["must_change_password"] = False
+        request.session["session_version"] = me.session_version
         _flash(request, "Đổi mật khẩu thành công!", "success")
     except Exception:
         db.rollback()
@@ -107,7 +110,7 @@ def account_change_password(
 
     # 🧭 Xác định nơi redirect sau khi đổi thành công
     # Ưu tiên: nếu form gửi lên next -> đi theo next
-    if next:
+    if next and next.startswith("/") and not next.startswith("//") and "\\" not in next:
         target = next
     # Nếu đang trong trạng thái "bị ép đổi lần đầu" -> cho về thẳng trang chủ AMS
     elif must_change_flag or first_time_change:
