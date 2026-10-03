@@ -194,6 +194,7 @@ def snapshot_applicant(a: Applicant) -> dict:
         "ho_dem": getattr(a, "ho_dem", None),
         "ten": getattr(a, "ten", None),
         "email_hoc_vien": getattr(a, "email_hoc_vien", None),
+        "email_hoc_vien_2": getattr(a, "email_hoc_vien_2", None),
         "ngay_nhan_hs": iso(a.ngay_nhan_hs),
         "ngay_sinh": iso(a.ngay_sinh),
         "so_dt": a.so_dt,
@@ -320,6 +321,7 @@ def get_by_code(
         "ten": getattr(a, "ten", None),
         "full_name": _display_name(getattr(a, "ho_dem", None), getattr(a, "ten", None), getattr(a, "ho_ten", None)),
         "email_hoc_vien": getattr(a, "email_hoc_vien", None),
+        "email_hoc_vien_2": getattr(a, "email_hoc_vien_2", None),
         "ngay_sinh": _to_dmy(a.ngay_sinh),
         "ngay_sinh_iso": _to_iso(a.ngay_sinh),
         "so_dt": a.so_dt,
@@ -455,6 +457,7 @@ def get_by_mshv(
 
         "so_dt": a.so_dt,
         "email_hoc_vien": getattr(a, "email_hoc_vien", None),
+        "email_hoc_vien_2": getattr(a, "email_hoc_vien_2", None),
 
         "nganh_nhap_hoc": pick("nganh_nhap_hoc", "nganh"),
         "dot": pick("dot", "dot_tuyen"),
@@ -582,6 +585,7 @@ def create_applicant(
         ten=input_ten or None,              
         # =================
         email_hoc_vien=payload.get("email_hoc_vien"),
+        email_hoc_vien_2=payload.get("email_hoc_vien_2"),
         ngay_sinh=_parse_date_flexible(payload.get("ngay_sinh")),
         so_dt=payload.get("so_dt"),
         dot=payload.get("dot"),
@@ -715,6 +719,7 @@ def search_applicants(
                 "full_name": _display_name(getattr(a, "ho_dem", None), getattr(a, "ten", None), getattr(a, "ho_ten", None)),
                 "ho_ten": a.ho_ten,
                 "email_hoc_vien": getattr(a, "email_hoc_vien", None),
+                "email_hoc_vien_2": getattr(a, "email_hoc_vien_2", None),
                 "ngay_nhan_hs": a.ngay_nhan_hs.isoformat() if a.ngay_nhan_hs else None,
                 "dot": a.dot,
                 # ✅ luôn trả về theo key 'nganh_nhap_hoc'
@@ -769,6 +774,7 @@ def find_by_ma_ho_so(
         "ten": getattr(a, "ten", None),
         "full_name": _display_name(getattr(a, "ho_dem", None), getattr(a, "ten", None), getattr(a, "ho_ten", None)),
         "email_hoc_vien": getattr(a, "email_hoc_vien", None),
+        "email_hoc_vien_2": getattr(a, "email_hoc_vien_2", None),
         "ngay_sinh": (
             a.ngay_sinh if isinstance(getattr(a, "ngay_sinh", None), str)
             else (a.ngay_sinh.isoformat() if getattr(a, "ngay_sinh", None) else None)
@@ -875,7 +881,7 @@ def update_applicant(
         a.ngay_sinh = _parse_date_flexible(get("ngay_sinh"))
 
     # Text fields: "" -> None (ngoại trừ ngành – xử riêng bên dưới)
-    for f in ("ho_ten", "email_hoc_vien", "so_dt", "dot", "khoa", "da_tn_truoc_do", "ghi_chu"):
+    for f in ("ho_ten", "email_hoc_vien", "email_hoc_vien_2", "so_dt", "dot", "khoa", "da_tn_truoc_do", "ghi_chu"):
         if has(f):
             setattr(a, f, str_or_none(get(f)))
 

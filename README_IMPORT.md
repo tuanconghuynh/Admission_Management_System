@@ -41,4 +41,14 @@ Nhật ký không còn ghi lượt xem hồ sơ thành công hoặc các dòng t
 
 Trong Danh sách hồ sơ, đánh dấu từng dòng hoặc **Chọn tất cả trên trang**, rồi bấm **Sửa các hồ sơ đã chọn** hoặc **Xóa các hồ sơ đã chọn**. Tối đa 100 hồ sơ trên trang. Sửa nhiều chỉ thay các trường đã đánh dấu trong hộp thoại; bỏ đánh dấu để giữ dữ liệu hiện tại. Xóa nhiều yêu cầu lý do và dùng xóa tạm, có thể khôi phục từ nhật ký. Các dòng không thực hiện được sẽ có thông báo riêng; không tự báo thành công cho dòng lỗi.
 
-Sau khi cập nhật hệ thống, tải lại trang bằng Ctrl+F5. Thay đổi này không cần migration và không tự sửa các hồ sơ đã có trong database.
+Sau khi cập nhật hệ thống, tải lại trang bằng Ctrl+F5.
+
+## Email 1, Email 2 và xuất danh sách lớn
+
+Email hiện có được giữ làm **Email 1**; **Email 2** là địa chỉ tùy chọn. Có thể nhập/sửa và import cả hai cột. Các file import cũ có cột Email hoặc Email học viên vẫn ghép vào Email 1.
+
+Trước khi gửi email riêng lẻ hoặc hàng loạt, chọn **Email 1**, **Email 2** hoặc **Cả hai**. Chọn một email chưa có sẽ báo lỗi; chọn Cả hai gửi đến các địa chỉ có sẵn, loại bỏ địa chỉ trùng. Mỗi địa chỉ có một hàng đợi và kết quả gửi riêng. Gửi hàng loạt được kiểm tra trong một giao dịch; nếu một hồ sơ thiếu địa chỉ đã chọn, cả yêu cầu sẽ không được lưu vào hàng đợi.
+
+Xuất Excel theo ngày hoặc khóa/đợt hỗ trợ mặc định **100.000 hồ sơ** một file (`MAX_EXCEL_ROWS`), giữ nguyên các bộ lọc và xuất cả hai cột email. Giới hạn bản in PDF (`MAX_REPORT_ROWS`, mặc định 1.000) được giữ riêng. File Excel ghi từng dòng để giảm bộ nhớ; danh sách vượt giới hạn sẽ báo lỗi, không cắt âm thầm. Có thể tăng giới hạn Excel theo tài nguyên host, tối đa 1.048.575 dòng dữ liệu mỗi sheet.
+
+Bản này cần migration thêm cột `applicants.email_hoc_vien_2`: chạy `.venv\Scripts\python.exe -m alembic upgrade head` trước khi mở web/worker. Lệnh khởi chạy local tự thực hiện migration. Không thay đổi email hoặc mã hồ sơ đã lưu.

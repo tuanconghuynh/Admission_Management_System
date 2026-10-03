@@ -222,7 +222,8 @@ const FIELD_DEFS = [
     {key:"dan_toc",        label:"Dân tộc",         aliases:["dan toc","dantoc","ethnicity","dan-toc"]},
     {key:"ngay_sinh",      label:"Ngày sinh",       aliases:["dob","date of birth","ns","sinh nhat"]},
     {key:"so_dt",          label:"Số ĐT",           aliases:["sdt","so dien thoai","dien thoai","so lien he"]},
-    {key:"email_hoc_vien", label:"Email học viên",  aliases:["email","email hoc vien","mail","gmail"]},
+    {key:"email_hoc_vien", label:"Email 1", aliases:["email","email hoc vien","mail","gmail","email 1"]},
+    {key:"email_hoc_vien_2", label:"Email 2", aliases:["email 2","email hoc vien 2","email2"]},
     {key:"nganh_nhap_hoc", label:"Ngành nhập học",  aliases:["nganh","nganh hoc"]},
     {key:"dot",            label:"Đợt",             aliases:["dot nhap hoc","dot tuyen"]},
     {key:"khoa",           label:"Khóa",            aliases:["nien khoa","khoa hoc","nk"]},
@@ -454,6 +455,7 @@ async function makeApplicantPayload(src, map){
     ngay_sinh: ngay_sinh_iso,
     so_dt: pick("so_dt") || null,
     email_hoc_vien: pick("email_hoc_vien") || null,
+    email_hoc_vien_2: pick("email_hoc_vien_2") || null,
     nganh_nhap_hoc: pick("nganh_nhap_hoc") || null,
     dot: pick("dot") || null,
     khoa: pick("khoa") || null,
@@ -651,7 +653,7 @@ function nowTag(){
 }
 function toAoAFull(list) {
     const header = [
-        "MaHS","Họ đệm","Tên","MSSV","Giới tính","Dân tộc","Ngày sinh","Số ĐT","Email",
+        "MaHS","Họ đệm","Tên","MSSV","Giới tính","Dân tộc","Ngày sinh","Số ĐT","Email 1","Email 2",
         "Ngành nhập học","Đợt","Khóa","Đối tượng TN","Ngày nhận","Kết quả","Ghi chú kết quả"
     ];
     const aoa = [header];
@@ -668,6 +670,7 @@ function toAoAFull(list) {
             anyToVNDate(d.ngay_sinh),
             d.so_dt || "",
             d.email_hoc_vien || "",
+            d.email_hoc_vien_2 || "",
             d.nganh_nhap_hoc || "",
             d.dot || "",
             d.khoa || "",

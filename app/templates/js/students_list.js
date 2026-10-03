@@ -417,6 +417,8 @@ function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':
       // Liên hệ
       $id('detailSoDT').textContent = app.so_dt || app.so_dien_thoai || '—';
 
+      const email2El = $id('detailEmail2');
+      if (email2El) { email2El.textContent = app.email_hoc_vien_2 || '—'; if(app.email_hoc_vien_2) email2El.href = 'mailto:' + app.email_hoc_vien_2; else email2El.removeAttribute('href'); }
       const email = app.email_hoc_vien || app.email || '';
       const emailEl = $id('detailEmail');
       if (emailEl) {
@@ -1301,12 +1303,12 @@ function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':
     const rows = [
       [
         "ma_so_hv","ho_dem","ten","ho_ten","gioi_tinh","dan_toc",
-        "ngay_sinh","so_dt","email_hoc_vien","nganh_nhap_hoc","dot","khoa","ghi_chu"
+        "ngay_sinh","so_dt","email_hoc_vien","email_hoc_vien_2","nganh_nhap_hoc","dot","khoa","ghi_chu"
       ],
       // ví dụ 1
-      ["2510000123","Nguyen Van","An","","Nam","Kinh","01/01/2005","0912345678","an@example.com","CNTT","1","27",""],
+      ["2510000123","Nguyen Van","An","","Nam","Kinh","01/01/2005","0912345678","an@example.com","an2@example.com","CNTT","1","27",""],
       // ví dụ 2
-      ["2510000456","","","Nguyen Thi B","Nu","Kinh","2004-12-31","","b@example.com","Marketing","2","27","Cập nhật email"]
+      ["2510000456","","","Nguyen Thi B","Nu","Kinh","2004-12-31","","b@example.com","","Marketing","2","27","Cập nhật email"]
     ];
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -1417,7 +1419,7 @@ function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':
       const rows  = await readFileToRows(file);
       const items = (function normalizeItems(rawList){
         const fields = ["ma_so_hv","ho_dem","ten","ho_ten","gioi_tinh","dan_toc",
-                        "ngay_sinh","so_dt","email_hoc_vien","nganh_nhap_hoc","dot","khoa","ghi_chu"];
+                        "ngay_sinh","so_dt","email_hoc_vien","email_hoc_vien_2","nganh_nhap_hoc","dot","khoa","ghi_chu"];
         return rawList.map(r=>{
           const o = {};
           fields.forEach(f=>{ if (r[f] !== undefined && String(r[f]).trim() !== '') o[f] = String(r[f]).trim(); });
@@ -1653,7 +1655,14 @@ async function openEmailModal(mshv) {
     if (!r || !r.ok) throw new Error(`Không tạo được bản nháp (HTTP ${r?.status||'???'})`);
     const draft = await r.json();
 
-    em_to && (em_to.value   = draft.to_email || '');
+    const choice = document.getElementById('email_recipient_choice');
+    if (choice) {
+      choice.options[0].disabled = !draft.email1; choice.options[0].textContent = 'Email 1' + (draft.email1 ? ' — ' + draft.email1 : ' (chưa có)');
+      choice.options[1].disabled = !draft.email2; choice.options[1].textContent = 'Email 2' + (draft.email2 ? ' — ' + draft.email2 : ' (chưa có)');
+      choice.value = draft.email1 ? 'email1' : 'email2';
+      choice.onchange = () => { if(em_to) em_to.value = (choice.value === 'both' ? [...new Set([draft.email1,draft.email2].filter(Boolean))] : [choice.value === 'email2' ? draft.email2 : draft.email1]).join(', '); };
+      choice.onchange();
+    } else if(em_to) em_to.value = draft.to_email || '';
     em_mshv && (em_mshv.value = mshv);
     em_sub && (em_sub.value  = draft.subject || '');
     em_html && (em_html.value = draft.html_body || '');
@@ -1759,7 +1768,7 @@ async function sendEmail(){
     const r = await apiFetch(path, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ subject: subj, html_body: html, attach_receipt: attach })
+      body: JSON.stringify({ subject: subj, html_body: html, attach_receipt: attach, recipient_choice: $('email_recipient_choice')?.value || 'email1' })
     });
 
     if (!r || !r.ok){
@@ -1884,7 +1893,7 @@ $('btnSendBulk')?.addEventListener('click', async ()=>{
         const r2 = await apiFetch(`/applicants/send-email-batch?tpl=${encodeURIComponent(tplKey)}`, {
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ ma_so_hv_list: ids, subject, a5 })
+          body: JSON.stringify({ ma_so_hv_list: ids, subject, a5, recipient_choice: $('bulk_recipient_choice')?.value || 'email1' })
         });
         if (!r2 || !r2.ok){
           let msg = `Batch gửi thất bại (HTTP ${r2?.status||'???'})`;

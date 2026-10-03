@@ -246,11 +246,11 @@ def export_excel(
 
     q = db.query(Applicant).filter(Applicant.ngay_nhan_hs >= d1, Applicant.ngay_nhan_hs < d2)
     q = exclude_deleted(Applicant, q)
-    apps = report_rows(q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()))
+    apps = report_rows(q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()), excel=True)
 
     if not apps:
         q = exclude_deleted(Applicant, db.query(Applicant).filter(Applicant.ngay_nhan_hs == d))
-        apps = report_rows(q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()))
+        apps = report_rows(q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()), excel=True)
 
     apps = [a for a in apps if ensure_not_deleted(a, raise_http_exception=False)]
     if not apps:
@@ -263,7 +263,9 @@ def export_excel(
         raise HTTPException(status_code=404, detail=f"Không có hồ sơ trong ngày {d.strftime('%d/%m/%Y')}")
 
     mssv_list = [a.ma_so_hv for a in apps]
-    docs = db.query(ApplicantDoc).filter(ApplicantDoc.applicant_ma_so_hv.in_(mssv_list)).all()
+    docs = []
+    for offset in range(0, len(mssv_list), 500):
+        docs.extend(db.query(ApplicantDoc).filter(ApplicantDoc.applicant_ma_so_hv.in_(mssv_list[offset:offset + 500])).all())
 
     version_ids = {a.checklist_version_id for a in apps if a.checklist_version_id}
     items_all = _items_merged_by_versions(db, version_ids) if version_ids else []
@@ -322,7 +324,7 @@ def export_excel_dot(
 
     q = exclude_deleted(Applicant, q)
 
-    apps = report_rows(q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()))
+    apps = report_rows(q.order_by(Applicant.created_at.asc(), Applicant.ma_so_hv.asc()), excel=True)
     apps = [a for a in apps if ensure_not_deleted(a, raise_http_exception=False)]
     if not apps:
         _audit_print_or_export(
@@ -334,7 +336,9 @@ def export_excel_dot(
         raise HTTPException(status_code=404, detail="Không có hồ sơ nào phù hợp")
 
     mssv_list = [a.ma_so_hv for a in apps]
-    docs = db.query(ApplicantDoc).filter(ApplicantDoc.applicant_ma_so_hv.in_(mssv_list)).all()
+    docs = []
+    for offset in range(0, len(mssv_list), 500):
+        docs.extend(db.query(ApplicantDoc).filter(ApplicantDoc.applicant_ma_so_hv.in_(mssv_list[offset:offset + 500])).all())
 
     items_all = _items_merged_by_versions(db, {a.checklist_version_id for a in apps if a.checklist_version_id})
 

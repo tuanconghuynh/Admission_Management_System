@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 5
     DB_POOL_TIMEOUT: int = 30
     MAX_REPORT_ROWS: int = 1000
+    MAX_EXCEL_ROWS: int = 100000
     MAX_EMAIL_BATCH: int = 100
     MAX_REQUEST_BYTES: int = 10 * 1024 * 1024
     LOGIN_RATE_LIMIT: int = 10
@@ -92,7 +93,7 @@ class Settings(BaseSettings):
                 raise ValueError("Production requires MySQL/MariaDB")
         else:
             self.SESSION_SECRET = self.SESSION_SECRET or secrets.token_urlsafe(48)
-        for name in ("DB_POOL_SIZE", "DB_POOL_TIMEOUT", "MAX_REPORT_ROWS", "MAX_EMAIL_BATCH", "MAX_REQUEST_BYTES", "LOGIN_RATE_LIMIT", "EMAIL_RATE_LIMIT", "EMAIL_MAX_ATTEMPTS"):
+        for name in ("DB_POOL_SIZE", "DB_POOL_TIMEOUT", "MAX_REPORT_ROWS", "MAX_EXCEL_ROWS", "MAX_EMAIL_BATCH", "MAX_REQUEST_BYTES", "LOGIN_RATE_LIMIT", "EMAIL_RATE_LIMIT", "EMAIL_MAX_ATTEMPTS"):
             if getattr(self, name) <= 0:
                 raise ValueError(f"{name} must be positive")
         if self.EMAIL_ENABLED and self.SMTP_STARTTLS and self.SMTP_SSL_TLS:

@@ -67,7 +67,7 @@
     new MutationObserver(sync).observe(select,{childList:true,subtree:true,attributes:true});
     sync();
   }
-  function boot(){document.querySelectorAll('select').forEach(s=>{if(!['pageSize','bulkPreviewSelect','email_tpl'].includes(s.id))upgrade(s);});}
+  function boot(){document.querySelectorAll('select').forEach(s=>{if(!['pageSize','bulkPreviewSelect','email_tpl','email_recipient_choice','bulk_recipient_choice'].includes(s.id))upgrade(s);});}
   window.AMSSearchSelect = {upgrade,boot};
   document.addEventListener('DOMContentLoaded',boot);
   // Links produced by historical import use the same confirmed-print workflow.

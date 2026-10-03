@@ -54,6 +54,7 @@ ALLOWED_FIELDS = {
     "ngay_sinh",
     "so_dt",
     "email_hoc_vien",
+    "email_hoc_vien_2",
     "nganh_nhap_hoc",
     "dot",
     "khoa",
@@ -69,7 +70,8 @@ FIELD_LABELS = {
     "dan_toc": "Dân tộc",
     "ngay_sinh": "Ngày sinh",
     "so_dt": "Số điện thoại",
-    "email_hoc_vien": "Email học viên",
+    "email_hoc_vien": "Email 1",
+    "email_hoc_vien_2": "Email 2",
     "nganh_nhap_hoc": "Ngành nhập học",
     "dot": "Đợt",
     "khoa": "Khóa",
@@ -86,6 +88,7 @@ class BatchUpdateItem(BaseModel):
     ngay_sinh: Optional[str] = Field(None, description="yyyy-mm-dd hoặc dd/mm/yyyy")
     so_dt: Optional[str] = None
     email_hoc_vien: Optional[EmailStr] = None
+    email_hoc_vien_2: Optional[EmailStr] = None
     nganh_nhap_hoc: Optional[str] = None
     dot: Optional[str] = None
     khoa: Optional[str] = None

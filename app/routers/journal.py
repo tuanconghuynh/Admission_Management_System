@@ -395,6 +395,7 @@ def hard_delete(
         "ten": getattr(a, "ten", None),
         "full_name": _display_name_from_obj(a),
         "email_hoc_vien": getattr(a, "email_hoc_vien", None),
+        "email_hoc_vien_2": getattr(a, "email_hoc_vien_2", None),
         "ngay_nhan_hs": iso(getattr(a, "ngay_nhan_hs", None)),
         "ngay_sinh": iso(getattr(a, "ngay_sinh", None)),
         "so_dt": a.so_dt,

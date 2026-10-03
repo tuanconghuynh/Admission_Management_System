@@ -22,13 +22,14 @@ from app.services.sendmail_service import send_html_email
 log = logging.getLogger("email-worker")
 
 
-def enqueue(db, request, applicant, subject, html, attachments, idempotency_key=None):
+def enqueue(db, request, applicant, subject, html, attachments, idempotency_key=None, *, to_email=None):
     if not settings.smtp_ready:
         raise HTTPException(503, "Email chưa được cấu hình hoặc đang tắt")
     if len(subject) > 255 or len(html.encode()) > 200_000:
         raise HTTPException(422, "Email content too large")
+    to_email = to_email or applicant.email_hoc_vien
     uid = request.session.get("uid")
-    content = [uid, applicant.ma_so_hv, applicant.email_hoc_vien, subject, html, bool(attachments)]
+    content = [uid, applicant.ma_so_hv, to_email, subject, html, bool(attachments)]
     # Default suppresses accidental repeated clicks for five minutes.
     content.append(idempotency_key or str(int(datetime.now(timezone.utc).timestamp()) // 300))
     key = hashlib.sha256(json.dumps(content, ensure_ascii=False).encode()).hexdigest()
@@ -37,7 +38,7 @@ def enqueue(db, request, applicant, subject, html, attachments, idempotency_key=
         return existing
     actor = {k: request.session.get(k) for k in ("uid", "full_name", "username", "role")}
     job = EmailJob(id=str(uuid.uuid4()), dedup_key=key, applicant_ma_so_hv=applicant.ma_so_hv,
-        to_email=applicant.email_hoc_vien, subject=subject, html_body=html, attachments=attachments,
+        to_email=to_email, subject=subject, html_body=html, attachments=attachments,
         actor=actor, state="pending", attempts=0)
     try:
         with db.begin_nested():

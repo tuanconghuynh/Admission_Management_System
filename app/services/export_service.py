@@ -9,6 +9,7 @@ import re
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment
+from openpyxl.cell import WriteOnlyCell
 
 # TYPE IMPORTS (may be used for attributes; fallback to Any if import fails)
 try:
@@ -189,7 +190,7 @@ def build_excel_bytes_by_items(
                 m[key_n] = m[key]
 
     base_headers = [
-        "STT", "Mã hồ sơ", "Ngày nhận", "Email học viên"
+        "STT", "Mã hồ sơ", "Ngày nhận", "Email 1", "Email 2"
     ]
     if split_name:
         base_headers += ["Họ và tên", "Họ đệm", "Tên"]
@@ -204,11 +205,13 @@ def build_excel_bytes_by_items(
     item_headers = [getattr(it, "display_name", None) or it.code for it in (items or [])]
     headers = base_headers + item_headers
 
-    wb = Workbook()
+    wb = Workbook(write_only=True)
 
     # Sheet 1: Hồ sơ Nhập học
-    ws = wb.active
-    ws.title = "Hồ sơ"
+    ws = wb.create_sheet("Hồ sơ")
+    ws.freeze_panes = "A2"
+    for col, header in enumerate(headers, start=1):
+        ws.column_dimensions[get_column_letter(col)].width = min(max(14, len(header) + 4), 40)
     ws.append(headers)
 
     for idx, a in enumerate(apps or [], start=1):
@@ -217,6 +220,7 @@ def build_excel_bytes_by_items(
             a.ma_ho_so or "",
             _parse_to_date(getattr(a, "ngay_nhan_hs", None)),
             a.email_hoc_vien or "",
+            getattr(a, "email_hoc_vien_2", None) or "",
         ]
 
         if split_name:
@@ -245,29 +249,18 @@ def build_excel_bytes_by_items(
 
         # Keep zeros as integers
         row = common_prefix + name_cells + common_suffix + received_row
-        ws.append(row)
-
-    # Freeze & autosize both sheets
-    for ws_sheet in (ws,):
-        ws_sheet.freeze_panes = "A2"
-        for col in range(1, len(headers) + 1):
-            letter = get_column_letter(col)
-            max_len = 0
-            for cell in ws_sheet[letter]:
-                val = "" if cell.value is None else str(cell.value)
-                if len(val) > max_len:
-                    max_len = len(val)
-            ws_sheet.column_dimensions[letter].width = min(max(10, max_len + 2), 40)
-
-    # Set date formats for date columns
-    _set_date_format_by_header(ws, headers, header_names=["Ngày nhận", "Ngày sinh"])
+        cells = []
+        for value in row:
+            cell = WriteOnlyCell(ws, value=value)
+            if cell.data_type == "f":
+                cell.data_type = "s"
+            if isinstance(value, (date, datetime)):
+                cell.number_format = "dd/mm/yyyy"
+                cell.alignment = Alignment(horizontal="center")
+            cells.append(cell)
+        ws.append(cells)
 
     buf = BytesIO()
-    for worksheet in wb.worksheets:
-        for row in worksheet.iter_rows():
-            for cell in row:
-                if cell.data_type == "f":
-                    cell.data_type = "s"
     wb.save(buf)
     buf.seek(0)
     return buf.getvalue()

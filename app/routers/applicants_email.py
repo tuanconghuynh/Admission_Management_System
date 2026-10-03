@@ -10,8 +10,9 @@ from app.models.operations import EmailJob
 from app.routers.auth import require_roles
 from app.services.rate_limit import limit_email
 from app.services.email_queue import enqueue
+from app.services.email_recipients import recipients
 from app.services.sendmail_service import render_email
-from app.services.email_content import _load_items_docs, _merge_items_with_docs_for_email, _normalize_docs_for_pdf, _ensure_to_email
+from app.services.email_content import _load_items_docs, _merge_items_with_docs_for_email, _normalize_docs_for_pdf
 from app.services.pdf_service import render_student_receipt_pdf_a5
 from app.utils.soft_delete import ensure_not_deleted
 
@@ -30,7 +31,8 @@ def content(db, mshv, tpl, attach=False):
     if not applicant:
         raise HTTPException(404, "Applicant not found")
     ensure_not_deleted(applicant)
-    _ensure_to_email(applicant)
+    if not (applicant.email_hoc_vien or applicant.email_hoc_vien_2):
+        raise HTTPException(422, "Học viên chưa có email")
     items, docs = _load_items_docs(db, applicant)
     docs = _merge_items_with_docs_for_email(items, docs)
     missing = [d["name"] for d in docs if int(d.get("so_luong") or 0) <= 0]
@@ -52,18 +54,18 @@ def content(db, mshv, tpl, attach=False):
 @router.get("/{ma_so_hv}/email-draft")
 def draft(ma_so_hv: str, db: Session = Depends(get_db), tpl: Template = Query("confirmation")):
     applicant, subject, html, attachments = content(db, ma_so_hv, tpl, attach=True)
-    return {"to_email": applicant.email_hoc_vien, "subject": subject, "html_body": html,
+    return {"to_email": applicant.email_hoc_vien or applicant.email_hoc_vien_2, "email1": applicant.email_hoc_vien, "email2": applicant.email_hoc_vien_2, "subject": subject, "html_body": html,
         "attachment_url": "/static/receipts/" + Path(attachments[0]).name if attachments else None, "template": tpl}
 
 
 @router.post("/{ma_so_hv}/send-email", status_code=202)
 def send_email(ma_so_hv: str, request: Request, db: Session = Depends(get_db), tpl: Template = Query("confirmation"),
-    subject: str | None = Body(None), html_body: str | None = Body(None), attach_receipt: bool = Body(False),
+    subject: str | None = Body(None), html_body: str | None = Body(None), attach_receipt: bool = Body(False), recipient_choice: Literal["email1", "email2", "both"] = Body("email1"),
     idempotency_key: str | None = Header(None, alias="Idempotency-Key", max_length=128)):
     applicant, default_subject, default_html, attachments = content(db, ma_so_hv, tpl, attach_receipt)
-    job = enqueue(db, request, applicant, subject or default_subject, html_body or default_html, attachments, idempotency_key)
+    jobs = [enqueue(db, request, applicant, subject or default_subject, html_body or default_html, attachments, idempotency_key, to_email=address) for address in recipients(applicant, recipient_choice)]
     db.commit()
-    return {"ok": True, "job_id": job.id, "delivery_state": job.state, "ma_so_hv": ma_so_hv, "status": applicant.status, "template": tpl}
+    return {"ok": True, "job_id": jobs[0].id, "job_ids": [j.id for j in jobs], "to_emails": [j.to_email for j in jobs], "delivery_state": jobs[0].state, "ma_so_hv": ma_so_hv, "status": applicant.status, "template": tpl}
 
 
 @router.post("/send-email-batch", status_code=202)
@@ -72,11 +74,13 @@ def batch(request: Request, db: Session = Depends(get_db), tpl: Template = Query
     raw = payload.get("ma_so_hv_list")
     if not isinstance(raw, list) or not raw or len(raw) > settings.MAX_EMAIL_BATCH:
         raise HTTPException(422, f"Danh sách phải có 1–{settings.MAX_EMAIL_BATCH} hồ sơ")
+    choice = payload.get("recipient_choice", "email1")
     jobs = []
     for mshv in dict.fromkeys(map(str, raw)):
         applicant, subject, html, attachments = content(db, mshv, tpl)
-        job = enqueue(db, request, applicant, subject, html, attachments, idempotency_key)
-        jobs.append(job.id)
+        for address in recipients(applicant, choice):
+            job = enqueue(db, request, applicant, subject, html, attachments, idempotency_key, to_email=address)
+            jobs.append(job.id)
     db.commit()
     return {"ok": True, "count": len(jobs), "job_ids": jobs, "template": tpl, "delivery_state": "queued"}
 

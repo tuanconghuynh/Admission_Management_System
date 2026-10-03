@@ -40,6 +40,7 @@ class ApplicantIn(BaseModel):
     ngay_nhan_hs: date
 
     email_hoc_vien: Optional[str] = None
+    email_hoc_vien_2: Optional[str] = None
     ngay_sinh: Optional[date] = None
     so_dt: Optional[str] = None
     nganh_nhap_hoc: Optional[str] = None
@@ -107,6 +108,7 @@ class ApplicantUpdate(BaseModel):
 
     ma_so_hv: Optional[str] = None
     email_hoc_vien: Optional[str] = None
+    email_hoc_vien_2: Optional[str] = None
     ngay_sinh: Optional[date] = None      # FE nên gửi ISO YYYY-MM-DD
     so_dt: Optional[str] = None
     nganh_nhap_hoc: Optional[str] = None
@@ -179,6 +181,7 @@ class ApplicantDetailOut(BaseModel):
 
     ma_so_hv_display: Optional[str] = None  # nếu cần hiển thị khác
     email_hoc_vien: Optional[str] = None
+    email_hoc_vien_2: Optional[str] = None
     ngay_sinh: Optional[date] = None
     so_dt: Optional[str] = None
     nganh_nhap_hoc: Optional[str] = None

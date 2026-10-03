@@ -357,6 +357,7 @@
       ma_so_hv: $('ma_so_hv').value.trim(),
       ngay_sinh: ymdKeep($('ngay_sinh').value) || null,
       so_dt: $('so_dt').value.trim() || null,
+      email_hoc_vien_2: $("email_hoc_vien_2").value.trim() || null,
       email_hoc_vien: $('email_hoc_vien').value.trim() || null,
       nganh_nhap_hoc: $('nganh_nhap_hoc').value.trim() || null,
       dot: d,
@@ -411,6 +412,7 @@
       ma_so_hv: $("ma_so_hv").value.trim(),
       ngay_sinh: ymdKeep($("ngay_sinh").value) || null,
       so_dt: $("so_dt").value.trim() || null,
+      email_hoc_vien_2: $("email_hoc_vien_2").value.trim() || null,
       email_hoc_vien: $("email_hoc_vien").value.trim() || null,
       nganh_nhap_hoc: $("nganh_nhap_hoc").value.trim() || null,
       dot: $("dot").value.trim() || null,
@@ -454,6 +456,7 @@
     $('dan_toc').value = a.dan_toc || "";
     $('so_dt').value = a.so_dt || "";
     $('email_hoc_vien').value = a.email_hoc_vien || "";
+    $('email_hoc_vien_2').value = a.email_hoc_vien_2 || "";
     const majorSelect = $('nganh_nhap_hoc');
     const majorName = a.nganh_nhap_hoc || '';
     const normalizedMajor = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -567,7 +570,7 @@
   }
 
   async function clearForm(){
-    ["ma_ho_so","ngay_nhan_hs","khoa","ho_ten","ho_dem","ten","ma_so_hv","gioi_tinh","ngay_sinh","so_dt","email_hoc_vien","nganh_nhap_hoc","dot","da_tn_truoc_do","ghi_chu"].forEach(id=>{
+    ["ma_ho_so","ngay_nhan_hs","khoa","ho_ten","ho_dem","ten","ma_so_hv","gioi_tinh","ngay_sinh","so_dt","email_hoc_vien","email_hoc_vien_2","nganh_nhap_hoc","dot","da_tn_truoc_do","ghi_chu"].forEach(id=>{
       const el=$(id); if(!el) return; if(el.type==='checkbox') el.checked=false; else el.value="";
     });
     document.querySelectorAll('.has-doc').forEach(chk=>{ chk.checked=false; });
@@ -668,6 +671,8 @@
     if (!khoa) { markError('khoa', 'Chọn Niên khoá.'); return null; }
     if (!dot)  { markError('dot',  'Chọn Đợt.');       return null; }
 
+    const email2 = ($('email_hoc_vien_2')?.value || '').trim();
+    if (email2 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email2)) { markError('email_hoc_vien_2','Email 2 không hợp lệ.'); return null; }
     const email = ( $('email_hoc_vien')?.value || '' ).trim();
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { markError('email_hoc_vien','Email không hợp lệ.'); return null; }
     const phone = ( $('so_dt')?.value || '' ).trim();

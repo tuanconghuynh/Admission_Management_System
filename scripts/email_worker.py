@@ -14,7 +14,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
     if settings.ENVIRONMENT == "production":
         with engine.connect() as connection:
-            if connection.execute(text("SELECT version_num FROM alembic_version")).scalar() != "20261002_01":
+            if connection.execute(text("SELECT version_num FROM alembic_version")).scalar() != "20261003_02":
                 raise RuntimeError("Run alembic upgrade head before starting the worker")
     while True:
         try:

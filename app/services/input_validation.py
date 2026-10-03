@@ -11,12 +11,13 @@ def validate_applicant_payload(payload):
         length = getattr(column.type, "length", None)
         if length and (not isinstance(payload[name], str) or len(payload[name]) > length):
             raise HTTPException(422, f"{name} phải là chuỗi tối đa {length} ký tự")
-    if "email_hoc_vien" in payload:
-        value = payload["email_hoc_vien"]
-        try:
-            payload["email_hoc_vien"] = TypeAdapter(EmailStr).validate_python(value) if value else None
-        except ValidationError:
-            raise HTTPException(422, "Email học viên không hợp lệ")
+    for name in ("email_hoc_vien", "email_hoc_vien_2"):
+        if name in payload:
+            value = payload[name]
+            try:
+                payload[name] = TypeAdapter(EmailStr).validate_python(value) if value else None
+            except ValidationError:
+                raise HTTPException(422, f"{name}: Email học viên không hợp lệ")
     docs = payload.get("docs")
     if docs is not None:
         if not isinstance(docs, list) or len(docs) > 100:

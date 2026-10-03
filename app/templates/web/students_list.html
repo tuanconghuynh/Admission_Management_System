@@ -293,6 +293,8 @@
           <div class="col-span-8">
             <label class="text-sm text-gray-600">Đến</label>
             <input id="email_to" class="input" disabled />
+            <label class="label mt-2">Gửi đến</label>
+            <select id="email_recipient_choice" class="input"><option value="email1">Email 1</option><option value="email2">Email 2</option><option value="both">Cả hai email</option></select>
           </div>
           <div class="col-span-4">
             <label class="text-sm text-gray-600">MSHV</label>
@@ -352,6 +354,8 @@
         </div>
 
         <div>
+          <label class="label">Gửi đến (áp dụng cho tất cả học viên đã chọn)</label>
+          <select id="bulk_recipient_choice" class="input"><option value="email1">Email 1</option><option value="email2">Email 2</option><option value="both">Cả hai email có sẵn</option></select>
           <label class="text-sm text-gray-600 block mb-1">Xem mẫu của học viên</label>
           <select id="bulkPreviewSelect" class="input w-full"></select>
         </div>
@@ -428,8 +432,9 @@
           <h4 class="font-semibold text-gray-800 mb-2">Thông tin liên hệ</h4>
           <div class="space-y-1">
             <div><span class="text-gray-500">Số điện thoại:</span> <span id="detailSoDT" class="font-mono">—</span></div>
-            <div><span class="text-gray-500">Email học viên:</span>
+            <div><span class="text-gray-500">Email 1:</span>
               <a id="detailEmail" href="#" class="text-blue-600 hover:underline break-all">—</a>
+              <div><span class="text-gray-500">Email 2:</span> <a id="detailEmail2" class="text-blue-600 hover:underline break-all">—</a></div>
             </div>
           </div>
         </section>
@@ -522,6 +527,6 @@
 {% endblock %}
 
 {% block scripts %}
-  <script src="/js/students_list.js?v=20261002-bulk-print-4"></script>
-  <script src="/js/selected_actions.js?v=20261002-1"></script>
+  <script src="/js/students_list.js?v=20261003-email2-1"></script>
+  <script src="/js/selected_actions.js?v=20261003-email2-1"></script>
 {% endblock %}

@@ -57,7 +57,7 @@ async def lifespan(application):
         def check_schema():
             with engine.connect() as connection:
                 version = connection.execute(text("SELECT version_num FROM alembic_version")).scalar()
-                if version != "20261002_01":
+                if version != "20261003_02":
                     raise RuntimeError("Run alembic upgrade head before starting this release")
         await run_in_threadpool(check_schema)
     yield
